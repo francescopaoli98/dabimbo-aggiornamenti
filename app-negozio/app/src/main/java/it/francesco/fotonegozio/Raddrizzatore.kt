@@ -32,6 +32,7 @@ class FotoRaddrizzata(
     val metodo: String,            // come è stato trovato il cartellino (per le prove)
     val dati: DatiCartellino? = null, // descrizione, prezzo, taglia letti dal cartellino principale
     val altri: List<DatiCartellino> = emptyList(), // altri cartellini nella stessa foto (es. 9 librottini)
+    val versoSicuro: Boolean = false,  // true = il verso è stato deciso leggendo il cartellino dritto
 )
 
 /**
@@ -89,7 +90,7 @@ class Raddrizzatore(private val context: Context) {
             } catch (e: Exception) {
                 emptyList()
             }
-            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati, altri)
+            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati, altri, versoSicuro = true)
         }
         // Cartellino trovato ma verso incerto: se viene dalla rotazione di 90° almeno quella la applico
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")

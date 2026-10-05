@@ -108,66 +108,72 @@ private fun Schermata(vm: FotoViewModel) {
     }
 }
 
-/** Una riga della lista: miniatura + cosa ha fatto l'app. */
+/** Una foto nella lista: foto grande, avviso se il verso è da controllare, articoli letti, pulsanti. */
 @Composable
 private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(enabled = f.file != null, onClick = onClick)) {
-      Column {
-        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                if (f.daControllare && !f.inCorso) {
+                    Text("⚠ Controlla il verso", color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Foto grande, a tutta larghezza: si vede subito se è dritta. Toccala per lo schermo intero.
+            Box(
+                Modifier.fillMaxWidth().height(280.dp).padding(vertical = 8.dp)
+                    .clickable(enabled = f.file != null, onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
                 when {
                     f.miniatura != null -> Image(f.miniatura, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                     f.inCorso -> CircularProgressIndicator()
                 }
             }
-            Column(Modifier.padding(start = 12.dp)) {
-                Text("Foto ${f.numero}", fontWeight = FontWeight.Bold)
-                when {
-                    f.inCorso -> Text("In attesa…")
-                    f.errore != null -> Text("Errore: ${f.errore}", color = MaterialTheme.colorScheme.error)
-                    else -> {
-                        Text(
-                            (if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°") +
-                                (if (f.messaInVerticale) " · messa in verticale" else "") +
-                                (if (f.rotazioneManuale != 0) " · girata a mano" else "")
-                        )
-                        Text(
-                            f.codice?.let { "Codice letto: $it" } ?: "Cartellino non trovato",
-                            color = if (f.codice == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        )
-                        DatiLetti(f.dati)
-                        // Altri articoli nella stessa foto
-                        f.altri.forEach { d ->
-                            Text(
-                                "+ ${d.codice} · ${d.descrizione ?: "—"} · ${d.prezzo ?: "—"}" + (d.taglia?.let { " · $it" } ?: ""),
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(top = 4.dp),
-                            )
-                        }
-                        Text("Metodo: ${f.metodo} · ${"%.1f".format(f.secondi)} s", fontSize = 12.sp)
+
+            when {
+                f.inCorso -> Text("In attesa…")
+                f.errore != null -> Text("Errore: ${f.errore}", color = MaterialTheme.colorScheme.error)
+                else -> {
+                    if (f.codice == null) Text("Cartellino non trovato", color = MaterialTheme.colorScheme.error)
+                    val articoli = listOfNotNull(f.dati) + f.altri
+                    if (f.codice != null && articoli.isEmpty()) {
+                        Text("Codice: ${f.codice}")
+                        Text("Dati del cartellino non letti", color = MaterialTheme.colorScheme.error)
                     }
+                    articoli.forEachIndexed { i, d ->
+                        if (articoli.size > 1) {
+                            Text("Articolo ${i + 1} di ${articoli.size}", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        }
+                        DatiLetti(d)
+                    }
+                    // Per le prove: come ha lavorato l'app (sparirà nella versione finale)
+                    Text(
+                        (if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°") +
+                            (if (f.messaInVerticale) " · messa in verticale" else "") +
+                            (if (f.rotazioneManuale != 0) " · girata a mano" else "") +
+                            " · ${f.metodo} · ${"%.1f".format(f.secondi)} s",
+                        fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
+            if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
         }
-        if (f.file != null) PulsantiGira(gira, Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp))
-      }
     }
 }
 
-/** Pezzo 2: i campi letti dal cartellino, così come sono (le sigle le espande il pezzo 3). */
+/** I dati di UN articolo, così come sono letti dal cartellino (le sigle le espande il pezzo 3). */
 @Composable
-private fun DatiLetti(dati: DatiCartellino?) {
+private fun DatiLetti(dati: DatiCartellino) {
     val mancante = MaterialTheme.colorScheme.error
-    if (dati == null) {
-        Text("Dati del cartellino non letti", color = mancante)
-        return
-    }
     @Composable
     fun Campo(nome: String, valore: String?, obbligatorio: Boolean = true) = Text(
         "$nome: ${valore ?: "—"}",
         color = if (valore == null && obbligatorio) mancante else Color.Unspecified,
         fontSize = 15.sp,
     )
+    Campo("Codice", dati.codice)
     Campo("Descrizione", dati.descrizione)
     Campo("Prezzo", dati.prezzo)
     Campo("Taglia", dati.taglia, obbligatorio = false)   // i giochi non ce l'hanno

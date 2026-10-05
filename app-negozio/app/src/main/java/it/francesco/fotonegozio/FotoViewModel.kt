@@ -32,6 +32,7 @@ data class Foto(
     val messaInVerticale: Boolean = false,
     val versoVerticale: Int = 0,         // 90 o 270, solo se messaInVerticale
     val rotazioneManuale: Int = 0,       // 0, 90, 180, 270 aggiunti da Elisa
+    val daControllare: Boolean = false,  // l'app non è sicura del verso: Elisa deve guardarla
     val codice: String? = null,
     val dati: DatiCartellino? = null,    // descrizione, prezzo, taglia (pezzo 2)
     val altri: List<DatiCartellino> = emptyList(),   // altri cartellini nella stessa foto
@@ -73,10 +74,12 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             val inizio = System.currentTimeMillis()
             val r = raddrizzatore.raddrizza(f.origine)
 
-            // Foto sempre verticale: se è orizzontale la giro nel verso che Elisa preferisce
+            // Capi d'abbigliamento sempre in verticale (nel verso che Elisa preferisce).
+            // Giochi, libri, peluche e scarpe restano come sono stati fotografati.
             var immagine = r.immagine
             var verso = 0
-            if (immagine.width > immagine.height) {
+            val unCapo = (listOfNotNull(r.dati) + r.altri).any { Abbigliamento.eUnCapo(it.descrizione) }
+            if (unCapo && immagine.width > immagine.height) {
                 verso = versoPreferito.verso
                 immagine = Raddrizzatore.ruotaImmagine(immagine, verso)
                 versoPreferito.cambiaVoto(null, verso)   // finché Elisa non la corregge, il verso era giusto
@@ -90,6 +93,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 file = file,
                 rotazione = (r.rotazioneApplicata + verso) % 360,
                 messaInVerticale = verso != 0,
+                // Verso da far controllare a Elisa: cartellino non letto dritto, o verso verticale scelto "a intuito"
+                daControllare = !r.versoSicuro || verso != 0,
                 versoVerticale = verso,
                 codice = r.codiceLetto,
                 dati = r.dati,
@@ -131,7 +136,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                         nuovo = (f.versoVerticale + nuovaManuale) % 360,
                     )
                 }
-                foto[i] = f.copy(file = file, miniatura = mini, rotazioneManuale = nuovaManuale)
+                // Elisa l'ha guardata e girata: non serve più l'avviso
+                foto[i] = f.copy(file = file, miniatura = mini, rotazioneManuale = nuovaManuale, daControllare = false)
             }
         }
     }
