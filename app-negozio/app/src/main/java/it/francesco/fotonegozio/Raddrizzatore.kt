@@ -136,6 +136,13 @@ class Raddrizzatore(private val context: Context) {
             ingrandisciZone(base, gradi, zoneTasselli, if (gradi == 0) provate else mutableListOf())
                 ?.let { return it }
         }
+
+        // 6. Ultima spiaggia: rettangoli bianchi (etichette) trovati dalla forma, letti uno per uno
+        //    ingranditi, in tutti i versi e, se serve, con l'immagine "pulita"
+        for (r in etichetteIn(foto).take(MAX_ETICHETTE)) {
+            val c = codiciNelRitaglio(foto, r, listOf(0, 90, 270, 180)).firstOrNull() ?: continue
+            return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "etichetta")
+        }
         return null
     }
 
@@ -231,12 +238,14 @@ class Raddrizzatore(private val context: Context) {
         val prove = if (abs(inclinazione) < 3f) listOf(0f) else listOf(-inclinazione, inclinazione, 0f)
         var migliore: DatiCartellino? = null
         var stortoMigliore = Float.MAX_VALUE
+        var pezzoMigliore: Bitmap? = null
         for (correzione in prove) {
             val matrice = Matrix().apply {
                 postScale(scala, scala)
                 postRotate(correzione)
             }
             val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
+            if (pezzoMigliore == null) pezzoMigliore = pezzo
             val testo = leggi(pezzo)
             val dati = LettoreCartellino.analizza(righeDa(testo))
             if (dati.codice == null) continue
@@ -249,11 +258,79 @@ class Raddrizzatore(private val context: Context) {
             if (meglio) {
                 migliore = dati
                 stortoMigliore = storto
+                pezzoMigliore = pezzo
             }
             if (stortoMigliore < 2f && completezza(migliore) == 3) break   // dritto e completo: basta così
         }
+        // Lettura incompleta (cartellino sbiadito o sfocato): riprovo con l'immagine "pulita"
+        if (completezza(migliore) < 3) {
+            pezzoMigliore?.let { p ->
+                val pulita = LettoreCartellino.analizza(righeDa(leggi(migliora(p))))
+                if (pulita.codice != null && completezza(pulita) > completezza(migliore)) migliore = pulita
+            }
+        }
         return migliore
     }
+
+    /** Immagine "pulita": bianco e nero, contrasto al massimo, più nitida (vedi [Miglioramento]). */
+    private fun migliora(b: Bitmap): Bitmap {
+        val px = IntArray(b.width * b.height)
+        b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+        return Bitmap.createBitmap(Miglioramento.migliora(px, b.width, b.height), b.width, b.height, Bitmap.Config.ARGB_8888)
+    }
+
+    /** Etichette (rettangoli bianchi con del nero dentro) cercate a due risoluzioni, nelle coordinate della foto. */
+    private fun etichetteIn(foto: Bitmap): List<Rect> {
+        val trovate = mutableListOf<TrovaEtichette.Riquadro>()
+        for (lato in listOf(400, 800)) {
+            val k = (lato.toFloat() / max(foto.width, foto.height)).coerceAtMost(1f)
+            val w = (foto.width * k).toInt().coerceAtLeast(1)
+            val h = (foto.height * k).toInt().coerceAtLeast(1)
+            val piccola = Bitmap.createScaledBitmap(foto, w, h, true)
+            val px = IntArray(w * h).also { piccola.getPixels(it, 0, w, 0, 0, w, h) }
+            for (r in TrovaEtichette.trova(px, w, h)) {
+                val nellaFoto = TrovaEtichette.Riquadro((r.sx / k).toInt(), (r.su / k).toInt(), (r.dx / k).toInt(), (r.giu / k).toInt())
+                if (trovate.none { it.sovrappostoA(nellaFoto) }) trovate += nellaFoto
+            }
+        }
+        return trovate.map { Rect(it.sx, it.su, it.dx, it.giu) }
+    }
+
+    /**
+     * Ritaglia [zona] (allargata un po'), la ingrandisce, e cerca i codici provando le [rotazioni];
+     * se non trova niente riprova con l'immagine "pulita". Restituisce i codici nelle coordinate della foto.
+     */
+    private suspend fun codiciNelRitaglio(foto: Bitmap, zona: Rect, rotazioni: List<Int>): List<CodiceTrovato> {
+        val area = Rect(zona).apply { inset(-width() * 15 / 100, -height() * 15 / 100) }
+        if (!area.intersect(0, 0, foto.width, foto.height)) return emptyList()
+        val scala = (LATO_ETICHETTA.toFloat() / max(area.width(), area.height())).coerceIn(0.5f, 6f)
+        val ritaglio = Bitmap.createBitmap(foto, area.left, area.top, area.width(), area.height()).let {
+            Bitmap.createScaledBitmap(it, (it.width * scala).toInt().coerceAtLeast(1), (it.height * scala).toInt().coerceAtLeast(1), true)
+        }
+        for (versione in 0..1) {
+            val immagine = if (versione == 0) ritaglio else migliora(ritaglio)
+            for (g in rotazioni) {
+                val inversa = Matrix().also { matriceRotazione(immagine.width, immagine.height, g).invert(it) }
+                val codici = leggi(ruota(immagine, g)).textBlocks.flatMap { it.lines }.mapNotNull { l ->
+                    val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+                    val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
+                    CodiceTrovato(codice, angoli.map { q ->
+                        val xy = floatArrayOf(q.x.toFloat(), q.y.toFloat())
+                        inversa.mapPoints(xy)
+                        PointF(xy[0] / scala + area.left, xy[1] / scala + area.top)
+                    })
+                }
+                if (codici.isNotEmpty()) return codici
+            }
+        }
+        return emptyList()
+    }
+
+    /** Riquadro che contiene i 4 angoli. */
+    private fun riquadroDi(angoli: List<PointF>) = Rect(
+        angoli.minOf { it.x }.toInt(), angoli.minOf { it.y }.toInt(),
+        angoli.maxOf { it.x }.toInt(), angoli.maxOf { it.y }.toInt(),
+    )
 
     /** Un codice trovato nella foto dritta, con i 4 angoli della sua riga. */
     private class CodiceTrovato(val codice: String, val angoli: List<PointF>) {
@@ -322,7 +399,17 @@ class Raddrizzatore(private val context: Context) {
             }
             if (prezziProvati.isNotEmpty()) conta["prezzi provati"] = prezziProvati.size
 
-            // 4. Zone con testo illeggibile lontane dai cartellini già presi: ritaglio, ingrandisco, rileggo
+            // 4. Etichette trovate dalla forma (rettangoli bianchi) che non contengono un cartellino già preso
+            var etichetteProvate = 0
+            for (r in etichetteIn(dritta)) {
+                if (etichetteProvate >= MAX_ETICHETTE) break
+                if (posizioni.any { p -> r.contains(p.x.toInt(), p.y.toInt()) }) continue
+                etichetteProvate++
+                codiciNelRitaglio(dritta, r, listOf(0, 90)).forEach { aggiungi(it, "etichette") }
+            }
+            if (etichetteProvate > 0) conta["etichette provate"] = etichetteProvate
+
+            // 5. Zone con testo illeggibile lontane dai cartellini già presi: ritaglio, ingrandisco, rileggo
             val provate = mutableListOf<Rect>()
             var tentativi = 0
             for (z in zone) {
@@ -525,6 +612,8 @@ class Raddrizzatore(private val context: Context) {
         private const val LATO_TASSELLO = 1600   // tasselli più piccoli di così vengono ingranditi
         private const val ALTEZZA_TESTO = 40f    // altezza (px) a cui porto il testo piccolo del cartellino prima di leggerlo
         private const val MAX_ZONE = 6
+        private const val MAX_ETICHETTE = 10     // etichette (trovate dalla forma) lette al massimo per foto
+        private const val LATO_ETICHETTA = 1400  // ogni etichetta viene ingrandita a questa misura prima di leggerla
         private const val MAX_PREZZI = 15        // prezzi usati come segnaposto (foto con tanti articoli)
         private const val MAX_ZONE_ALTRI = 12    // zone ingrandite per cercare gli altri cartellini (foto con tanti articoli)           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
