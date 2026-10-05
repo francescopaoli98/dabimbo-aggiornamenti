@@ -27,7 +27,7 @@ ben = Benetton
 capp = con cappuccio
 giubb = giubbotto
 
-# Da confermare con Elisa
+# Confermate da Elisa
 nr = numero
 ginn = ginnastica
 felp = felpato / felpata / felpati / felpate
@@ -38,7 +38,7 @@ dis = disegno
 bott = bottoni
 vell = velluto
 
-# Viste sui cartellini di prova (da confermare)
+# Viste sui cartellini di prova (confermate da Elisa)
 vi = viola
 ar = arancione / arancioni
 ipo = ippopotamo
