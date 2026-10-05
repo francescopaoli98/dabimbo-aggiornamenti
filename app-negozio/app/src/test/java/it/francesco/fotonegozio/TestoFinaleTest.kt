@@ -112,6 +112,9 @@ class TestoFinaleTest {
         assertEquals("Maglia fucsia scritta", TestoFinale.espandi("MAGLIA FUX SCR", null, voci))
         assertEquals("Magliette fucsia", TestoFinale.espandi("MAGLIETTE FUX", null, voci))
         assertEquals("Felpa piccola ricamo", TestoFinale.espandi("FELPA PIC RIC", null, voci))
+        assertEquals("Grembiule microfibra grigio", TestoFinale.espandi("GREMBE MICROF GRI", null, voci))
+        assertEquals("Maglione piccolo", TestoFinale.espandi("MAGLIONE PIC", null, voci))
+        assertEquals("Scarpe grigie", TestoFinale.espandi("SCARPE GRI", null, voci))
     }
 
     @Test

@@ -69,3 +69,5 @@ primark =
 pic = piccolo / piccola / piccoli / piccole
 ric = ricamo
 scr = scritta
+microf = microfibra
+grembe = grembiule / grembiuli

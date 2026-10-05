@@ -105,6 +105,8 @@ object TestoFinale {
     private fun formaDi(parola: String): Forma = when {
         parola in MASCHILI_IN_A -> Forma.MS
         parola.endsWith("a") -> Forma.FS
+        // Maschili singolari in -e: grembiule, maglione, costume, stivale, ...
+        listOf("one", "ule", "ume", "ale", "ile").any { parola.endsWith(it) } -> Forma.MS
         parola.endsWith("e") && parola.length > 3 -> Forma.FP   // scarpe, magliette, ...
         parola.endsWith("i") -> Forma.MP
         else -> Forma.MS
