@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
@@ -17,6 +19,8 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
@@ -26,6 +30,7 @@ class FotoRaddrizzata(
     val rotazioneApplicata: Int,   // gradi aggiunti da noi (0, 90, 180, 270)
     val codiceLetto: String?,      // codice di 7 cifre (null = cartellino non trovato)
     val metodo: String,            // come è stato trovato il cartellino (per le prove)
+    val dati: DatiCartellino? = null, // descrizione, prezzo, taglia letti dal cartellino
 )
 
 /**
@@ -55,14 +60,22 @@ class Raddrizzatore(private val context: Context) {
             ?: return FotoRaddrizzata(foto, 0, null, "non trovato")
 
         // Ritaglio il cartellino e cerco il verso giusto (4 prove su un pezzo piccolo = veloce)
-        val ritaglio = ritaglia(zona.base, zona.riquadro)
+        val (ritaglio, area) = ritagliaConArea(zona.base, zona.riquadro)
         for (gradi in listOf(0, 90, 270, 180)) {
-            val testo = leggi(ruota(ritaglio, gradi))
-            val codiceDritto = cercaCodice(testo, soloDritto = true)
-            if (codiceDritto != null) {
-                val totale = (zona.rotazione + gradi) % 360
-                return FotoRaddrizzata(ruota(foto, totale), totale, zona.codice ?: codiceDritto, zona.metodo)
+            val ritaglioGirato = ruota(ritaglio, gradi)
+            val riga = rigaCodiceDritta(leggi(ritaglioGirato)) ?: continue
+            val totale = (zona.rotazione + gradi) % 360
+            val dritta = ruota(foto, totale)
+
+            // Pezzo 2: dove sta la riga del codice nella foto dritta → leggo tutto il cartellino
+            val dati = try {
+                val angoli = riga.cornerPoints?.map { posizioneInFotoDritta(it.x.toFloat(), it.y.toFloat(), ritaglio, area, gradi, zona.base) }
+                if (angoli != null && angoli.size == 4) leggiCartellino(dritta, angoli) else null
+            } catch (e: Exception) {
+                null   // la lettura dei dati non deve mai bloccare il raddrizzamento
             }
+            val codice = zona.codice ?: dati?.codice ?: codiceDi(riga)
+            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati)
         }
         // Cartellino trovato ma verso incerto: se viene dalla rotazione di 90° almeno quella la applico
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
@@ -143,13 +156,62 @@ class Raddrizzatore(private val context: Context) {
 
     private fun codiceDi(riga: Text.Line): String? = REGEX_CODICE.find(riga.text)?.value
 
-    /** Codice di 7 cifre; con [soloDritto] solo se la riga è più orizzontale che verticale (cartellino anche un po' storto). */
-    private fun cercaCodice(testo: Text, soloDritto: Boolean): String? {
-        for (riga in testo.textBlocks.flatMap { it.lines }) {
-            val trovato = REGEX_CODICE.find(riga.text) ?: continue
-            if (!soloDritto || abs(riga.angle) < 45f) return trovato.value
+    /** Riga col codice scritta più in orizzontale che in verticale (cartellino anche un po' storto). */
+    private fun rigaCodiceDritta(testo: Text): Text.Line? =
+        testo.textBlocks.flatMap { it.lines }.firstOrNull {
+            REGEX_CODICE.containsMatchIn(it.text) && abs(it.angle) < 45f && it.cornerPoints != null
         }
-        return null
+
+    /**
+     * Porta un punto dal ritaglio girato alla foto dritta finale.
+     * Passaggi inversi: ritaglio girato → ritaglio → foto "base" → foto dritta (= base girata degli stessi gradi).
+     */
+    private fun posizioneInFotoDritta(x: Float, y: Float, ritaglio: Bitmap, area: Rect, gradi: Int, base: Bitmap): PointF {
+        val p = floatArrayOf(x, y)
+        // 1. Annullo la rotazione del ritaglio
+        val inversa = Matrix()
+        matriceRotazione(ritaglio.width, ritaglio.height, gradi).invert(inversa)
+        inversa.mapPoints(p)
+        // 2. Annullo l'ingrandimento e lo spostamento del ritaglio
+        val scala = ritaglio.width.toFloat() / area.width()
+        p[0] = p[0] / scala + area.left
+        p[1] = p[1] / scala + area.top
+        // 3. Applico la stessa rotazione alla foto intera
+        matriceRotazione(base.width, base.height, gradi).mapPoints(p)
+        return PointF(p[0], p[1])
+    }
+
+    /**
+     * Pezzo 2: legge codice, descrizione, prezzo e taglia.
+     * [angoli] = i 4 angoli della riga del codice nella foto dritta (in alto a sx, in alto a dx, in basso a dx, in basso a sx).
+     */
+    private suspend fun leggiCartellino(dritta: Bitmap, angoli: List<PointF>): DatiCartellino? {
+        val (a, b, _, d) = angoli
+        val larghezzaCodice = hypot(b.x - a.x, b.y - a.y)
+        val altezzaCodice = hypot(d.x - a.x, d.y - a.y).coerceAtLeast(1f)
+        // Inclinazione del cartellino (es. porta banane messo storto)
+        val inclinazione = Math.toDegrees(atan2((b.y - a.y).toDouble(), (b.x - a.x).toDouble())).toFloat()
+
+        // Quadrato attorno al codice, abbastanza grande da contenere il cartellino con qualsiasi inclinazione
+        val cx = (a.x + b.x) / 2
+        val cy = (a.y + d.y) / 2
+        val meta = max(6 * larghezzaCodice, 11 * altezzaCodice)
+        val area = Rect((cx - meta).toInt(), (cy - meta).toInt(), (cx + meta).toInt(), (cy + meta).toInt())
+        if (!area.intersect(0, 0, dritta.width, dritta.height)) return null
+
+        // Ingrandisco (o rimpicciolisco) perché il testo del codice sia alto ~40 px, e raddrizzo l'inclinazione
+        val scala = (ALTEZZA_TESTO / altezzaCodice).coerceIn(0.5f, 4f)
+        val matrice = Matrix().apply {
+            postScale(scala, scala)
+            postRotate(-inclinazione)
+        }
+        val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
+
+        // Leggo e passo le righe all'analizzatore (che ragiona sulle posizioni)
+        val righe = leggi(pezzo).textBlocks.flatMap { it.lines }.mapNotNull { l ->
+            l.boundingBox?.let { Riga(l.text, it.left, it.top, it.right, it.bottom) }
+        }
+        return LettoreCartellino.analizza(righe).takeIf { it.codice != null }
     }
 
     /** 9 tasselli che si sovrappongono a metà (griglia 3x3, ognuno grande metà foto). */
@@ -168,10 +230,8 @@ class Raddrizzatore(private val context: Context) {
     /**
      * Ritaglio quadrato attorno alla zona trovata, abbastanza grande da contenere
      * tutto il cartellino, ingrandito se piccolo (ML Kit legge meglio).
+     * Restituisce anche l'area della foto ritagliata.
      */
-    private fun ritaglia(b: Bitmap, zona: Rect): Bitmap = ritagliaConArea(b, zona).first
-
-    /** Come [ritaglia], ma restituisce anche l'area della foto ritagliata. */
     private fun ritagliaConArea(b: Bitmap, zona: Rect): Pair<Bitmap, Rect> {
         // Almeno 1/5 della foto: se la zona è una sola parola, il ritaglio prende comunque tutto il cartellino
         val lato = max(max(zona.width(), zona.height()) * 3, max(b.width, b.height) / 5)
@@ -210,9 +270,19 @@ class Raddrizzatore(private val context: Context) {
 
     private fun ruota(foto: Bitmap, gradi: Int): Bitmap = ruotaImmagine(foto, gradi)
 
+    /** La stessa trasformazione che usa [ruotaImmagine]: rotazione + spostamento per restare in coordinate positive. */
+    private fun matriceRotazione(w: Int, h: Int, gradi: Int): Matrix {
+        val m = Matrix().apply { postRotate(gradi.toFloat()) }
+        val bordi = RectF(0f, 0f, w.toFloat(), h.toFloat())
+        m.mapRect(bordi)
+        m.postTranslate(-bordi.left, -bordi.top)
+        return m
+    }
+
     companion object {
         private const val LATO_MASSIMO = 4100   // 12 MP restano intere, 50 MP dimezzate
         private const val LATO_RITAGLIO = 1200
+        private const val ALTEZZA_TESTO = 40f    // altezza (px) a cui porto il testo piccolo del cartellino prima di leggerlo
         private const val MAX_ZONE = 6           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
         private val SETTE_CIFRE = Regex("\\d{7}")

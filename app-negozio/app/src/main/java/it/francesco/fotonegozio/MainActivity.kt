@@ -135,6 +135,7 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
                             f.codice?.let { "Codice letto: $it" } ?: "Cartellino non trovato",
                             color = if (f.codice == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         )
+                        DatiLetti(f.dati)
                         Text("Metodo: ${f.metodo} · ${"%.1f".format(f.secondi)} s", fontSize = 12.sp)
                     }
                 }
@@ -143,6 +144,25 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
         if (f.file != null) PulsantiGira(gira, Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp))
       }
     }
+}
+
+/** Pezzo 2: i campi letti dal cartellino, così come sono (le sigle le espande il pezzo 3). */
+@Composable
+private fun DatiLetti(dati: DatiCartellino?) {
+    val mancante = MaterialTheme.colorScheme.error
+    if (dati == null) {
+        Text("Dati del cartellino non letti", color = mancante)
+        return
+    }
+    @Composable
+    fun Campo(nome: String, valore: String?, obbligatorio: Boolean = true) = Text(
+        "$nome: ${valore ?: "—"}",
+        color = if (valore == null && obbligatorio) mancante else Color.Unspecified,
+        fontSize = 15.sp,
+    )
+    Campo("Descrizione", dati.descrizione)
+    Campo("Prezzo", dati.prezzo)
+    Campo("Taglia", dati.taglia, obbligatorio = false)   // i giochi non ce l'hanno
 }
 
 /** "Gira" = 90° a destra; "Capovolgi" = 180°, un tocco solo se l'app ha scelto il verso sbagliato. */
