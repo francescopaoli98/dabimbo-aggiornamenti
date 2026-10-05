@@ -35,9 +35,29 @@ object TestoFinale {
         return parti.joinToString(" - ")
     }
 
-    /** Tutte le righe di una foto (una per articolo). */
-    fun testo(articoli: List<DatiCartellino>, voci: List<VoceDizionario>): String =
-        articoli.joinToString("\n") { riga(it, voci) }
+    /**
+     * Tutte le righe di una foto (una per articolo).
+     * Collage con lo stesso articolo più volte: una riga sola.
+     * Stesso codice = stesso articolo: tengo la riga più completa (es. una etichetta letta male, l'altra bene).
+     */
+    fun testo(articoli: List<DatiCartellino>, voci: List<VoceDizionario>): String {
+        val righe = mutableListOf<String>()
+        val posizioneCodice = mutableMapOf<String, Int>()
+        for (d in articoli) {
+            val r = riga(d, voci)
+            if (r.isBlank()) continue
+            val gia = d.codice?.let { posizioneCodice[it] }
+            when {
+                gia != null -> if (r.length > righe[gia].length) righe[gia] = r
+                r in righe -> {}
+                else -> {
+                    d.codice?.let { posizioneCodice[it] = righe.size }
+                    righe += r
+                }
+            }
+        }
+        return righe.joinToString("\n")
+    }
 
     /** Espande le sigle, accorda i colori, toglie taglie ripetute e marchi esclusi. */
     fun espandi(descrizione: String, taglia: String?, voci: List<VoceDizionario>): String {

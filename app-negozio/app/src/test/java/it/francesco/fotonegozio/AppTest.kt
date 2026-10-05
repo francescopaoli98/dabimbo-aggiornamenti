@@ -117,7 +117,7 @@ class AppTest {
         metti(fotoDiProva(1, emptyList()))
         regola.onNodeWithText("Cartellino non letto", substring = true).assertExists()
         regola.onNodeWithText("📋 Articoli (0)").performClick()
-        regola.onNodeWithText("+ Aggiungi articolo").performClick()
+        regola.onNodeWithText("+ Aggiungi etichetta").performClick()
         regola.onAllNodes(hasSetTextAction())[0].performTextInput("1444115 librottino inside out 1,50")
         regola.onNodeWithText("Salva").performClick()
         regola.waitForIdle()
@@ -125,6 +125,17 @@ class AppTest {
         assertEquals("1444115", a.codice)
         assertEquals("€ 1,50", a.prezzo)
         regola.onNodeWithText("📋 Articoli (1)").assertExists()
+    }
+
+    @Test
+    fun dueDitaIngrandisconoLAnteprimaSenzaAprireLaFoto() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.onNodeWithText("🔍 Tocca").performTouchInput { pinch(center - Offset(20f, 0f), center - Offset(200f, 0f), center + Offset(20f, 0f), center + Offset(200f, 0f)) }
+        regola.waitForIdle()
+        regola.onNodeWithText("Capovolgi").assertDoesNotExist()   // il visore non si è aperto
+        // Un tocco normale invece apre la foto grande
+        regola.onNodeWithText("🔍 Tocca").performClick()
+        regola.onNodeWithText("Capovolgi").assertExists()
     }
 
     @Test

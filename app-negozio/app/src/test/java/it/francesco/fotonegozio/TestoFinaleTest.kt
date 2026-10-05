@@ -90,4 +90,19 @@ class TestoFinaleTest {
     fun dizionario_si_riscrive_e_rilegge_uguale() {
         assertEquals(voci.sortedBy { it.sigla }, Dizionario.leggi(Dizionario.scrivi(voci)))
     }
+
+    @Test
+    fun collage_stesso_articolo_una_volta_sola() {
+        val libro = DatiCartellino("1444115", "LIBROTTINO INSIDE OUT", "€ 1,50", null)
+        val mezzo = DatiCartellino("1444115", "LIBROTTINO", null, null)          // stessa etichetta letta peggio
+        val senzaCodice = DatiCartellino(null, "PUZZLE", "€ 2,00", null)
+        val altro = DatiCartellino("1444116", "LIBROTTINO INSIDE OUT", "€ 1,50", null)   // codice diverso: altro pezzo
+        val t = TestoFinale.testo(listOf(mezzo, libro, senzaCodice, senzaCodice, altro), emptyList())
+        assertEquals(
+            "Librottino inside out - cod. 1444115 - € 1,50\n" +
+                "Puzzle - € 2,00\n" +
+                "Librottino inside out - cod. 1444116 - € 1,50",
+            t,
+        )
+    }
 }
