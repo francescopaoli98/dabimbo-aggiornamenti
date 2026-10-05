@@ -41,7 +41,10 @@ data class Foto(
     val errore: String? = null,
     val diario: Diario? = null,          // modalità diagnosi: cosa ha provato a leggere
     val testoManuale: String? = null,
-    val etichetteViste: Int = 0,         // cartellini che si vedono nella foto (contati dai prezzi)    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
+    val etichetteViste: Int = 0,         // cartellini che si vedono nella foto (contati dai prezzi)
+    val fileNitida: File? = null,        // pezzo 4: foto senza pixelatura
+    val filePixelata: File? = null,      // pezzo 4: foto con lo sfondo pixelato (null = non riuscita)
+    val pixelata: Boolean = false,       // quale delle due si usa    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
 )
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
@@ -68,6 +71,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     private val raddrizzatore = Raddrizzatore(app)
     private val versoPreferito = VersoPreferito(app)
+    private val pixelatore = Pixelatore()
     private var lavoro: Job? = null
     private val bloccoRotazioni = Mutex()   // un tocco su "Gira" alla volta
 
@@ -132,11 +136,25 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 versoPreferito.cambiaVoto(null, verso)   // finché Elisa non la corregge, il verso era giusto
             }
 
-            val file = Raddrizzatore.salva(getApplication(), immagine, "foto_${f.numero}")
+            // Pezzo 4: sfondo pixelato (sulla foto dritta, dove sono note le posizioni dei cartellini)
+            val pix = try {
+                pixelatore.pixela(r.immagine, r.zoneCartellini)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null   // segmentazione non disponibile: foto senza pixelatura
+            }
+            val fileNitida = Raddrizzatore.salva(getApplication(), immagine, "foto_${f.numero}_n")
+            val filePixelata = pix?.let { Raddrizzatore.salva(getApplication(), Raddrizzatore.ruotaImmagine(it.immagine, verso), "foto_${f.numero}_p") }
+            val file = filePixelata ?: fileNitida
+            val anteprima = pix?.let { BitmapFactory.decodeFile(file.path) } ?: immagine
             f.copy(
                 inCorso = false,
-                miniatura = miniatura(immagine).asImageBitmap(),
+                miniatura = miniatura(anteprima).asImageBitmap(),
                 fileAuto = file,
+                fileNitida = fileNitida,
+                filePixelata = filePixelata,
+                pixelata = filePixelata != null,
                 file = file,
                 rotazione = (r.rotazioneApplicata + verso) % 360,
                 messaInVerticale = verso != 0,
@@ -147,7 +165,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 dati = r.dati,
                 altri = r.altri,
                 etichetteViste = r.etichetteViste,
-                metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}",
+                metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}" +
+                    (pix?.let { " · nitidi ${it.oggettiNitidi}/${it.oggettiTotali}" } ?: " · pixelatura non riuscita"),
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
                 diario = diario,
             )
@@ -161,6 +180,29 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Pulsanti "Gira" (90) e "Capovolgi" (180): Elisa corregge il verso a mano. */
+    /** Pezzo 4: sfondo pixelato sì/no per una foto (se la pixelatura viene male). */
+    fun pixelatura(numero: Int, attiva: Boolean) {
+        viewModelScope.launch {
+            bloccoRotazioni.withLock {
+                val i = foto.indexOfFirst { it.numero == numero }
+                val f = foto.getOrNull(i) ?: return@withLock
+                val base = (if (attiva) f.filePixelata else f.fileNitida) ?: return@withLock
+                val (file, mini) = girata(f, base, f.rotazioneManuale, attiva)
+                foto[i] = f.copy(fileAuto = base, file = file, miniatura = mini, pixelata = attiva)
+            }
+        }
+    }
+
+    /** La foto [base] girata di [gradi] a mano, salvata con un nome diverso per ogni versione. */
+    private suspend fun girata(f: Foto, base: File, gradi: Int, pixelata: Boolean) = withContext(Dispatchers.Default) {
+        val partenza = BitmapFactory.decodeFile(base.path)
+        val girata = Raddrizzatore.ruotaImmagine(partenza, gradi)
+        // Nome diverso per ogni verso e versione, così l'anteprima si aggiorna
+        val file = if (gradi == 0) base
+        else Raddrizzatore.salva(getApplication(), girata, "foto_${f.numero}_${if (pixelata) "p" else "n"}_r$gradi")
+        file to miniatura(girata).asImageBitmap()
+    }
+
     fun gira(numero: Int, gradi: Int) {
         viewModelScope.launch {
             bloccoRotazioni.withLock {
@@ -168,15 +210,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 val f = foto.getOrNull(i) ?: return@withLock
                 val base = f.fileAuto ?: return@withLock
                 val nuovaManuale = (f.rotazioneManuale + gradi) % 360
-
-                val (file, mini) = withContext(Dispatchers.Default) {
-                    val partenza = BitmapFactory.decodeFile(base.path)
-                    val girata = Raddrizzatore.ruotaImmagine(partenza, nuovaManuale)
-                    // Nome diverso per ogni verso, così l'anteprima si aggiorna
-                    val file = if (nuovaManuale == 0) base
-                    else Raddrizzatore.salva(getApplication(), girata, "foto_${f.numero}_r$nuovaManuale")
-                    file to miniatura(girata).asImageBitmap()
-                }
+                val (file, mini) = girata(f, base, nuovaManuale, f.pixelata)
 
                 // L'app impara: il voto passa al verso in cui la foto è finita davvero
                 if (f.messaInVerticale) {
