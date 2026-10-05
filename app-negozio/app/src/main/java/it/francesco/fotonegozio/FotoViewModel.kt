@@ -40,6 +40,7 @@ data class Foto(
     val secondi: Float = 0f,             // per le prove: tempo di elaborazione
     val errore: String? = null,
     val diario: Diario? = null,          // modalità diagnosi: cosa ha provato a leggere
+    val testoManuale: String? = null,    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
 )
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
@@ -47,6 +48,15 @@ val Foto.articoli: List<DatiCartellino> get() = listOfNotNull(dati) + altri
 
 /** Un articolo è "da completare" se manca la descrizione o il prezzo (es. cartellino sfocato). */
 val DatiCartellino.daCompletare: Boolean get() = descrizione == null || prezzo == null
+
+private fun fileDizionario(app: Application) = File(app.filesDir, "dizionario.txt")
+
+/** Il dizionario salvato sul telefono; la prima volta, quello di partenza (assets/dizionario.txt). */
+private fun caricaDizionario(app: Application): List<VoceDizionario> {
+    val file = fileDizionario(app)
+    if (!file.exists()) file.writeText(app.assets.open("dizionario.txt").bufferedReader().readText())
+    return Dizionario.leggi(file.readText()).sortedBy { it.sigla }
+}
 
 /** Tiene la lista delle foto ed esegue l'elaborazione una alla volta, in sottofondo. */
 class FotoViewModel(app: Application) : AndroidViewModel(app) {
@@ -59,6 +69,28 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     private val versoPreferito = VersoPreferito(app)
     private var lavoro: Job? = null
     private val bloccoRotazioni = Mutex()   // un tocco su "Gira" alla volta
+
+    /** Dizionario delle sigle (salvato in un file di testo sul telefono). */
+    val dizionario = mutableStateListOf<VoceDizionario>().apply { addAll(caricaDizionario(app)) }
+
+    /** Testo per lo stato di una foto: quello corretto da Elisa, o quello composto dall'app. */
+    fun testo(f: Foto): String = f.testoManuale ?: TestoFinale.testo(f.articoli, dizionario)
+
+    fun cambiaTesto(numero: Int, testo: String?) {
+        val i = foto.indexOfFirst { it.numero == numero }
+        if (i >= 0) foto[i] = foto[i].copy(testoManuale = testo)
+    }
+
+    /** Aggiunge o corregge una sigla ([vecchia] = sigla da sostituire, null se nuova); [nuova] null = elimina. */
+    fun salvaSigla(vecchia: String?, nuova: VoceDizionario?) {
+        if (vecchia != null) dizionario.removeAll { it.sigla == vecchia }
+        if (nuova != null) {
+            dizionario.removeAll { it.sigla == nuova.sigla }
+            dizionario += nuova
+        }
+        dizionario.sortBy { it.sigla }
+        fileDizionario(getApplication()).writeText(Dizionario.scrivi(dizionario))
+    }
 
     /** Modalità diagnosi: l'app si annota ogni lettura, per mandarla a chi sistema l'app. */
     var diagnosi by mutableStateOf(false)

@@ -83,6 +83,7 @@ private fun Schermata(vm: FotoViewModel) {
     }
     var ingrandita by remember { mutableStateOf<Int?>(null) }   // numero della foto aperta a schermo intero
     var inModifica by remember { mutableStateOf<Pair<Int, Int?>?>(null) }   // (foto, articolo) - articolo null = nuovo
+    var dizionarioAperto by remember { mutableStateOf(false) }
 
     Scaffold { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
@@ -90,6 +91,9 @@ private fun Schermata(vm: FotoViewModel) {
                 onClick = { scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(56.dp),
             ) { Text("Scegli foto", fontSize = 18.sp) }
+            OutlinedButton(onClick = { dizionarioAperto = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text("📖 Dizionario delle sigle")
+            }
 
             // Modalità diagnosi (per le prove): vale per le foto scelte DOPO averla accesa
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -125,10 +129,16 @@ private fun Schermata(vm: FotoViewModel) {
                         gira = { gradi -> vm.gira(f.numero, gradi) },
                         modifica = { indice -> inModifica = f.numero to indice },
                         salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
+                        testo = vm.testo(f),
+                        cambiaTesto = { t -> vm.cambiaTesto(f.numero, t) },
                     )
                 }
             }
         }
+    }
+
+    if (dizionarioAperto) {
+        SchermataDizionario(vm.dizionario, salva = vm::salvaSigla, chiudi = { dizionarioAperto = false })
     }
 
     // Modifica / aggiunta di un articolo a mano
@@ -153,7 +163,15 @@ private fun Schermata(vm: FotoViewModel) {
 
 /** Una foto nella lista: foto grande, avviso se il verso è da controllare, articoli letti, pulsanti. */
 @Composable
-private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: (Int?) -> Unit, salvaDiagnosi: () -> Unit) {
+private fun Scheda(
+    f: Foto,
+    onClick: () -> Unit,
+    gira: (Int) -> Unit,
+    modifica: (Int?) -> Unit,
+    salvaDiagnosi: () -> Unit,
+    testo: String,
+    cambiaTesto: (String?) -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -200,6 +218,21 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: 
                     OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                         Text("+ Aggiungi articolo")
                     }
+
+                    // Pezzo 3: il testo che andrà nello stato (si può correggere a mano)
+                    if (testo.isNotBlank() || f.testoManuale != null) {
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Testo per lo stato", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            if (f.testoManuale != null) TextButton(onClick = { cambiaTesto(null) }) { Text("↺ Automatico") }
+                        }
+                        OutlinedTextField(
+                            value = testo,
+                            onValueChange = { cambiaTesto(it) },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                        )
+                        if (f.testoManuale != null) Text("Corretto a mano: le modifiche agli articoli non lo cambiano più", fontSize = 12.sp, color = Color.Gray)
+                    }
                     // Per le prove: come ha lavorato l'app (sparirà nella versione finale)
                     Text(
                         (if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°") +
@@ -216,6 +249,93 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: 
             }
         }
     }
+}
+
+/** Elenco delle sigle: cerca, aggiungi, correggi, elimina. Si salva da solo nel file di testo. */
+@Composable
+private fun SchermataDizionario(voci: List<VoceDizionario>, salva: (String?, VoceDizionario?) -> Unit, chiudi: () -> Unit) {
+    var cerca by remember { mutableStateOf("") }
+    var inModifica by remember { mutableStateOf<VoceDizionario?>(null) }
+    var nuova by remember { mutableStateOf(false) }
+    val filtrate = voci.filter { cerca.isBlank() || it.sigla.contains(cerca.lowercase()) || it.significatoTesto.contains(cerca, ignoreCase = true) }
+
+    Dialog(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("📖 Dizionario (${voci.size} sigle)", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = chiudi) { Text("✕ Chiudi", fontSize = 16.sp) }
+            }
+            OutlinedTextField(cerca, { cerca = it }, label = { Text("Cerca") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Button(onClick = { nuova = true }, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) { Text("+ Nuova sigla") }
+            LazyColumn(Modifier.weight(1f)) {
+                items(filtrate, key = { it.sigla }) { v ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { inModifica = v }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(v.sigla.uppercase(), fontWeight = FontWeight.Bold, modifier = Modifier.width(90.dp))
+                        Text(
+                            if (v.daTogliere) "(tolto dal testo)" else v.significatoTesto,
+                            color = if (v.daTogliere) ARANCIONE else Color.Unspecified,
+                        )
+                    }
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+
+    if (nuova || inModifica != null) {
+        ModificaSigla(
+            iniziale = inModifica,
+            salva = { v -> salva(inModifica?.sigla, v); nuova = false; inModifica = null },
+            annulla = { nuova = false; inModifica = null },
+        )
+    }
+}
+
+/** Finestra per una sigla: sigla, significato (con le forme separate da "/"), oppure "togli dal testo". */
+@Composable
+private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) -> Unit, annulla: () -> Unit) {
+    var sigla by remember { mutableStateOf(iniziale?.sigla.orEmpty()) }
+    var significato by remember { mutableStateOf(iniziale?.significatoTesto.orEmpty()) }
+    var togli by remember { mutableStateOf(iniziale?.daTogliere ?: false) }
+    AlertDialog(
+        onDismissRequest = annulla,
+        title = { Text(if (iniziale == null) "Nuova sigla" else "Modifica sigla") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(sigla, { sigla = it.trim() }, label = { Text("Sigla (es. gri)") }, singleLine = true)
+                if (!togli) {
+                    OutlinedTextField(significato, { significato = it }, label = { Text("Significato") })
+                    Text(
+                        "Se cambia con maschile/femminile scrivi le 4 forme:\ngrigio / grigia / grigi / grigie\n" +
+                            "Se cambia solo col plurale: verde / verdi",
+                        fontSize = 12.sp, color = Color.Gray,
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = togli, onCheckedChange = { togli = it })
+                    Text("Togli dal testo (es. marchio da non scrivere)")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = sigla.isNotBlank() && (togli || significato.isNotBlank()),
+                onClick = {
+                    val forme = if (togli) emptyList() else significato.split("/").map { it.trim() }.filter { it.isNotEmpty() }
+                    salva(VoceDizionario(sigla.lowercase(), forme))
+                },
+            ) { Text("Salva") }
+        },
+        dismissButton = {
+            Row {
+                if (iniziale != null) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = annulla) { Text("Annulla") }
+            }
+        },
+    )
 }
 
 /** Scritta arancione: qui Elisa deve guardare. */

@@ -1,0 +1,66 @@
+# DIZIONARIO DELLE SIGLE - una riga per sigla:   sigla = significato
+#
+# Se il significato cambia con maschile/femminile/plurale, scrivi le 4 forme separate da "/":
+#   maschile / femminile / maschile plurale / femminile plurale
+# Se cambia solo tra singolare e plurale, scrivi 2 forme:   singolare / plurale
+# Parole o marchi da TOGLIERE dal testo: niente dopo l'uguale (es.  primark = )
+# Le righe che iniziano con # sono note e vengono ignorate.
+
+# Colori (da Elisa)
+gri = grigio / grigia / grigi / grigie
+g = giallo / gialla / gialli / gialle
+ve = verde / verdi
+fux = fucsia / fucsie
+b = bianco / bianca / bianchi / bianche
+n = nero / nera / neri / nere
+cel = celeste / celesti
+marr = marrone / marroni
+azz = azzurro / azzurra / azzurri / azzurre
+rs = rosa
+rss = rosso / rossa / rossi / rosse
+
+# Capi e dettagli (da Elisa)
+mm = mezza manica
+ml = manica lunga
+canott = canottiera
+ben = Benetton
+capp = con cappuccio
+giubb = giubbotto
+
+# Da confermare con Elisa
+nr = numero
+ginn = ginnastica
+felp = felpato / felpata / felpati / felpate
+margh = margherite
+arg = argento
+brill = brillantini
+dis = disegno
+bott = bottoni
+vell = velluto
+
+# Viste sui cartellini di prova (da confermare)
+vi = viola
+ar = arancione / arancioni
+ipo = ippopotamo
+rinoc = rinoceronte
+dinos = dinosauri
+princip = principesse
+plast = plastica
+scat = scatola
+mel = melange
+
+# Marchi scritti per bene
+ido = Ido
+okaidi = Okaidi
+diadora = Diadora
+artengo = Artengo
+blukids = Blukids
+prenatal = Prenatal
+chicco = Chicco
+disney = Disney
+lol = LOL
+piazza = Piazza
+italia = Italia
+
+# Marchi da togliere dal testo
+primark =
