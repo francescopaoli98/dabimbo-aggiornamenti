@@ -136,6 +136,14 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
                             color = if (f.codice == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         )
                         DatiLetti(f.dati)
+                        // Altri articoli nella stessa foto
+                        f.altri.forEach { d ->
+                            Text(
+                                "+ ${d.codice} · ${d.descrizione ?: "—"} · ${d.prezzo ?: "—"}" + (d.taglia?.let { " · $it" } ?: ""),
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                         Text("Metodo: ${f.metodo} · ${"%.1f".format(f.secondi)} s", fontSize = 12.sp)
                     }
                 }

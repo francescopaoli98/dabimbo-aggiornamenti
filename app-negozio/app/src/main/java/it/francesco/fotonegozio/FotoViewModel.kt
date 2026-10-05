@@ -34,6 +34,7 @@ data class Foto(
     val rotazioneManuale: Int = 0,       // 0, 90, 180, 270 aggiunti da Elisa
     val codice: String? = null,
     val dati: DatiCartellino? = null,    // descrizione, prezzo, taglia (pezzo 2)
+    val altri: List<DatiCartellino> = emptyList(),   // altri cartellini nella stessa foto
     val metodo: String = "",             // per le prove: come è stato trovato il cartellino
     val secondi: Float = 0f,             // per le prove: tempo di elaborazione
     val errore: String? = null,
@@ -92,6 +93,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 versoVerticale = verso,
                 codice = r.codiceLetto,
                 dati = r.dati,
+                altri = r.altri,
                 metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}",
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
             )

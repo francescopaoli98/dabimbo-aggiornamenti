@@ -30,7 +30,8 @@ class FotoRaddrizzata(
     val rotazioneApplicata: Int,   // gradi aggiunti da noi (0, 90, 180, 270)
     val codiceLetto: String?,      // codice di 7 cifre (null = cartellino non trovato)
     val metodo: String,            // come è stato trovato il cartellino (per le prove)
-    val dati: DatiCartellino? = null, // descrizione, prezzo, taglia letti dal cartellino
+    val dati: DatiCartellino? = null, // descrizione, prezzo, taglia letti dal cartellino principale
+    val altri: List<DatiCartellino> = emptyList(), // altri cartellini nella stessa foto (es. 9 librottini)
 )
 
 /**
@@ -69,14 +70,26 @@ class Raddrizzatore(private val context: Context) {
             val dritta = ruota(foto, totale)
 
             // Pezzo 2: dove sta la riga del codice nella foto dritta → leggo tutto il cartellino
+            val angoli = try {
+                riga.cornerPoints?.map { posizioneInFotoDritta(it.x.toFloat(), it.y.toFloat(), ritaglio, area, gradi, zona.base) }
+                    ?.takeIf { it.size == 4 }
+            } catch (e: Exception) {
+                null
+            }
             val dati = try {
-                val angoli = riga.cornerPoints?.map { posizioneInFotoDritta(it.x.toFloat(), it.y.toFloat(), ritaglio, area, gradi, zona.base) }
-                if (angoli != null && angoli.size == 4) leggiCartellino(dritta, angoli) else null
+                angoli?.let { leggiCartellino(dritta, it) }
             } catch (e: Exception) {
                 null   // la lettura dei dati non deve mai bloccare il raddrizzamento
             } ?: LettoreCartellino.analizza(righeDa(testoGirato)).takeIf { it.codice != null }
             val codice = zona.codice ?: dati?.codice ?: codiceDi(riga)
-            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati)
+
+            // Altri cartellini nella stessa foto (es. tanti librottini insieme)
+            val altri = try {
+                if (codice != null && angoli != null) altriCartellini(dritta, codice, angoli) else emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati, altri)
         }
         // Cartellino trovato ma verso incerto: se viene dalla rotazione di 90° almeno quella la applico
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
@@ -238,6 +251,79 @@ class Raddrizzatore(private val context: Context) {
             if (stortoMigliore < 2f && completezza(migliore) == 3) break   // dritto e completo: basta così
         }
         return migliore
+    }
+
+    /** Un codice trovato nella foto dritta, con i 4 angoli della sua riga. */
+    private class CodiceTrovato(val codice: String, val angoli: List<PointF>) {
+        val altezza get() = hypot(angoli[3].x - angoli[0].x, angoli[3].y - angoli[0].y)
+    }
+
+    /**
+     * Cerca gli ALTRI cartellini nella foto già dritta e li legge tutti.
+     * Prima un giro veloce (codici a barre + testo su tutta la foto); se trova almeno un altro
+     * cartellino, fa anche il giro a tasselli per non perdere quelli piccoli.
+     * Tiene solo i cartellini grandi almeno metà di quello principale: quelli sullo sfondo
+     * (es. sugli scaffali) sono più piccoli e vengono ignorati.
+     */
+    private suspend fun altriCartellini(dritta: Bitmap, principale: String, angoliPrincipale: List<PointF>): List<DatiCartellino> {
+        val altezzaPrincipale = CodiceTrovato(principale, angoliPrincipale).altezza
+        val trovati = mutableMapOf<String, CodiceTrovato>()
+        val posizioni = mutableListOf(angoliPrincipale[0])   // dove stanno i cartellini già presi
+        fun aggiungi(c: CodiceTrovato) {
+            if (c.codice == principale || c.codice in trovati) return
+            if (c.altezza < altezzaPrincipale / 2) return   // troppo piccolo: è sullo sfondo
+            // Nello stesso punto di un cartellino già preso = stesso cartellino letto con una cifra sbagliata
+            val vicino = posizioni.any { p -> hypot(p.x - c.angoli[0].x, p.y - c.angoli[0].y) < 3 * altezzaPrincipale }
+            if (vicino) return
+            trovati[c.codice] = c
+            posizioni += c.angoli[0]
+        }
+
+        // Giro veloce
+        lettoreBarre.process(InputImage.fromBitmap(dritta, 0)).await().forEach { b ->
+            val valore = b.rawValue?.takeIf { it.matches(SETTE_CIFRE) } ?: return@forEach
+            b.boundingBox?.let { aggiungi(CodiceTrovato(valore, angoliDaCodiceABarre(it))) }
+        }
+        codiciNelTesto(leggi(dritta), Rect(0, 0, dritta.width, dritta.height), 1f).forEach(::aggiungi)
+
+        // Ci sono altri cartellini: giro a tasselli per trovare anche quelli piccoli
+        if (trovati.isNotEmpty()) {
+            for (t in tasselli(dritta)) {
+                val scala = (LATO_TASSELLO.toFloat() / max(t.width(), t.height())).coerceAtLeast(1f)
+                val pezzo = Bitmap.createBitmap(dritta, t.left, t.top, t.width(), t.height()).let {
+                    if (scala > 1f) Bitmap.createScaledBitmap(it, (it.width * scala).toInt(), (it.height * scala).toInt(), true)
+                    else it
+                }
+                codiciNelTesto(leggi(pezzo), t, scala).forEach(::aggiungi)
+            }
+        }
+
+        // Leggo ogni cartellino e li metto in ordine di lettura (dall'alto, da sinistra)
+        return trovati.values
+            .sortedWith(compareBy({ (it.angoli[0].y / (altezzaPrincipale * 6)).toInt() }, { it.angoli[0].x }))
+            .map { c -> leggiCartellino(dritta, c.angoli)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
+    }
+
+    /** Righe col codice (quasi orizzontali) lette in un pezzo di foto, riportate nelle coordinate della foto. */
+    private fun codiciNelTesto(testo: Text, pezzo: Rect, scala: Float): List<CodiceTrovato> =
+        testo.textBlocks.flatMap { it.lines }.mapNotNull { l ->
+            val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+            val angoli = l.cornerPoints?.takeIf { abs(l.angle) < 45f && it.size == 4 } ?: return@mapNotNull null
+            CodiceTrovato(codice, angoli.map { PointF(it.x / scala + pezzo.left, it.y / scala + pezzo.top) })
+        }
+
+    /**
+     * Posizione stimata della riga del codice partendo dal codice a barre
+     * (sul cartellino il codice sta subito a destra del codice a barre, in basso).
+     */
+    private fun angoliDaCodiceABarre(b: Rect): List<PointF> {
+        val w = b.width().toFloat()
+        val h = b.height().toFloat()
+        val sx = b.right + 0.02f * w
+        val dx = b.right + 0.35f * w
+        val su = b.bottom - 0.17f * h
+        val giu = b.bottom + 0.02f * h
+        return listOf(PointF(sx, su), PointF(dx, su), PointF(dx, giu), PointF(sx, giu))
     }
 
     /** Quanti dati importanti ha la lettura (codice, descrizione, prezzo). */
