@@ -278,7 +278,7 @@ class Raddrizzatore(private val context: Context) {
         fun segna(cosa: String) { conta[cosa] = (conta[cosa] ?: 0) + 1 }
         fun aggiungi(c: CodiceTrovato, metodo: String) {
             if (c.codice == principale || c.codice in trovati) return
-            if (c.altezza < altezzaPrincipale / 3) return segna("piccoli")   // sullo sfondo (es. scaffali)
+            if (c.altezza < altezzaPrincipale / 4) return segna("piccoli")   // sullo sfondo (es. scaffali)
             // Nello stesso punto di un cartellino già preso = stesso cartellino letto con una cifra sbagliata
             if (posizioni.any { p -> hypot(p.x - c.angoli[0].x, p.y - c.angoli[0].y) < 3 * altezzaPrincipale }) return segna("doppi")
             trovati[c.codice] = c
@@ -291,6 +291,7 @@ class Raddrizzatore(private val context: Context) {
         codiciABarre(dritta, tutta, 1f).forEach { aggiungi(it, "barre") }
         val testoIntero = leggi(dritta)
         codiciNelTesto(testoIntero, tutta, 1f).forEach { aggiungi(it, "testo") }
+        val prezzi = prezziNelTesto(testoIntero, tutta, 1f).toMutableList()   // segnaposto dei cartellini
 
         if (trovati.isNotEmpty()) {
             // 2. Tasselli
@@ -306,9 +307,22 @@ class Raddrizzatore(private val context: Context) {
                 val testo = leggi(pezzo)
                 codiciNelTesto(testo, t, scala).forEach { aggiungi(it, "tasselli") }
                 zone += zoneTesto(testo, t, scala)
+                prezzi += prezziNelTesto(testo, t, scala)
             }
 
-            // 3. Zone con testo illeggibile lontane dai cartellini già presi: ritaglio, ingrandisco, rileggo
+            // 3. Ogni prezzo letto segna un cartellino: ritaglio attorno al prezzo, raddrizzo, ingrandisco, cerco il codice
+            val prezziProvati = mutableListOf<PointF>()
+            for (p in prezzi) {
+                if (prezziProvati.size >= MAX_PREZZI) break
+                val centro = p.centro
+                // stesso prezzo letto due volte (foto intera + tassello): una prova basta
+                if (prezziProvati.any { hypot(it.x - centro.x, it.y - centro.y) < 2 * p.altezza }) continue
+                prezziProvati += centro
+                codiciAttornoAlPrezzo(dritta, p).forEach { aggiungi(it, "prezzi") }
+            }
+            if (prezziProvati.isNotEmpty()) conta["prezzi provati"] = prezziProvati.size
+
+            // 4. Zone con testo illeggibile lontane dai cartellini già presi: ritaglio, ingrandisco, rileggo
             val provate = mutableListOf<Rect>()
             var tentativi = 0
             for (z in zone) {
@@ -346,6 +360,52 @@ class Raddrizzatore(private val context: Context) {
             .map { c -> leggiCartellino(dritta, c.angoli)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
         val diagnostica = if (conta.isEmpty()) "" else "altri: " + conta.entries.joinToString(", ") { "${it.key} ${it.value}" }
         return AltriCartellini(dati, diagnostica)
+    }
+
+    /** Un prezzo ("1,50") letto nella foto: segna dove sta un cartellino. */
+    private class PrezzoTrovato(val angoli: List<PointF>) {
+        val altezza get() = hypot(angoli[3].x - angoli[0].x, angoli[3].y - angoli[0].y).coerceAtLeast(1f)
+        val centro get() = PointF((angoli[0].x + angoli[2].x) / 2, (angoli[0].y + angoli[2].y) / 2)
+        /** Inclinazione della scritta del prezzo, in gradi (qualsiasi, anche capovolta). */
+        val inclinazione get() = Math.toDegrees(atan2((angoli[1].y - angoli[0].y).toDouble(), (angoli[1].x - angoli[0].x).toDouble())).toFloat()
+    }
+
+    /** Righe con un prezzo (qualsiasi inclinazione), riportate nelle coordinate della foto. */
+    private fun prezziNelTesto(testo: Text, pezzo: Rect, scala: Float): List<PrezzoTrovato> =
+        testo.textBlocks.flatMap { it.lines }.mapNotNull { l ->
+            if (!REGEX_PREZZO.containsMatchIn(l.text)) return@mapNotNull null
+            val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
+            PrezzoTrovato(angoli.map { PointF(it.x / scala + pezzo.left, it.y / scala + pezzo.top) })
+        }
+
+    /**
+     * Ritaglia un quadrato attorno al prezzo (il codice sta in alto a destra, entro ~7 altezze del prezzo),
+     * lo raddrizza con l'inclinazione del prezzo, lo ingrandisce e cerca i codici.
+     */
+    private suspend fun codiciAttornoAlPrezzo(dritta: Bitmap, p: PrezzoTrovato): List<CodiceTrovato> {
+        val c = p.centro
+        val meta = 7 * p.altezza
+        val area = Rect((c.x - meta).toInt(), (c.y - meta).toInt(), (c.x + meta).toInt(), (c.y + meta).toInt())
+        if (!area.intersect(0, 0, dritta.width, dritta.height)) return emptyList()
+
+        // Ingrandisco perché il prezzo sia alto ~80 px (il codice viene ~25-30 px) e raddrizzo
+        val scala = (80f / p.altezza).coerceIn(0.5f, 4f)
+        val m = Matrix().apply { postScale(scala, scala); postRotate(-p.inclinazione) }
+        val bordi = RectF(0f, 0f, area.width().toFloat(), area.height().toFloat())
+        Matrix(m).mapRect(bordi)
+        m.postTranslate(-bordi.left, -bordi.top)   // come fa createBitmap
+        val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), m, true)
+        val inversa = Matrix().also { m.invert(it) }
+
+        return leggi(pezzo).textBlocks.flatMap { it.lines }.mapNotNull { l ->
+            val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+            val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
+            CodiceTrovato(codice, angoli.map { q ->
+                val xy = floatArrayOf(q.x.toFloat(), q.y.toFloat())
+                inversa.mapPoints(xy)
+                PointF(xy[0] + area.left, xy[1] + area.top)
+            })
+        }
     }
 
     /** Righe col codice (con qualsiasi inclinazione) lette in un pezzo di foto, riportate nelle coordinate della foto. */
@@ -465,9 +525,12 @@ class Raddrizzatore(private val context: Context) {
         private const val LATO_TASSELLO = 1600   // tasselli più piccoli di così vengono ingranditi
         private const val ALTEZZA_TESTO = 40f    // altezza (px) a cui porto il testo piccolo del cartellino prima di leggerlo
         private const val MAX_ZONE = 6
+        private const val MAX_PREZZI = 15        // prezzi usati come segnaposto (foto con tanti articoli)
         private const val MAX_ZONE_ALTRI = 12    // zone ingrandite per cercare gli altri cartellini (foto con tanti articoli)           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
         private val SETTE_CIFRE = Regex("\\d{7}")
+        // Prezzo tipo "1,50" o "12.00" (anche con spazi: "2, 00")
+        private val REGEX_PREZZO = Regex("(?<![\\d/])\\d{1,3}\\s?[,.]\\s?\\d{2}(?!\\d)")
         // 7 cifre esatte, non attaccate ad altre cifre (esclude i codici EAN a 13 cifre)
         private val REGEX_CODICE = Regex("(?<!\\d)\\d{7}(?!\\d)")
 
