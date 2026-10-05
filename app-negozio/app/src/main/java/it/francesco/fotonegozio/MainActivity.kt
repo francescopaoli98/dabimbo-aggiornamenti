@@ -91,6 +91,16 @@ private fun Schermata(vm: FotoViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(56.dp),
             ) { Text("Scegli foto", fontSize = 18.sp) }
 
+            // Modalità diagnosi (per le prove): vale per le foto scelte DOPO averla accesa
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Diagnosi (per le prove)", Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray)
+                Switch(checked = vm.diagnosi, onCheckedChange = { vm.diagnosi = it })
+            }
+            vm.messaggio?.let { m ->
+                Text(m, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { vm.messaggio = null }.padding(vertical = 4.dp))
+            }
+
             // Avanzamento: "Elaboro 3 di 50"
             if (vm.foto.isNotEmpty()) {
                 val totale = vm.foto.size
@@ -114,6 +124,7 @@ private fun Schermata(vm: FotoViewModel) {
                         onClick = { ingrandita = f.numero },
                         gira = { gradi -> vm.gira(f.numero, gradi) },
                         modifica = { indice -> inModifica = f.numero to indice },
+                        salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                     )
                 }
             }
@@ -142,7 +153,7 @@ private fun Schermata(vm: FotoViewModel) {
 
 /** Una foto nella lista: foto grande, avviso se il verso è da controllare, articoli letti, pulsanti. */
 @Composable
-private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: (Int?) -> Unit) {
+private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: (Int?) -> Unit, salvaDiagnosi: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -200,6 +211,9 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: 
                 }
             }
             if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
+            if (f.diario != null && !f.diario.vuoto) {
+                OutlinedButton(onClick = salvaDiagnosi, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("📷 Salva diagnosi in Galleria") }
+            }
         }
     }
 }

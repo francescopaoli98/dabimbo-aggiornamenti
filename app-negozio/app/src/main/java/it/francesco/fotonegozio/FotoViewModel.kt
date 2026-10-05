@@ -39,6 +39,7 @@ data class Foto(
     val metodo: String = "",             // per le prove: come è stato trovato il cartellino
     val secondi: Float = 0f,             // per le prove: tempo di elaborazione
     val errore: String? = null,
+    val diario: Diario? = null,          // modalità diagnosi: cosa ha provato a leggere
 )
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
@@ -59,6 +60,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     private var lavoro: Job? = null
     private val bloccoRotazioni = Mutex()   // un tocco su "Gira" alla volta
 
+    /** Modalità diagnosi: l'app si annota ogni lettura, per mandarla a chi sistema l'app. */
+    var diagnosi by mutableStateOf(false)
+    /** Messaggio breve da mostrare (es. "Diagnosi salvata in Galleria"). */
+    var messaggio by mutableStateOf<String?>(null)
+
     /** Sostituisce la lista con le nuove foto e le elabora in ordine. */
     fun carica(uris: List<Uri>) {
         if (uris.isEmpty()) return
@@ -78,6 +84,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun elabora(f: Foto): Foto = withContext(Dispatchers.Default) {
         try {
             val inizio = System.currentTimeMillis()
+            val diario = if (diagnosi) Diario() else null
+            raddrizzatore.diario = diario
             val r = raddrizzatore.raddrizza(f.origine)
 
             // Capi d'abbigliamento sempre in verticale (nel verso che Elisa preferisce).
@@ -107,6 +115,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 altri = r.altri,
                 metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}",
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
+                diario = diario,
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e   // lista sostituita: interrompi senza segnare errori
@@ -162,6 +171,19 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             indice != null -> lista.removeAt(indice)
         }
         foto[i] = f.copy(dati = lista.firstOrNull(), altri = lista.drop(1), codice = lista.firstOrNull()?.codice ?: f.codice)
+    }
+
+    /** Salva in Galleria (album FotoNegozio) le pagine della diagnosi di una foto. */
+    fun salvaDiagnosi(numero: Int) {
+        val f = foto.firstOrNull { it.numero == numero } ?: return
+        val diario = f.diario ?: return
+        viewModelScope.launch {
+            val quante = withContext(Dispatchers.Default) {
+                val testa = "Foto ${f.numero} · ${f.metodo}"
+                Diario.salvaInGalleria(getApplication(), diario.pagine(testa), "foto${f.numero}_${System.currentTimeMillis() / 1000}")
+            }
+            messaggio = "Diagnosi foto ${f.numero}: $quante immagini in Galleria › FotoNegozio"
+        }
     }
 
     /** Versione piccola (max 600 px) per la lista, così la memoria non si riempie. */

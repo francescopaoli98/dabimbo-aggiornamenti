@@ -23,6 +23,7 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /** Risultato del raddrizzamento di una foto. */
 class FotoRaddrizzata(
@@ -68,7 +69,7 @@ class Raddrizzatore(private val context: Context) {
         val (ritaglio, area) = ritagliaConArea(zona.base, zona.riquadro)
         for (gradi in listOf(0, 90, 270, 180)) {
             val ritaglioGirato = ruota(ritaglio, gradi)
-            val testoGirato = leggi(ritaglioGirato)
+            val testoGirato = leggi(ritaglioGirato, "verso: ritaglio girato di $gradi°")
             val riga = rigaCodiceDritta(testoGirato) ?: continue
             val totale = (zona.rotazione + gradi) % 360
             val dritta = ruota(foto, totale)
@@ -122,13 +123,14 @@ class Raddrizzatore(private val context: Context) {
     private suspend fun trovaCartellino(foto: Bitmap): Zona? {
         // 1. Codice a barre su tutta la foto: contiene direttamente il codice articolo
         val barre = lettoreBarre.process(InputImage.fromBitmap(foto, 0)).await()
+        diario?.nota("primo: codici a barre", barre.joinToString { "${it.rawValue}" }.ifEmpty { "nessuno" })
         barre.firstOrNull { it.rawValue?.matches(SETTE_CIFRE) == true && it.boundingBox != null }?.let {
             return Zona(foto, 0, it.boundingBox!!, it.rawValue, "codice a barre",
                 it.cornerPoints?.takeIf { p -> p.size == 4 }?.let { p -> rigaCodiceDaCodiceABarre(p.map { q -> PointF(q.x.toFloat(), q.y.toFloat()) }) })
         }
 
         // 2. Testo su tutta la foto (funziona se il cartellino è grande, foto da vicino)
-        val testoIntero = leggi(foto)
+        val testoIntero = leggi(foto, "primo: foto intera")
         rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, codiceDi(it), "testo", angoliDi(it, Rect(0, 0, 0, 0), 1f)) }
 
         // 3. Zone dove ML Kit ha visto del testo ma non è riuscito a leggerlo: ritaglio e ingrandisco
@@ -147,7 +149,7 @@ class Raddrizzatore(private val context: Context) {
                     if (scala > 1f) Bitmap.createScaledBitmap(it, (it.width * scala).toInt(), (it.height * scala).toInt(), true)
                     else it
                 }
-                val testo = leggi(pezzo)
+                val testo = leggi(pezzo, "primo: tassello rot $gradi")
                 rigaCodice(testo)?.let {
                     // coordinate dal tassello alla foto intera
                     return Zona(base, gradi, nellaFoto(it.boundingBox!!, t, scala), codiceDi(it), "tasselli", angoliDi(it, t, scala))
@@ -195,7 +197,7 @@ class Raddrizzatore(private val context: Context) {
             val (ritaglio, area) = ritagliaConArea(base, z)
             provate += area
             for (g in listOf(0, 90)) {
-                rigaCodice(leggi(ruota(ritaglio, g)))?.let {
+                rigaCodice(leggi(ruota(ritaglio, g), "primo: zona ingrandita $g°"))?.let {
                     val angoli = it.cornerPoints?.takeIf { p -> p.size == 4 }?.map { p ->
                         dalRitaglio(p.x.toFloat(), p.y.toFloat(), ritaglio, area, g)
                     }
@@ -206,7 +208,11 @@ class Raddrizzatore(private val context: Context) {
         return null
     }
 
-    private suspend fun leggi(b: Bitmap): Text = lettoreTesto.process(InputImage.fromBitmap(b, 0)).await()
+    /** Modalità diagnosi: se non è null, ogni lettura viene annotata (vedi [Diario]). */
+    var diario: Diario? = null
+
+    private suspend fun leggi(b: Bitmap, fase: String = "lettura"): Text =
+        lettoreTesto.process(InputImage.fromBitmap(b, 0)).await().also { diario?.registra(fase, b, it) }
 
     /** Riga con il codice di 7 cifre (qualsiasi inclinazione), es. "1443984" o "A442/1443984". */
     private fun rigaCodice(testo: Text): Text.Line? =
@@ -271,7 +277,7 @@ class Raddrizzatore(private val context: Context) {
             }
             val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
             if (pezzoMigliore == null) pezzoMigliore = pezzo
-            val testo = leggi(pezzo)
+            val testo = leggi(pezzo, "lettura cartellino, correzione ${correzione.roundToInt()}°")
             val dati = LettoreCartellino.analizza(righeDa(testo))
             if (dati.codice == null) continue
             // Quanto sono storte in media le righe lette (0 = perfettamente dritte)
@@ -290,7 +296,7 @@ class Raddrizzatore(private val context: Context) {
         // Lettura incompleta (cartellino sbiadito o sfocato): riprovo con l'immagine "pulita"
         if (completezza(migliore) < 3) {
             pezzoMigliore?.let { p ->
-                val pulita = LettoreCartellino.analizza(righeDa(leggi(migliora(p))))
+                val pulita = LettoreCartellino.analizza(righeDa(leggi(migliora(p), "lettura cartellino, immagine pulita")))
                 if (pulita.codice != null && completezza(pulita) > completezza(migliore)) migliore = pulita
             }
         }
@@ -336,7 +342,7 @@ class Raddrizzatore(private val context: Context) {
             val immagine = if (versione == 0) ritaglio else migliora(ritaglio)
             for (g in rotazioni) {
                 val inversa = Matrix().also { matriceRotazione(immagine.width, immagine.height, g).invert(it) }
-                val codici = leggi(ruota(immagine, g)).textBlocks.flatMap { it.lines }.mapNotNull { l ->
+                val codici = leggi(ruota(immagine, g), "etichetta ${if (versione == 0) "" else "pulita "}$g°").textBlocks.flatMap { it.lines }.mapNotNull { l ->
                     val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
                     val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
                     CodiceTrovato(codice, angoli.map { q ->
@@ -403,7 +409,7 @@ class Raddrizzatore(private val context: Context) {
         // 1. Giro veloce
         val tutta = Rect(0, 0, dritta.width, dritta.height)
         codiciABarre(dritta, tutta, 1f).forEach { aggiungi(it, "barre") }
-        val testoIntero = leggi(dritta)
+        val testoIntero = leggi(dritta, "altri: foto intera")
         codiciNelTesto(testoIntero, tutta, 1f).forEach { aggiungi(it, "testo") }
         val prezzi = prezziNelTesto(testoIntero, tutta, 1f).toMutableList()   // segnaposto dei cartellini
 
@@ -418,7 +424,7 @@ class Raddrizzatore(private val context: Context) {
                 }
                 // Il codice a barre si legge anche se il cartellino è storto o girato
                 codiciABarre(pezzo, t, scala).forEach { aggiungi(it, "tasselli") }
-                val testo = leggi(pezzo)
+                val testo = leggi(pezzo, "altri: tassello")
                 codiciNelTesto(testo, t, scala).forEach { aggiungi(it, "tasselli") }
                 zone += zoneTesto(testo, t, scala)
                 prezzi += prezziNelTesto(testo, t, scala)
@@ -462,7 +468,7 @@ class Raddrizzatore(private val context: Context) {
                     val girato = ruota(ritaglio, g)
                     val inverso = Matrix().also { matriceRotazione(ritaglio.width, ritaglio.height, g).invert(it) }
                     val scalaRitaglio = ritaglio.width.toFloat() / area.width()
-                    leggi(girato).textBlocks.flatMap { it.lines }.forEach { l ->
+                    leggi(girato, "altri: zona $g°").textBlocks.flatMap { it.lines }.forEach { l ->
                         val codice = REGEX_CODICE.find(l.text)?.value ?: return@forEach
                         val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@forEach
                         // dal ritaglio girato alla foto dritta
@@ -521,7 +527,7 @@ class Raddrizzatore(private val context: Context) {
         val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), m, true)
         val inversa = Matrix().also { m.invert(it) }
 
-        return leggi(pezzo).textBlocks.flatMap { it.lines }.mapNotNull { l ->
+        return leggi(pezzo, "altri: attorno al prezzo").textBlocks.flatMap { it.lines }.mapNotNull { l ->
             val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
             val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
             CodiceTrovato(codice, angoli.map { q ->
