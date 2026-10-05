@@ -81,8 +81,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // I tasti del volume, dentro l'app, regolano i contenuti multimediali (quelli dei suoni dell'app)
-        volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         // App sempre chiara: icone di sistema (ora, batteria) sempre scure, anche col telefono in modalità scura
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
@@ -170,7 +168,6 @@ private fun Schermata(vm: FotoViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     val (s1, m1) = rimbalzo()
                     val (s2, m2) = rimbalzo()
-                    val (s3, m3) = rimbalzo()
                     Button(
                         onClick = ::scegliFoto,
                         modifier = Modifier.weight(1f).height(60.dp).then(m1),
@@ -185,14 +182,6 @@ private fun Schermata(vm: FotoViewModel) {
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
                     ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-                    FilledTonalButton(
-                        onClick = vm::cambiaSuoni,
-                        modifier = Modifier.height(60.dp).width(60.dp).then(m3),
-                        interactionSource = s3,
-                        shape = MaterialTheme.shapes.large,
-                        contentPadding = PaddingValues(0.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color.White, contentColor = BluNotte),
-                    ) { Text(if (vm.suoniAttivi) "🔊" else "🔇", fontSize = 22.sp) }
                 }
             }
             // Solo in modalità prove
