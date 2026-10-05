@@ -86,11 +86,12 @@ class Raddrizzatore(private val context: Context) {
 
             // Altri cartellini nella stessa foto (es. tanti librottini insieme)
             val altri = try {
-                if (codice != null && angoli != null) altriCartellini(dritta, codice, angoli) else emptyList()
+                if (codice != null && angoli != null) altriCartellini(dritta, codice, angoli) else null
             } catch (e: Exception) {
-                emptyList()
+                AltriCartellini(emptyList(), "altri: errore ${e.javaClass.simpleName}")
             }
-            return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati, altri, versoSicuro = true)
+            val metodo = zona.metodo + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true)
         }
         // Cartellino trovato ma verso incerto: se viene dalla rotazione di 90° almeno quella la applico
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
@@ -259,34 +260,41 @@ class Raddrizzatore(private val context: Context) {
         val altezza get() = hypot(angoli[3].x - angoli[0].x, angoli[3].y - angoli[0].y)
     }
 
+    /** Altri cartellini trovati nella foto, più un riassunto per le prove ("cosa ha trovato e cosa ha scartato"). */
+    private class AltriCartellini(val dati: List<DatiCartellino>, val diagnostica: String)
+
     /**
      * Cerca gli ALTRI cartellini nella foto già dritta e li legge tutti.
-     * Prima un giro veloce (codici a barre + testo su tutta la foto); se trova almeno un altro
-     * cartellino, fa anche il giro a tasselli per non perdere quelli piccoli.
-     * Tiene solo i cartellini grandi almeno metà di quello principale: quelli sullo sfondo
-     * (es. sugli scaffali) sono più piccoli e vengono ignorati.
+     * 1. giro veloce: codici a barre + testo su tutta la foto;
+     * 2. se c'è almeno un altro cartellino: tasselli (codici a barre + testo, anche storti);
+     * 3. zone con testo illeggibile: ritagliate, ingrandite e rilette.
+     * Scarta i cartellini molto più piccoli del principale (sullo sfondo) e le doppie letture nello stesso punto.
      */
-    private suspend fun altriCartellini(dritta: Bitmap, principale: String, angoliPrincipale: List<PointF>): List<DatiCartellino> {
+    private suspend fun altriCartellini(dritta: Bitmap, principale: String, angoliPrincipale: List<PointF>): AltriCartellini {
         val altezzaPrincipale = CodiceTrovato(principale, angoliPrincipale).altezza
         val trovati = mutableMapOf<String, CodiceTrovato>()
         val posizioni = mutableListOf(angoliPrincipale[0])   // dove stanno i cartellini già presi
-        fun aggiungi(c: CodiceTrovato) {
+        val conta = mutableMapOf<String, Int>()               // per la diagnostica
+        fun segna(cosa: String) { conta[cosa] = (conta[cosa] ?: 0) + 1 }
+        fun aggiungi(c: CodiceTrovato, metodo: String) {
             if (c.codice == principale || c.codice in trovati) return
-            if (c.altezza < altezzaPrincipale / 3) return   // molto più piccolo: è sullo sfondo (es. scaffali)
+            if (c.altezza < altezzaPrincipale / 3) return segna("piccoli")   // sullo sfondo (es. scaffali)
             // Nello stesso punto di un cartellino già preso = stesso cartellino letto con una cifra sbagliata
-            val vicino = posizioni.any { p -> hypot(p.x - c.angoli[0].x, p.y - c.angoli[0].y) < 3 * altezzaPrincipale }
-            if (vicino) return
+            if (posizioni.any { p -> hypot(p.x - c.angoli[0].x, p.y - c.angoli[0].y) < 3 * altezzaPrincipale }) return segna("doppi")
             trovati[c.codice] = c
             posizioni += c.angoli[0]
+            segna(metodo)
         }
 
-        // Giro veloce
+        // 1. Giro veloce
         val tutta = Rect(0, 0, dritta.width, dritta.height)
-        codiciABarre(dritta, tutta, 1f).forEach(::aggiungi)
-        codiciNelTesto(leggi(dritta), tutta, 1f).forEach(::aggiungi)
+        codiciABarre(dritta, tutta, 1f).forEach { aggiungi(it, "barre") }
+        val testoIntero = leggi(dritta)
+        codiciNelTesto(testoIntero, tutta, 1f).forEach { aggiungi(it, "testo") }
 
-        // Ci sono altri cartellini: giro a tasselli per trovare anche quelli piccoli
         if (trovati.isNotEmpty()) {
+            // 2. Tasselli
+            val zone = zoneTesto(testoIntero, tutta).toMutableList()
             for (t in tasselli(dritta)) {
                 val scala = (LATO_TASSELLO.toFloat() / max(t.width(), t.height())).coerceAtLeast(1f)
                 val pezzo = Bitmap.createBitmap(dritta, t.left, t.top, t.width(), t.height()).let {
@@ -294,15 +302,50 @@ class Raddrizzatore(private val context: Context) {
                     else it
                 }
                 // Il codice a barre si legge anche se il cartellino è storto o girato
-                codiciABarre(pezzo, t, scala).forEach(::aggiungi)
-                codiciNelTesto(leggi(pezzo), t, scala).forEach(::aggiungi)
+                codiciABarre(pezzo, t, scala).forEach { aggiungi(it, "tasselli") }
+                val testo = leggi(pezzo)
+                codiciNelTesto(testo, t, scala).forEach { aggiungi(it, "tasselli") }
+                zone += zoneTesto(testo, t, scala)
             }
+
+            // 3. Zone con testo illeggibile lontane dai cartellini già presi: ritaglio, ingrandisco, rileggo
+            val provate = mutableListOf<Rect>()
+            var tentativi = 0
+            for (z in zone) {
+                if (tentativi >= MAX_ZONE_ALTRI) break
+                val cx = z.centerX().toFloat()
+                val cy = z.centerY().toFloat()
+                if (provate.any { it.contains(z.centerX(), z.centerY()) }) continue
+                if (posizioni.any { p -> hypot(p.x - cx, p.y - cy) < 8 * altezzaPrincipale }) continue
+                tentativi++
+                val (ritaglio, area) = ritagliaConArea(dritta, z)
+                provate += area
+                for (g in listOf(0, 90)) {
+                    val girato = ruota(ritaglio, g)
+                    val inverso = Matrix().also { matriceRotazione(ritaglio.width, ritaglio.height, g).invert(it) }
+                    val scalaRitaglio = ritaglio.width.toFloat() / area.width()
+                    leggi(girato).textBlocks.flatMap { it.lines }.forEach { l ->
+                        val codice = REGEX_CODICE.find(l.text)?.value ?: return@forEach
+                        val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@forEach
+                        // dal ritaglio girato alla foto dritta
+                        val nellaFoto = angoli.map { p ->
+                            val xy = floatArrayOf(p.x.toFloat(), p.y.toFloat())
+                            inverso.mapPoints(xy)
+                            PointF(xy[0] / scalaRitaglio + area.left, xy[1] / scalaRitaglio + area.top)
+                        }
+                        aggiungi(CodiceTrovato(codice, nellaFoto), "ingrandimento")
+                    }
+                }
+            }
+            if (tentativi > 0) conta["zone provate"] = tentativi
         }
 
         // Leggo ogni cartellino e li metto in ordine di lettura (dall'alto, da sinistra)
-        return trovati.values
+        val dati = trovati.values
             .sortedWith(compareBy({ (it.angoli[0].y / (altezzaPrincipale * 6)).toInt() }, { it.angoli[0].x }))
             .map { c -> leggiCartellino(dritta, c.angoli)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
+        val diagnostica = if (conta.isEmpty()) "" else "altri: " + conta.entries.joinToString(", ") { "${it.key} ${it.value}" }
+        return AltriCartellini(dati, diagnostica)
     }
 
     /** Righe col codice (con qualsiasi inclinazione) lette in un pezzo di foto, riportate nelle coordinate della foto. */
@@ -421,7 +464,8 @@ class Raddrizzatore(private val context: Context) {
         private const val LATO_RITAGLIO = 1200
         private const val LATO_TASSELLO = 1600   // tasselli più piccoli di così vengono ingranditi
         private const val ALTEZZA_TESTO = 40f    // altezza (px) a cui porto il testo piccolo del cartellino prima di leggerlo
-        private const val MAX_ZONE = 6           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
+        private const val MAX_ZONE = 6
+        private const val MAX_ZONE_ALTRI = 12    // zone ingrandite per cercare gli altri cartellini (foto con tanti articoli)           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
         private val SETTE_CIFRE = Regex("\\d{7}")
         // 7 cifre esatte, non attaccate ad altre cifre (esclude i codici EAN a 13 cifre)
