@@ -306,6 +306,7 @@ private fun ModificaArticolo(
     var descrizione by remember { mutableStateOf(iniziale?.descrizione.orEmpty()) }
     var prezzo by remember { mutableStateOf(iniziale?.prezzo?.removePrefix("€")?.trim().orEmpty()) }
     var taglia by remember { mutableStateOf(iniziale?.taglia.orEmpty()) }
+    var rigaVeloce by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = annulla,
@@ -313,6 +314,22 @@ private fun ModificaArticolo(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = guardaFoto, modifier = Modifier.fillMaxWidth()) { Text("🔍 Guarda la foto") }
+                // Tutto in una riga (anche dettato col microfono della tastiera): l'app riempie i campi sotto
+                OutlinedTextField(
+                    rigaVeloce,
+                    { testo ->
+                        rigaVeloce = testo
+                        val d = RigaVeloce.analizza(testo)
+                        codice = d.codice.orEmpty()
+                        descrizione = d.descrizione.orEmpty()
+                        prezzo = d.prezzo?.removePrefix("€")?.trim().orEmpty()
+                        taglia = d.taglia.orEmpty()
+                    },
+                    label = { Text("Scrivi tutto in una riga") },
+                    placeholder = { Text("es. 1444115 librottino inside out 1,50") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("…oppure riempi o correggi i campi:", fontSize = 13.sp, color = Color.Gray)
                 OutlinedTextField(codice, { codice = it.filter(Char::isDigit).take(7) }, label = { Text("Codice") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
                 OutlinedTextField(descrizione, { descrizione = it }, label = { Text("Descrizione") })
