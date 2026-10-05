@@ -272,7 +272,7 @@ class Raddrizzatore(private val context: Context) {
         val posizioni = mutableListOf(angoliPrincipale[0])   // dove stanno i cartellini già presi
         fun aggiungi(c: CodiceTrovato) {
             if (c.codice == principale || c.codice in trovati) return
-            if (c.altezza < altezzaPrincipale / 2) return   // troppo piccolo: è sullo sfondo
+            if (c.altezza < altezzaPrincipale / 3) return   // molto più piccolo: è sullo sfondo (es. scaffali)
             // Nello stesso punto di un cartellino già preso = stesso cartellino letto con una cifra sbagliata
             val vicino = posizioni.any { p -> hypot(p.x - c.angoli[0].x, p.y - c.angoli[0].y) < 3 * altezzaPrincipale }
             if (vicino) return
@@ -281,11 +281,9 @@ class Raddrizzatore(private val context: Context) {
         }
 
         // Giro veloce
-        lettoreBarre.process(InputImage.fromBitmap(dritta, 0)).await().forEach { b ->
-            val valore = b.rawValue?.takeIf { it.matches(SETTE_CIFRE) } ?: return@forEach
-            b.boundingBox?.let { aggiungi(CodiceTrovato(valore, angoliDaCodiceABarre(it))) }
-        }
-        codiciNelTesto(leggi(dritta), Rect(0, 0, dritta.width, dritta.height), 1f).forEach(::aggiungi)
+        val tutta = Rect(0, 0, dritta.width, dritta.height)
+        codiciABarre(dritta, tutta, 1f).forEach(::aggiungi)
+        codiciNelTesto(leggi(dritta), tutta, 1f).forEach(::aggiungi)
 
         // Ci sono altri cartellini: giro a tasselli per trovare anche quelli piccoli
         if (trovati.isNotEmpty()) {
@@ -295,6 +293,8 @@ class Raddrizzatore(private val context: Context) {
                     if (scala > 1f) Bitmap.createScaledBitmap(it, (it.width * scala).toInt(), (it.height * scala).toInt(), true)
                     else it
                 }
+                // Il codice a barre si legge anche se il cartellino è storto o girato
+                codiciABarre(pezzo, t, scala).forEach(::aggiungi)
                 codiciNelTesto(leggi(pezzo), t, scala).forEach(::aggiungi)
             }
         }
@@ -305,27 +305,37 @@ class Raddrizzatore(private val context: Context) {
             .map { c -> leggiCartellino(dritta, c.angoli)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
     }
 
-    /** Righe col codice (quasi orizzontali) lette in un pezzo di foto, riportate nelle coordinate della foto. */
+    /** Righe col codice (con qualsiasi inclinazione) lette in un pezzo di foto, riportate nelle coordinate della foto. */
     private fun codiciNelTesto(testo: Text, pezzo: Rect, scala: Float): List<CodiceTrovato> =
         testo.textBlocks.flatMap { it.lines }.mapNotNull { l ->
             val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
-            val angoli = l.cornerPoints?.takeIf { abs(l.angle) < 45f && it.size == 4 } ?: return@mapNotNull null
+            val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
             CodiceTrovato(codice, angoli.map { PointF(it.x / scala + pezzo.left, it.y / scala + pezzo.top) })
         }
 
+    /** Codici a barre (7 cifre) in un pezzo di foto, con la posizione stimata della riga del codice. */
+    private suspend fun codiciABarre(pezzo: Bitmap, area: Rect, scala: Float): List<CodiceTrovato> =
+        lettoreBarre.process(InputImage.fromBitmap(pezzo, 0)).await().mapNotNull { b ->
+            val valore = b.rawValue?.takeIf { it.matches(SETTE_CIFRE) } ?: return@mapNotNull null
+            val angoli = b.cornerPoints?.takeIf { it.size == 4 }
+                ?.map { PointF(it.x / scala + area.left, it.y / scala + area.top) }
+                ?: return@mapNotNull null
+            CodiceTrovato(valore, rigaCodiceDaCodiceABarre(angoli))
+        }
+
     /**
-     * Posizione stimata della riga del codice partendo dal codice a barre
+     * Posizione stimata della riga del codice partendo dai 4 angoli del codice a barre
      * (sul cartellino il codice sta subito a destra del codice a barre, in basso).
+     * Funziona con qualsiasi inclinazione: ci si sposta "lungo" e "giù" rispetto al codice a barre.
      */
-    private fun angoliDaCodiceABarre(b: Rect): List<PointF> {
-        val w = b.width().toFloat()
-        val h = b.height().toFloat()
-        val sx = b.right + 0.02f * w
-        val dx = b.right + 0.35f * w
-        val su = b.bottom - 0.17f * h
-        val giu = b.bottom + 0.02f * h
-        return listOf(PointF(sx, su), PointF(dx, su), PointF(dx, giu), PointF(sx, giu))
+    private fun rigaCodiceDaCodiceABarre(barre: List<PointF>): List<PointF> {
+        val (a, b, c) = barre                                   // in alto a sx, in alto a dx, in basso a dx
+        val lungoX = b.x - a.x; val lungoY = b.y - a.y          // direzione della larghezza
+        val giuX = c.x - b.x;   val giuY = c.y - b.y            // direzione dell'altezza
+        fun punto(lungo: Float, giu: Float) = PointF(a.x + lungoX * lungo + giuX * giu, a.y + lungoY * lungo + giuY * giu)
+        return listOf(punto(1.02f, 0.83f), punto(1.35f, 0.83f), punto(1.35f, 1.02f), punto(1.02f, 1.02f))
     }
+
 
     /** Quanti dati importanti ha la lettura (codice, descrizione, prezzo). */
     private fun completezza(d: DatiCartellino?): Int =
