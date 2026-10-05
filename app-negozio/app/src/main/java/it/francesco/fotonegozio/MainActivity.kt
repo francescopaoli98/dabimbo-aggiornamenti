@@ -133,7 +133,6 @@ private fun Schermata(vm: FotoViewModel) {
                         testo = vm.testo(f),
                         cambiaTesto = { t -> vm.cambiaTesto(f.numero, t) },
                         modificaTesto = { testoInModifica = f.numero },
-                        pixelatura = { on -> vm.pixelatura(f.numero, on) },
                     )
                 }
             }
@@ -188,7 +187,6 @@ private fun Scheda(
     testo: String,
     cambiaTesto: (String?) -> Unit,
     modificaTesto: () -> Unit,
-    pixelatura: (Boolean) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
@@ -276,15 +274,6 @@ private fun Scheda(
                 }
             }
             if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
-            // Pezzo 4: sfondo pixelato sì/no
-            if (f.filePixelata != null) {
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Sfondo pixelato", Modifier.weight(1f))
-                    Switch(checked = f.pixelata, onCheckedChange = pixelatura)
-                }
-            } else if (!f.inCorso && f.file != null) {
-                Text("Sfondo non pixelato (separazione oggetti non riuscita)", fontSize = 12.sp, color = Color.Gray)
-            }
             if (f.diario != null && !f.diario.vuoto) {
                 OutlinedButton(onClick = salvaDiagnosi, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("📷 Salva diagnosi in Galleria") }
             }

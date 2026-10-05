@@ -35,7 +35,6 @@ class FotoRaddrizzata(
     val altri: List<DatiCartellino> = emptyList(), // altri cartellini nella stessa foto (es. 9 librottini)
     val versoSicuro: Boolean = false,  // true = il verso è stato deciso leggendo il cartellino dritto
     val etichetteViste: Int = 0,       // cartellini che si vedono nella foto (contati dai prezzi)
-    val zoneCartellini: List<ZonaNitida> = emptyList(),   // dove stanno i cartellini (per la pixelatura)
 )
 
 /**
@@ -97,8 +96,7 @@ class Raddrizzatore(private val context: Context) {
                 AltriCartellini(emptyList(), "altri: errore ${e.javaClass.simpleName}")
             }
             val metodo = zona.metodo + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
-            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true, etichetteViste = altri?.etichetteViste ?: 0,
-                zoneCartellini = listOfNotNull(angoli?.let { zonaDaCodice(it) }) + altri?.zone.orEmpty() + zoneEtichette(dritta))
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true, etichetteViste = altri?.etichetteViste ?: 0)
         }
         // Il ritaglio non ha funzionato, ma se conosco la riga del codice so in che direzione è scritta:
         // giro la foto in modo che la riga venga orizzontale e leggo il cartellino da lì
@@ -116,8 +114,7 @@ class Raddrizzatore(private val context: Context) {
                 if (codice != null) altriCartellini(dritta, codice, angoliDritti) else null
             } catch (e: Exception) { null }
             val metodo = zona.metodo + ", verso dalla riga" + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
-            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = false, etichetteViste = altri?.etichetteViste ?: 0,
-                zoneCartellini = listOf(zonaDaCodice(angoliDritti)) + altri?.zone.orEmpty() + zoneEtichette(dritta))
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = false, etichetteViste = altri?.etichetteViste ?: 0)
         }
         // Verso incerto e riga sconosciuta: applico almeno la rotazione con cui il cartellino è stato trovato
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
@@ -390,23 +387,6 @@ class Raddrizzatore(private val context: Context) {
         return PointF(xy[0] / scala + area.left, xy[1] / scala + area.top)
     }
 
-    /** Etichette riconosciute dalla forma (anche sfocate e non lette): restano nitide insieme al loro oggetto. */
-    private fun zoneEtichette(dritta: Bitmap): List<ZonaNitida> = try {
-        etichetteIn(dritta).take(MAX_ETICHETTE).map { r ->
-            ZonaNitida(r.exactCenterX(), r.exactCenterY(), max(r.width(), r.height()) * 0.7f)
-        }
-    } catch (e: Exception) {
-        emptyList()
-    }
-
-    /** Zona nitida attorno a un cartellino, dai 4 angoli della riga del codice. */
-    private fun zonaDaCodice(angoli: List<PointF>): ZonaNitida {
-        val cx = angoli.sumOf { it.x.toDouble() }.toFloat() / 4
-        val cy = angoli.sumOf { it.y.toDouble() }.toFloat() / 4
-        val larghezza = hypot(angoli[1].x - angoli[0].x, angoli[1].y - angoli[0].y)
-        return ZonaNitida(cx, cy, SceltaNitidi.raggioDaCodice(larghezza))
-    }
-
     /** Riquadro che contiene i 4 angoli. */
     private fun riquadroDi(angoli: List<PointF>) = Rect(
         angoli.minOf { it.x }.toInt(), angoli.minOf { it.y }.toInt(),
@@ -419,10 +399,7 @@ class Raddrizzatore(private val context: Context) {
     }
 
     /** Altri cartellini trovati nella foto, più un riassunto per le prove ("cosa ha trovato e cosa ha scartato"). */
-    private class AltriCartellini(
-        val dati: List<DatiCartellino>, val diagnostica: String, val etichetteViste: Int = 0,
-        val zone: List<ZonaNitida> = emptyList(),
-    )
+    private class AltriCartellini(val dati: List<DatiCartellino>, val diagnostica: String, val etichetteViste: Int = 0)
 
     /**
      * Cerca gli ALTRI cartellini nella foto già dritta e li legge tutti.
@@ -537,10 +514,7 @@ class Raddrizzatore(private val context: Context) {
             val c = p.centro
             if (prezziDistinti.none { q -> hypot(q.centro.x - c.x, q.centro.y - c.y) < 3 * max(p.altezza, q.altezza) }) prezziDistinti += p
         }
-        // Dove stanno i cartellini (letti e no), per tenerli nitidi nella pixelatura
-        val zone = trovati.values.map { zonaDaCodice(it.angoli) } +
-            prezziDistinti.map { ZonaNitida(it.centro.x, it.centro.y, SceltaNitidi.raggioDaPrezzo(it.altezza)) }
-        return AltriCartellini(dati, diagnostica + (if (prezziDistinti.isNotEmpty()) " · prezzi visti ${prezziDistinti.size}" else ""), prezziDistinti.size, zone)
+        return AltriCartellini(dati, diagnostica + (if (prezziDistinti.isNotEmpty()) " · prezzi visti ${prezziDistinti.size}" else ""), prezziDistinti.size)
     }
 
     /** Un prezzo ("1,50") letto nella foto: segna dove sta un cartellino. */
