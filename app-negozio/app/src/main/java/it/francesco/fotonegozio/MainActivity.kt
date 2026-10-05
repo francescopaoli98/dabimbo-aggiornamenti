@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -85,8 +86,47 @@ private fun Schermata(vm: FotoViewModel) {
     var inModifica by remember { mutableStateOf<Pair<Int, Int?>?>(null) }   // (foto, articolo) - articolo null = nuovo
     var dizionarioAperto by remember { mutableStateOf(false) }
     var testoInModifica by remember { mutableStateOf<Int?>(null) }   // numero della foto di cui si corregge il testo
+    var daConfermare by remember { mutableStateOf<Int?>(null) }      // foto con avvisi: chiedo prima di pubblicare
+    val context = LocalContext.current
 
-    Scaffold { padding ->
+    // Pezzo 6: foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
+    fun pubblica(f: Foto) {
+        val file = f.file ?: return
+        if (Condivisione.pubblica(context, file, vm.testo(f))) vm.segnaPubblicata(f.numero)
+        else vm.messaggio = "WhatsApp non trovato sul telefono"
+    }
+    fun chiediEPubblica(f: Foto) {
+        if (f.avvisi.isEmpty()) pubblica(f) else daConfermare = f.numero
+    }
+
+    Scaffold(
+        bottomBar = {
+            // Pulsante grande sempre visibile: la prossima foto da pubblicare
+            if (vm.foto.isNotEmpty()) {
+                Surface(shadowElevation = 8.dp) {
+                    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+                        val prossima = vm.prossima
+                        val tutte = vm.foto.size
+                        Text("Pubblicate ${vm.quantePubblicate} di $tutte", fontSize = 14.sp, color = Color.Gray)
+                        Button(
+                            onClick = { prossima?.let { chiediEPubblica(it) } },
+                            enabled = prossima != null,
+                            modifier = Modifier.fillMaxWidth().height(64.dp).padding(top = 4.dp),
+                        ) {
+                            Text(
+                                when {
+                                    prossima != null -> "📤 Pubblica la prossima · Foto ${prossima.numero}"
+                                    vm.quantePubblicate == tutte -> "✓ Tutte pubblicate"
+                                    else -> "Attendi, sto preparando le foto…"
+                                },
+                                fontSize = 18.sp,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+    ) { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
             Button(
                 onClick = { scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -133,6 +173,7 @@ private fun Schermata(vm: FotoViewModel) {
                         testo = vm.testo(f),
                         cambiaTesto = { t -> vm.cambiaTesto(f.numero, t) },
                         modificaTesto = { testoInModifica = f.numero },
+                        pubblica = { chiediEPubblica(f) },
                     )
                 }
             }
@@ -141,6 +182,19 @@ private fun Schermata(vm: FotoViewModel) {
 
     if (dizionarioAperto) {
         SchermataDizionario(vm.dizionario, salva = vm::salvaSigla, chiudi = { dizionarioAperto = false })
+    }
+
+    // Foto con avvisi: prima di pubblicare chiedo
+    daConfermare?.let { numero ->
+        vm.foto.firstOrNull { it.numero == numero }?.let { f ->
+            AlertDialog(
+                onDismissRequest = { daConfermare = null },
+                title = { Text("Foto ${f.numero}: da controllare") },
+                text = { Text(f.avvisi.joinToString("\n") { "• $it" } + "\n\nVuoi sistemarla prima, o pubblicarla così?") },
+                confirmButton = { TextButton(onClick = { daConfermare = null; pubblica(f) }) { Text("Pubblica lo stesso") } },
+                dismissButton = { TextButton(onClick = { daConfermare = null }) { Text("La sistemo") } },
+            )
+        }
     }
 
     // Correzione del testo per lo stato (schermo diviso con la foto)
@@ -187,12 +241,15 @@ private fun Scheda(
     testo: String,
     cambiaTesto: (String?) -> Unit,
     modificaTesto: () -> Unit,
+    pubblica: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                if (f.daControllare && !f.inCorso) {
+                if (f.pubblicata) {
+                    Text("✓ Pubblicata", color = VERDE, fontWeight = FontWeight.Bold)
+                } else if (f.daControllare && !f.inCorso) {
                     Text("⚠ Controlla il verso", color = ARANCIONE, fontWeight = FontWeight.Bold)
                 }
             }
@@ -274,6 +331,11 @@ private fun Scheda(
                 }
             }
             if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
+            if (f.file != null && !f.inCorso) {
+                Button(onClick = pubblica, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Text(if (f.pubblicata) "↺ Pubblica di nuovo" else "📤 Pubblica questa")
+                }
+            }
             if (f.diario != null && !f.diario.vuoto) {
                 OutlinedButton(onClick = salvaDiagnosi, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("📷 Salva diagnosi in Galleria") }
             }
@@ -373,6 +435,7 @@ private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) ->
 private fun Avviso(testo: String) = Text(testo, color = ARANCIONE, fontWeight = FontWeight.Bold)
 
 private val ARANCIONE = Color(0xFFE65100)
+private val VERDE = Color(0xFF2E7D32)
 
 /** I dati di UN articolo, così come sono letti dal cartellino (le sigle le espande il pezzo 3). */
 @Composable

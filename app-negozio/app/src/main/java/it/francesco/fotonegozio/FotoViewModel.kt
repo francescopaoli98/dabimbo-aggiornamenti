@@ -41,7 +41,8 @@ data class Foto(
     val errore: String? = null,
     val diario: Diario? = null,          // modalità diagnosi: cosa ha provato a leggere
     val testoManuale: String? = null,
-    val etichetteViste: Int = 0,         // cartellini che si vedono nella foto (contati dai prezzi)    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
+    val etichetteViste: Int = 0,         // cartellini che si vedono nella foto (contati dai prezzi)
+    val pubblicata: Boolean = false,     // pezzo 6: già mandata a WhatsApp    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
 )
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
@@ -57,6 +58,14 @@ private fun caricaDizionario(app: Application): List<VoceDizionario> {
     val file = fileDizionario(app)
     if (!file.exists()) file.writeText(app.assets.open("dizionario.txt").bufferedReader().readText())
     return Dizionario.leggi(file.readText()).sortedBy { it.sigla }
+}
+
+/** Cose da controllare prima di pubblicare (avvisi arancioni). Vuota = tutto a posto. */
+val Foto.avvisi: List<String> get() = buildList {
+    if (daControllare) add("il verso della foto")
+    if (articoli.isEmpty()) add("il cartellino non è stato letto")
+    if (articoli.any { it.daCompletare }) add("un articolo ha descrizione o prezzo mancanti")
+    if (etichetteViste > articoli.size) add("ci sono etichette non lette")
 }
 
 /** Tiene la lista delle foto ed esegue l'elaborazione una alla volta, in sottofondo. */
@@ -91,6 +100,16 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         }
         dizionario.sortBy { it.sigla }
         fileDizionario(getApplication()).writeText(Dizionario.scrivi(dizionario))
+    }
+
+    /** Pezzo 6: la prossima foto da pubblicare, in ordine (null = tutte pubblicate o ancora in lavorazione). */
+    val prossima: Foto? get() = foto.firstOrNull { !it.pubblicata && !it.inCorso && it.file != null && it.errore == null }
+
+    val quantePubblicate: Int get() = foto.count { it.pubblicata }
+
+    fun segnaPubblicata(numero: Int, pubblicata: Boolean = true) {
+        val i = foto.indexOfFirst { it.numero == numero }
+        if (i >= 0) foto[i] = foto[i].copy(pubblicata = pubblicata)
     }
 
     /** Modalità diagnosi: l'app si annota ogni lettura, per mandarla a chi sistema l'app. */
