@@ -33,6 +33,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import java.io.File
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
@@ -122,17 +125,16 @@ private fun Schermata(vm: FotoViewModel) {
         val f = vm.foto.firstOrNull { it.numero == numero }
         if (f != null) {
             ModificaArticolo(
+                foto = f.file,
                 iniziale = indice?.let { f.articoli.getOrNull(it) },
                 nuovo = indice == null,
-                guardaFoto = { ingrandita = numero },
                 salva = { d -> vm.salvaArticolo(numero, indice, d); inModifica = null },
                 annulla = { inModifica = null },
             )
         }
     }
 
-    // Cerco sempre la versione aggiornata, così dopo "Gira" l'ingrandimento cambia subito.
-    // Viene dopo la modifica: così dalla modifica si può aprire la foto e leggerla bene.
+    // Cerco sempre la versione aggiornata, così dopo "Gira" l'ingrandimento cambia subito
     vm.foto.firstOrNull { it.numero == ingrandita }?.let { f ->
         Ingrandimento(f, gira = { gradi -> vm.gira(f.numero, gradi) }) { ingrandita = null }
     }
@@ -293,12 +295,15 @@ private fun FotoZoomabile(immagine: ImageBitmap, modifier: Modifier) {
     }
 }
 
-/** Finestra per scrivere o correggere a mano un articolo. */
+/**
+ * Schermo per scrivere o correggere a mano un articolo:
+ * sopra la foto (si ingrandisce con le dita mentre si scrive), sotto i campi.
+ */
 @Composable
 private fun ModificaArticolo(
+    foto: File?,
     iniziale: DatiCartellino?,
     nuovo: Boolean,
-    guardaFoto: () -> Unit,
     salva: (DatiCartellino?) -> Unit,
     annulla: () -> Unit,
 ) {
@@ -307,13 +312,26 @@ private fun ModificaArticolo(
     var prezzo by remember { mutableStateOf(iniziale?.prezzo?.removePrefix("€")?.trim().orEmpty()) }
     var taglia by remember { mutableStateOf(iniziale?.taglia.orEmpty()) }
     var rigaVeloce by remember { mutableStateOf("") }
+    val immagine = remember(foto) { foto?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
 
-    AlertDialog(
-        onDismissRequest = annulla,
-        title = { Text(if (nuovo) "Nuovo articolo" else "Modifica articolo") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = guardaFoto, modifier = Modifier.fillMaxWidth()) { Text("🔍 Guarda la foto") }
+    Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
+            // Sopra: la foto, ingrandibile (due dita / doppio tocco)
+            Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
+                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize()) }
+                Text(
+                    "Due dita per ingrandire",
+                    color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.TopCenter).background(Color(0x88000000)).padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+
+            // Sotto: i campi
+            Column(
+                Modifier.weight(1.3f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(if (nuovo) "Nuovo articolo" else "Modifica articolo", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 // Tutto in una riga (anche dettato col microfono della tastiera): l'app riempie i campi sotto
                 OutlinedTextField(
                     rigaVeloce,
@@ -331,32 +349,30 @@ private fun ModificaArticolo(
                 )
                 Text("…oppure riempi o correggi i campi:", fontSize = 13.sp, color = Color.Gray)
                 OutlinedTextField(codice, { codice = it.filter(Char::isDigit).take(7) }, label = { Text("Codice") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
-                OutlinedTextField(descrizione, { descrizione = it }, label = { Text("Descrizione") })
-                OutlinedTextField(prezzo, { prezzo = it }, label = { Text("Prezzo (es. 2,50)") }, prefix = { Text("€ ") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
-                OutlinedTextField(taglia, { taglia = it }, label = { Text("Taglia (se c'è)") }, singleLine = true)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(descrizione, { descrizione = it }, label = { Text("Descrizione") }, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(prezzo, { prezzo = it }, label = { Text("Prezzo") }, prefix = { Text("€ ") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, modifier = Modifier.weight(1f))
+                    OutlinedTextField(taglia, { taglia = it }, label = { Text("Taglia") }, singleLine = true, modifier = Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (!nuovo) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                    TextButton(onClick = annulla) { Text("Annulla") }
+                    Button(onClick = {
+                        salva(
+                            DatiCartellino(
+                                codice = codice.ifBlank { null },
+                                descrizione = descrizione.trim().ifBlank { null },
+                                prezzo = prezzoInFormato(prezzo),
+                                taglia = taglia.trim().ifBlank { null },
+                            )
+                        )
+                    }) { Text("Salva") }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                salva(
-                    DatiCartellino(
-                        codice = codice.ifBlank { null },
-                        descrizione = descrizione.trim().ifBlank { null },
-                        prezzo = prezzoInFormato(prezzo),
-                        taglia = taglia.trim().ifBlank { null },
-                    )
-                )
-            }) { Text("Salva") }
-        },
-        dismissButton = {
-            Row {
-                if (!nuovo) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = annulla) { Text("Annulla") }
-            }
-        },
-    )
+        }
+    }
 }
 
 /** "2,5" → "€ 2,50"; "3" → "€ 3,00"; vuoto → null. */
