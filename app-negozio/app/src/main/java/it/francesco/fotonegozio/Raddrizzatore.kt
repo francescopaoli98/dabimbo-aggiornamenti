@@ -379,12 +379,12 @@ class Raddrizzatore(private val context: Context) {
         }
 
     /**
-     * Ritaglia un quadrato attorno al prezzo (il codice sta in alto a destra, entro ~7 altezze del prezzo),
+     * Ritaglia un quadrato attorno al prezzo (il codice sta in alto a destra, entro ~8 altezze del prezzo),
      * lo raddrizza con l'inclinazione del prezzo, lo ingrandisce e cerca i codici.
      */
     private suspend fun codiciAttornoAlPrezzo(dritta: Bitmap, p: PrezzoTrovato): List<CodiceTrovato> {
         val c = p.centro
-        val meta = 7 * p.altezza
+        val meta = 10 * p.altezza   // misurato su Inside Out: il codice sta a ~7,5 altezze del prezzo
         val area = Rect((c.x - meta).toInt(), (c.y - meta).toInt(), (c.x + meta).toInt(), (c.y + meta).toInt())
         if (!area.intersect(0, 0, dritta.width, dritta.height)) return emptyList()
 
