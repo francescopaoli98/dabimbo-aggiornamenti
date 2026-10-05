@@ -84,6 +84,7 @@ private fun Schermata(vm: FotoViewModel) {
     var ingrandita by remember { mutableStateOf<Int?>(null) }   // numero della foto aperta a schermo intero
     var inModifica by remember { mutableStateOf<Pair<Int, Int?>?>(null) }   // (foto, articolo) - articolo null = nuovo
     var dizionarioAperto by remember { mutableStateOf(false) }
+    var testoInModifica by remember { mutableStateOf<Int?>(null) }   // numero della foto di cui si corregge il testo
 
     Scaffold { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
@@ -131,6 +132,7 @@ private fun Schermata(vm: FotoViewModel) {
                         salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                         testo = vm.testo(f),
                         cambiaTesto = { t -> vm.cambiaTesto(f.numero, t) },
+                        modificaTesto = { testoInModifica = f.numero },
                     )
                 }
             }
@@ -139,6 +141,19 @@ private fun Schermata(vm: FotoViewModel) {
 
     if (dizionarioAperto) {
         SchermataDizionario(vm.dizionario, salva = vm::salvaSigla, chiudi = { dizionarioAperto = false })
+    }
+
+    // Correzione del testo per lo stato (schermo diviso con la foto)
+    testoInModifica?.let { numero ->
+        vm.foto.firstOrNull { it.numero == numero }?.let { f ->
+            ModificaTesto(
+                foto = f.file,
+                iniziale = vm.testo(f),
+                manuale = f.testoManuale != null,
+                salva = { t -> vm.cambiaTesto(numero, t); testoInModifica = null },
+                annulla = { testoInModifica = null },
+            )
+        }
     }
 
     // Modifica / aggiunta di un articolo a mano
@@ -171,6 +186,7 @@ private fun Scheda(
     salvaDiagnosi: () -> Unit,
     testo: String,
     cambiaTesto: (String?) -> Unit,
+    modificaTesto: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
@@ -225,12 +241,18 @@ private fun Scheda(
                             Text("Testo per lo stato", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             if (f.testoManuale != null) TextButton(onClick = { cambiaTesto(null) }) { Text("↺ Automatico") }
                         }
-                        OutlinedTextField(
-                            value = testo,
-                            onValueChange = { cambiaTesto(it) },
+                        // Toccando il testo si apre lo schermo diviso: foto ingrandibile sopra, testo sotto
+                        Surface(
+                            onClick = modificaTesto,
+                            shape = MaterialTheme.shapes.small,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.fillMaxWidth(),
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                        )
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(testo, style = MaterialTheme.typography.bodyLarge)
+                                Text("✏ Tocca per correggere", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+                            }
+                        }
                         if (f.testoManuale != null) Text("Corretto a mano: le modifiche agli articoli non lo cambiano più", fontSize = 12.sp, color = Color.Gray)
                     }
                     // Per le prove: come ha lavorato l'app (sparirà nella versione finale)
@@ -503,6 +525,38 @@ private fun ModificaArticolo(
                             )
                         )
                     }) { Text("Salva") }
+                }
+            }
+        }
+    }
+}
+
+/** Schermo per correggere il testo per lo stato: sopra la foto ingrandibile, sotto il testo. */
+@Composable
+private fun ModificaTesto(foto: File?, iniziale: String, manuale: Boolean, salva: (String?) -> Unit, annulla: () -> Unit) {
+    var testo by remember { mutableStateOf(iniziale) }
+    val immagine = remember(foto) { foto?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
+    Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
+            Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
+                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize()) }
+                Text(
+                    "Due dita per ingrandire",
+                    color = Color.White, fontSize = 12.sp,
+                    modifier = Modifier.align(Alignment.TopCenter).background(Color(0x88000000)).padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+            Column(Modifier.weight(1f).fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Testo per lo stato", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                OutlinedTextField(
+                    testo, { testo = it },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    if (manuale) TextButton(onClick = { salva(null) }) { Text("↺ Automatico") }
+                    TextButton(onClick = annulla) { Text("Annulla") }
+                    Button(onClick = { salva(testo.takeIf { it != iniziale || manuale }) }) { Text("Salva") }
                 }
             }
         }
