@@ -13,8 +13,11 @@ import kotlin.math.min
  */
 object TrovaEtichette {
 
-    /** Un'etichetta candidata: riquadro in pixel dell'immagine analizzata. */
-    data class Riquadro(val sx: Int, val su: Int, val dx: Int, val giu: Int) {
+    /**
+     * Un'etichetta candidata: riquadro in pixel dell'immagine analizzata.
+     * [somiglianza]: più è bassa, più sembra un cartellino vero (0 = perfetto).
+     */
+    data class Riquadro(val sx: Int, val su: Int, val dx: Int, val giu: Int, val somiglianza: Float = 0f) {
         val area get() = (dx - sx) * (giu - su)
         fun sovrappostoA(a: Riquadro): Boolean {
             val ix = max(0, min(dx, a.dx) - max(sx, a.sx))
@@ -37,7 +40,8 @@ object TrovaEtichette {
                 if (trovati.none { it.sovrappostoA(r) }) trovati += r
             }
         }
-        return trovati
+        // Prima quelli che sembrano di più un cartellino: così, col numero limitato di tentativi, si leggono quelli giusti
+        return trovati.sortedBy { it.somiglianza }
     }
 
     private fun componentiBianche(px: IntArray, w: Int, h: Int, soglia: Int, colore: Int): List<Riquadro> {
@@ -81,7 +85,12 @@ object TrovaEtichette {
             }
             val quotaScuri = scuri.toFloat() / (bw * bh)
             if (quotaScuri < 0.02f || quotaScuri > 0.5f) continue
-            risultato += Riquadro(x0, y0, x1 + 1, y1 + 1)
+            // Cartellino tipico: rettangolo ~2-3 volte più largo che alto, pieno, con il 5-30% di nero
+            val forma = max(bw, bh).toFloat() / min(bw, bh)
+            val somiglianza = kotlin.math.abs(forma - 2.5f) / 2.5f +
+                kotlin.math.abs(quotaScuri - 0.15f) / 0.15f +
+                (1f - conta.toFloat() / (bw * bh))
+            risultato += Riquadro(x0, y0, x1 + 1, y1 + 1, somiglianza)
         }
         return risultato
     }

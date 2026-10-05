@@ -54,7 +54,10 @@ class Raddrizzatore(private val context: Context) {
     )
 
     /** Zona della foto dove c'è il cartellino, trovata in una foto ruotata di [rotazione] gradi. */
-    private class Zona(val base: Bitmap, val rotazione: Int, val riquadro: Rect, val codice: String?, val metodo: String)
+    private class Zona(
+        val base: Bitmap, val rotazione: Int, val riquadro: Rect, val codice: String?, val metodo: String,
+        val angoli: List<PointF>? = null,   // i 4 angoli della riga del codice in "base", se conosciuti
+    )
 
     suspend fun raddrizza(uri: Uri): FotoRaddrizzata {
         val foto = caricaConExif(uri)
@@ -93,7 +96,25 @@ class Raddrizzatore(private val context: Context) {
             val metodo = zona.metodo + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
             return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true)
         }
-        // Cartellino trovato ma verso incerto: se viene dalla rotazione di 90° almeno quella la applico
+        // Il ritaglio non ha funzionato, ma se conosco la riga del codice so in che direzione è scritta:
+        // giro la foto in modo che la riga venga orizzontale e leggo il cartellino da lì
+        zona.angoli?.let { angoliBase ->
+            val (a, b) = angoliBase
+            val direzione = Math.toDegrees(atan2((b.y - a.y).toDouble(), (b.x - a.x).toDouble())).toFloat()
+            val gradi = ((-Math.round(direzione / 90f) * 90) % 360 + 360) % 360
+            val totale = (zona.rotazione + gradi) % 360
+            val dritta = ruota(foto, totale)
+            val m = matriceRotazione(zona.base.width, zona.base.height, gradi)
+            val angoliDritti = angoliBase.map { p -> floatArrayOf(p.x, p.y).also { m.mapPoints(it) }.let { PointF(it[0], it[1]) } }
+            val dati = try { leggiCartellino(dritta, angoliDritti) } catch (e: Exception) { null }
+            val codice = zona.codice ?: dati?.codice
+            val altri = try {
+                if (codice != null) altriCartellini(dritta, codice, angoliDritti) else null
+            } catch (e: Exception) { null }
+            val metodo = zona.metodo + ", verso dalla riga" + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = false)
+        }
+        // Verso incerto e riga sconosciuta: applico almeno la rotazione con cui il cartellino è stato trovato
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
     }
 
@@ -102,12 +123,13 @@ class Raddrizzatore(private val context: Context) {
         // 1. Codice a barre su tutta la foto: contiene direttamente il codice articolo
         val barre = lettoreBarre.process(InputImage.fromBitmap(foto, 0)).await()
         barre.firstOrNull { it.rawValue?.matches(SETTE_CIFRE) == true && it.boundingBox != null }?.let {
-            return Zona(foto, 0, it.boundingBox!!, it.rawValue, "codice a barre")
+            return Zona(foto, 0, it.boundingBox!!, it.rawValue, "codice a barre",
+                it.cornerPoints?.takeIf { p -> p.size == 4 }?.let { p -> rigaCodiceDaCodiceABarre(p.map { q -> PointF(q.x.toFloat(), q.y.toFloat()) }) })
         }
 
         // 2. Testo su tutta la foto (funziona se il cartellino è grande, foto da vicino)
         val testoIntero = leggi(foto)
-        rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, codiceDi(it), "testo") }
+        rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, codiceDi(it), "testo", angoliDi(it, Rect(0, 0, 0, 0), 1f)) }
 
         // 3. Zone dove ML Kit ha visto del testo ma non è riuscito a leggerlo: ritaglio e ingrandisco
         val provate = mutableListOf<Rect>()
@@ -128,7 +150,7 @@ class Raddrizzatore(private val context: Context) {
                 val testo = leggi(pezzo)
                 rigaCodice(testo)?.let {
                     // coordinate dal tassello alla foto intera
-                    return Zona(base, gradi, nellaFoto(it.boundingBox!!, t, scala), codiceDi(it), "tasselli")
+                    return Zona(base, gradi, nellaFoto(it.boundingBox!!, t, scala), codiceDi(it), "tasselli", angoliDi(it, t, scala))
                 }
                 zoneTasselli += zoneTesto(testo, t, scala)
             }
@@ -141,7 +163,7 @@ class Raddrizzatore(private val context: Context) {
         //    ingranditi, in tutti i versi e, se serve, con l'immagine "pulita"
         for (r in etichetteIn(foto).take(MAX_ETICHETTE)) {
             val c = codiciNelRitaglio(foto, r, listOf(0, 90, 270, 180)).firstOrNull() ?: continue
-            return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "etichetta")
+            return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "etichetta", c.angoli)
         }
         return null
     }
@@ -174,7 +196,10 @@ class Raddrizzatore(private val context: Context) {
             provate += area
             for (g in listOf(0, 90)) {
                 rigaCodice(leggi(ruota(ritaglio, g)))?.let {
-                    return Zona(base, gradi, z, codiceDi(it), "ingrandimento")
+                    val angoli = it.cornerPoints?.takeIf { p -> p.size == 4 }?.map { p ->
+                        dalRitaglio(p.x.toFloat(), p.y.toFloat(), ritaglio, area, g)
+                    }
+                    return Zona(base, gradi, z, codiceDi(it), "ingrandimento", angoli)
                 }
             }
         }
@@ -289,11 +314,11 @@ class Raddrizzatore(private val context: Context) {
             val piccola = Bitmap.createScaledBitmap(foto, w, h, true)
             val px = IntArray(w * h).also { piccola.getPixels(it, 0, w, 0, 0, w, h) }
             for (r in TrovaEtichette.trova(px, w, h)) {
-                val nellaFoto = TrovaEtichette.Riquadro((r.sx / k).toInt(), (r.su / k).toInt(), (r.dx / k).toInt(), (r.giu / k).toInt())
+                val nellaFoto = TrovaEtichette.Riquadro((r.sx / k).toInt(), (r.su / k).toInt(), (r.dx / k).toInt(), (r.giu / k).toInt(), r.somiglianza)
                 if (trovate.none { it.sovrappostoA(nellaFoto) }) trovate += nellaFoto
             }
         }
-        return trovate.map { Rect(it.sx, it.su, it.dx, it.giu) }
+        return trovate.sortedBy { it.somiglianza }.map { Rect(it.sx, it.su, it.dx, it.giu) }
     }
 
     /**
@@ -324,6 +349,18 @@ class Raddrizzatore(private val context: Context) {
             }
         }
         return emptyList()
+    }
+
+    /** Angoli di una riga letta in un pezzo (spostato di [pezzo] e ingrandito di [scala]), nelle coordinate della foto. */
+    private fun angoliDi(riga: Text.Line, pezzo: Rect, scala: Float): List<PointF>? =
+        riga.cornerPoints?.takeIf { it.size == 4 }?.map { PointF(it.x / scala + pezzo.left, it.y / scala + pezzo.top) }
+
+    /** Un punto del ritaglio (ingrandito e girato di [gradi]) riportato nelle coordinate della foto. */
+    private fun dalRitaglio(x: Float, y: Float, ritaglio: Bitmap, area: Rect, gradi: Int): PointF {
+        val xy = floatArrayOf(x, y)
+        Matrix().also { matriceRotazione(ritaglio.width, ritaglio.height, gradi).invert(it) }.mapPoints(xy)
+        val scala = ritaglio.width.toFloat() / area.width()
+        return PointF(xy[0] / scala + area.left, xy[1] / scala + area.top)
     }
 
     /** Riquadro che contiene i 4 angoli. */
