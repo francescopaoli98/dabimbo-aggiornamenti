@@ -163,20 +163,22 @@ class Raddrizzatore(private val context: Context) {
             // 5. Come il punto 3, ma con le zone viste nei tasselli
             ingrandisciZone(base, gradi, zoneTasselli, if (gradi == 0) provate else mutableListOf())
                 ?.let { return it }
+
+            if (gradi == 0) {
+                // Dopo il giro a 0°: attorno ai prezzi letti (ritaglio, raddrizzo, ingrandisco, cerco il codice)
+                val prezziProvati = mutableListOf<PointF>()
+                for (p in prezzi) {
+                    if (prezziProvati.size >= MAX_PREZZI_PRIMO) break
+                    val centro = p.centro
+                    if (prezziProvati.any { hypot(it.x - centro.x, it.y - centro.y) < 2 * p.altezza }) continue
+                    prezziProvati += centro
+                    val c = codiciAttornoAlPrezzo(foto, p).firstOrNull() ?: continue
+                    return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "prezzo", c.angoli)
+                }
+            }
         }
 
-        // 6. Attorno ai prezzi letti: ritaglio, raddrizzo, ingrandisco e cerco il codice
-        val prezziProvati = mutableListOf<PointF>()
-        for (p in prezzi) {
-            if (prezziProvati.size >= MAX_PREZZI_PRIMO) break
-            val centro = p.centro
-            if (prezziProvati.any { hypot(it.x - centro.x, it.y - centro.y) < 2 * p.altezza }) continue
-            prezziProvati += centro
-            val c = codiciAttornoAlPrezzo(foto, p).firstOrNull() ?: continue
-            return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "prezzo", c.angoli)
-        }
-
-        // 7. Ultima spiaggia: rettangoli bianchi (etichette) trovati dalla forma, letti uno per uno
+        // 6. Ultima spiaggia: rettangoli bianchi (etichette) trovati dalla forma, letti uno per uno
         //    ingranditi, in tutti i versi e, se serve, con l'immagine "pulita"
         for (r in etichetteIn(foto).take(MAX_ETICHETTE)) {
             val c = codiciNelRitaglio(foto, r, listOf(0, 90, 270, 180)).firstOrNull() ?: continue

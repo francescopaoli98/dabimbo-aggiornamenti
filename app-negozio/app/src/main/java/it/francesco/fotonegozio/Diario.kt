@@ -95,8 +95,8 @@ class Diario {
     }
 
     companion object {
-        private const val MAX_VOCI = 70
-        private const val MAX_PAGINE = 8
+        private const val MAX_VOCI = 140
+        private const val MAX_PAGINE = 16
         private const val MAX_RIGHE = 8
         private const val LARGHEZZA = 1080
         private const val ALTEZZA = 3600
