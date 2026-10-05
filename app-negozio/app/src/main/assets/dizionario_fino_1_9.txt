@@ -10,7 +10,7 @@
 gri = grigio / grigia / grigi / grigie
 g = giallo / gialla / gialli / gialle
 ve = verde / verdi
-fux = fucsia
+fux = fucsia / fucsie
 b = bianco / bianca / bianchi / bianche
 n = nero / nera / neri / nere
 cel = celeste / celesti
@@ -64,8 +64,3 @@ italia = Italia
 
 # Marchi da togliere dal testo
 primark =
-
-# Aggiunte di Elisa (versione 2.0)
-pic = piccolo / piccola / piccoli / piccole
-ric = ricamo
-scr = scritta

@@ -53,10 +53,24 @@ val DatiCartellino.daCompletare: Boolean get() = descrizione == null || prezzo =
 
 private fun fileDizionario(app: Application) = File(app.filesDir, "dizionario.txt")
 
-/** Il dizionario salvato sul telefono; la prima volta, quello di partenza (assets/dizionario.txt). */
+/**
+ * Il dizionario salvato sul telefono; la prima volta, quello di partenza (assets/dizionario.txt).
+ * Se l'app aggiornata porta sigle nuove o corrette, le aggiunge senza toccare le modifiche di Elisa.
+ */
 private fun caricaDizionario(app: Application): List<VoceDizionario> {
     val file = fileDizionario(app)
-    if (!file.exists()) file.writeText(app.assets.open("dizionario.txt").bufferedReader().readText())
+    val partenza = app.assets.open("dizionario.txt").bufferedReader().readText()
+    val baseApplicata = File(app.filesDir, "dizionario_base.txt")   // il dizionario di partenza già portato sul telefono
+    if (!file.exists()) {
+        file.writeText(partenza)
+    } else if (!baseApplicata.exists() || baseApplicata.readText() != partenza) {
+        // Telefoni con l'app fino alla 1.9: la base era quella di allora
+        val vecchia = if (baseApplicata.exists()) baseApplicata.readText()
+        else app.assets.open("dizionario_fino_1_9.txt").bufferedReader().readText()
+        val aggiornato = Dizionario.aggiorna(Dizionario.leggi(file.readText()), Dizionario.leggi(vecchia), Dizionario.leggi(partenza))
+        file.writeText(Dizionario.scrivi(aggiornato))
+    }
+    baseApplicata.writeText(partenza)
     return Dizionario.leggi(file.readText()).sortedBy { it.sigla }
 }
 

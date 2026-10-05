@@ -32,4 +32,16 @@ object Dizionario {
         appendLine("# Niente dopo l'uguale = parola da togliere dal testo")
         voci.sortedBy { it.sigla }.forEach { appendLine("${it.sigla} = ${it.significatoTesto}") }
     }
+
+    /**
+     * Porta sul telefono le sigle nuove o corrette arrivate con un aggiornamento dell'app,
+     * senza perdere quelle che Elisa ha scritto o corretto lei.
+     * Cambia solo le sigle che nel dizionario di partenza sono diverse tra [vecchiaBase] e [nuovaBase].
+     */
+    fun aggiorna(telefono: List<VoceDizionario>, vecchiaBase: List<VoceDizionario>, nuovaBase: List<VoceDizionario>): List<VoceDizionario> {
+        val prima = vecchiaBase.associateBy { it.sigla }
+        val risultato = telefono.associateBy { it.sigla }.toMutableMap()
+        for (v in nuovaBase) if (prima[v.sigla] != v) risultato[v.sigla] = v
+        return risultato.values.sortedBy { it.sigla }
+    }
 }

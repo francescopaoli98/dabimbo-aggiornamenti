@@ -46,7 +46,7 @@ class TestoFinaleTest {
     @Test
     fun scarpe_plurale_e_numero() {
         assertEquals(
-            "Scarpe ginnastica Diadora bianche logo fucsie brillantini lacci rosa velluto - numero 31 - cod. 1444488 - € 9,00",
+            "Scarpe ginnastica Diadora bianche logo fucsia brillantini lacci rosa velluto - numero 31 - cod. 1444488 - € 9,00",
             riga("SCARPE GINN DIADORA B LOGO FUX brill lacci rs vell 31 31", "31", "€ 9,00", "1444488"),
         )
         assertEquals(
@@ -104,5 +104,25 @@ class TestoFinaleTest {
                 "Librottino inside out - cod. 1444116 - € 1,50",
             t,
         )
+    }
+
+    @Test
+    fun sigle_nuove_di_elisa() {
+        val voci = Dizionario.leggi(java.io.File("src/main/assets/dizionario.txt").readText())
+        assertEquals("Maglia fucsia scritta", TestoFinale.espandi("MAGLIA FUX SCR", null, voci))
+        assertEquals("Magliette fucsia", TestoFinale.espandi("MAGLIETTE FUX", null, voci))
+        assertEquals("Felpa piccola ricamo", TestoFinale.espandi("FELPA PIC RIC", null, voci))
+    }
+
+    @Test
+    fun aggiornamento_dizionario_tiene_le_modifiche_di_elisa() {
+        val vecchia = Dizionario.leggi("fux = fucsia / fucsie\ngri = grigio / grigia / grigi / grigie")
+        val nuova = Dizionario.leggi("fux = fucsia\ngri = grigio / grigia / grigi / grigie\npic = piccolo / piccola / piccoli / piccole")
+        val telefono = Dizionario.leggi("fux = fucsia / fucsie\ngri = grigino\nzz = zebrato")   // gri e zz scritte da Elisa
+        val r = Dizionario.aggiorna(telefono, vecchia, nuova).associateBy { it.sigla }
+        assertEquals(listOf("fucsia"), r["fux"]!!.significati)      // corretta dall'aggiornamento
+        assertEquals(listOf("grigino"), r["gri"]!!.significati)     // quella di Elisa resta
+        assertEquals(listOf("zebrato"), r["zz"]!!.significati)
+        assertEquals(4, r["pic"]!!.significati.size)                // nuova
     }
 }
