@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <!-- Le foto sistemate dall'app, da passare a WhatsApp -->
-    <cache-path name="raddrizzate" path="raddrizzate/" />
+    <files-path name="raddrizzate" path="raddrizzate/" />
 </paths>

@@ -64,6 +64,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -96,7 +98,7 @@ class MainActivity : ComponentActivity() {
         )
         // Foto arrivate dal tasto "Condividi" della Galleria (solo al primo avvio, non dopo una rotazione schermo)
         if (savedInstanceState == null) viewModel.carica(fotoDaIntent(intent))
-        setContent { TemaBimbo { Schermata(viewModel) } }
+        setContent { ConScritte(viewModel.scritteGrandi) { TemaBimbo { Schermata(viewModel) } } }
 
         // Tasto Indietro sulla lista delle foto: la prima volta avvisa, la seconda (entro 2 secondi) chiude l'app.
         // Così un tocco per sbaglio non fa perdere le foto. Le finestre aperte (articoli, foto grande…) si chiudono da sole.
@@ -132,6 +134,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Scritte grandi accese o spente (letto anche dalle finestre, che hanno un loro schermo). */
+private val LocalScritteGrandi = compositionLocalOf { false }
+
+/** Ingrandisce tutte le scritte del 25% se [grandi] (il resto della grafica resta uguale). */
+@Composable
+private fun ConScritte(grandi: Boolean, contenuto: @Composable () -> Unit) {
+    val d = LocalDensity.current
+    CompositionLocalProvider(
+        LocalScritteGrandi provides grandi,
+        LocalDensity provides Density(d.density, d.fontScale * if (grandi) 1.25f else 1f),
+        content = contenuto,
+    )
+}
+
+/** Finestra a tutto schermo che rispetta anche lei le scritte grandi. */
+@Composable
+private fun Finestra(onDismissRequest: () -> Unit, properties: DialogProperties, contenuto: @Composable () -> Unit) {
+    val grandi = LocalScritteGrandi.current
+    Dialog(onDismissRequest, properties) { ConScritte(grandi, contenuto) }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Schermata(vm: FotoViewModel) {
@@ -145,6 +168,7 @@ private fun Schermata(vm: FotoViewModel) {
     var testoInModifica by remember { mutableStateOf<Int?>(null) }   // numero della foto di cui si corregge il testo
     var articoliAperti by remember { mutableStateOf<Int?>(null) }    // numero della foto di cui si guardano gli articoli
     var daConfermare by remember { mutableStateOf<Int?>(null) }      // foto con avvisi: chiedo prima di pubblicare
+    var daTogliere by remember { mutableStateOf<Int?>(null) }        // foto da togliere dalla lista (chiedo conferma)
     val context = LocalContext.current
 
     // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
@@ -152,8 +176,10 @@ private fun Schermata(vm: FotoViewModel) {
     // Coriandoli quando sono tutte pubblicate
     val tuttePubblicate = vm.foto.isNotEmpty() && vm.quantePubblicate == vm.foto.size
     var festa by remember { mutableStateOf(false) }
+    var mancavano by remember { mutableStateOf(!tuttePubblicate) }
     LaunchedEffect(tuttePubblicate) {
-        if (tuttePubblicate) { festa = true; kotlinx.coroutines.delay(3400); festa = false }
+        if (!tuttePubblicate) mancavano = true
+        else if (mancavano) { mancavano = false; festa = true; kotlinx.coroutines.delay(3400); festa = false }
     }
     fun pubblica(f: Foto) {
         val file = f.file ?: return
@@ -192,18 +218,45 @@ private fun Schermata(vm: FotoViewModel) {
                     val (s2, m2) = rimbalzo()
                     Button(
                         onClick = ::scegliFoto,
-                        modifier = Modifier.weight(1f).height(60.dp).then(m1),
+                        modifier = Modifier.weight(1f).heightIn(min = 60.dp).then(m1),
                         shape = MaterialTheme.shapes.large,
                         interactionSource = s1,
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                     ) { Text("📷  Scegli foto", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
                     FilledTonalButton(
                         onClick = { dizionarioAperto = true },
-                        modifier = Modifier.height(60.dp).then(m2),
+                        modifier = Modifier.heightIn(min = 60.dp).then(m2),
                         interactionSource = s2,
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
                     ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                }
+            }
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val quante = vm.foto.count { it.daGuardare }
+                    if (vm.foto.isNotEmpty()) {
+                        FilterChip(
+                            selected = !vm.soloDaControllare, onClick = { vm.soloDaControllare = false },
+                            label = { Text("Tutte (${vm.foto.size})") },
+                        )
+                        FilterChip(
+                            selected = vm.soloDaControllare, onClick = { vm.soloDaControllare = true },
+                            enabled = quante > 0 || vm.soloDaControllare,
+                            label = { Text("⚠ Da controllare ($quante)") },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Arancione, selectedLabelColor = Color.White),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    FilterChip(
+                        selected = vm.scritteGrandi, onClick = { vm.cambiaScritte(!vm.scritteGrandi) },
+                        label = { Text("A+") },
+                    )
+                }
+            }
+            if (vm.soloDaControllare && vm.fotoVisibili.isEmpty()) item {
+                Surface(onClick = { vm.soloDaControllare = false }, color = Color.White, shape = MaterialTheme.shapes.medium) {
+                    Text("Nessuna foto da controllare 👍  Tocca per vederle tutte.", Modifier.fillMaxWidth().padding(16.dp), color = BluNotte, fontWeight = FontWeight.Bold)
                 }
             }
             // Solo in modalità prove
@@ -227,7 +280,7 @@ private fun Schermata(vm: FotoViewModel) {
                 item { Avanzamento(vm.elaborate, vm.foto.size) }
             }
 
-            items(vm.foto, key = { it.numero }) { f ->
+            items(vm.fotoVisibili, key = { it.numero }) { f ->
                 Scheda(
                     f,
                     modifier = Modifier.animateItem(),
@@ -238,6 +291,7 @@ private fun Schermata(vm: FotoViewModel) {
                     modificaTesto = { testoInModifica = f.numero },
                     pubblica = { chiediEPubblica(f) },
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
+                    togli = { daTogliere = f.numero },
                 )
             }
         }
@@ -260,6 +314,17 @@ private fun Schermata(vm: FotoViewModel) {
                 dismissButton = { TextButton(onClick = { daConfermare = null }) { Text("La sistemo") } },
             )
         }
+    }
+
+    // Togliere una foto dalla lista: chiedo prima
+    daTogliere?.let { numero ->
+        AlertDialog(
+            onDismissRequest = { daTogliere = null },
+            title = { Text("Togliere la Foto $numero?") },
+            text = { Text("Sparisce solo da questa lista: nella Galleria del telefono resta.") },
+            confirmButton = { TextButton(onClick = { vm.togli(numero); daTogliere = null }) { Text("Togli", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { daTogliere = null }) { Text("Annulla") } },
+        )
     }
 
     // Correzione del testo per lo stato (schermo diviso con la foto)
@@ -334,7 +399,7 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
             Button(
                 onClick = pubblica,
                 enabled = prossima != null,
-                modifier = Modifier.fillMaxWidth().height(62.dp).then(morbido),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 62.dp).then(morbido),
                 shape = MaterialTheme.shapes.large,
                 interactionSource = sorgente,
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
@@ -394,6 +459,7 @@ private fun Scheda(
     modificaTesto: () -> Unit,
     pubblica: () -> Unit,
     salvaDiagnosi: () -> Unit,
+    togli: () -> Unit,
 ) {
     val lista = f.articoli
     // Le schede pubblicate si "spengono" un po': si vede subito cosa resta da fare
@@ -430,6 +496,11 @@ private fun Scheda(
                     else -> Etichetta("Pronta", Color.White, Verde)
                 }
             }
+            // ✕ per togliere la foto dalla lista (chiede conferma)
+            Box(
+                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)).clickable(onClick = togli),
+                contentAlignment = Alignment.Center,
+            ) { Text("✕", fontSize = 16.sp, color = BluNotte, fontWeight = FontWeight.Bold) }
         }
         Column(Modifier.padding(14.dp)) {
             // Foto: toccala per ingrandire, girare, pixelare
@@ -497,13 +568,13 @@ private fun Scheda(
                         val (s2, m2) = rimbalzo()
                         OutlinedButton(
                             onClick = articoli,
-                            modifier = Modifier.weight(1f).height(54.dp).then(m1),
+                            modifier = Modifier.weight(1f).heightIn(min = 54.dp).then(m1),
                             shape = MaterialTheme.shapes.medium,
                             interactionSource = s1,
                         ) { Text("📋 Articoli (${lista.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
                         Button(
                             onClick = pubblica,
-                            modifier = Modifier.weight(1f).height(54.dp).then(m2),
+                            modifier = Modifier.weight(1f).heightIn(min = 54.dp).then(m2),
                             shape = MaterialTheme.shapes.medium,
                             interactionSource = s2,
                             colors = ButtonDefaults.buttonColors(containerColor = Azzurro),
@@ -523,7 +594,7 @@ private fun Scheda(
 @Composable
 private fun SchermataArticoli(f: Foto, modifica: (Int?) -> Unit, chiudi: () -> Unit) {
     val lista = f.articoli
-    Dialog(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Finestra(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 16.dp, vertical = 12.dp),
@@ -566,7 +637,7 @@ private fun SchermataArticoli(f: Foto, modifica: (Int?) -> Unit, chiudi: () -> U
             }
             Button(
                 onClick = { modifica(null) },
-                modifier = Modifier.fillMaxWidth().padding(16.dp).height(58.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 58.dp),
                 shape = MaterialTheme.shapes.large,
             ) { Text("+ Aggiungi etichetta", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         }
@@ -594,7 +665,7 @@ private fun SchermataDizionario(voci: List<VoceDizionario>, salva: (String?, Voc
     fun chiudiScheda() { nuova = false; inModifica = null }
 
     // Una finestra sola: la scheda della sigla prende il posto dell'elenco (niente finestre una sopra l'altra)
-    Dialog(
+    Finestra(
         onDismissRequest = { if (inScheda) chiudiScheda() else chiudi() },   // Indietro: prima chiude la scheda
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
@@ -704,7 +775,7 @@ private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) ->
     val immagine by fotoPerSchermo(f.file)
     val misure = remember(f.file) { f.file?.let(::misureFoto) }   // grandezza vera, per i quadretti della pixelatura
     var pixela by remember { mutableStateOf(false) }
-    Dialog(onDismissRequest = { if (pixela) pixela = false else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Finestra(onDismissRequest = { if (pixela) pixela = false else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -744,7 +815,7 @@ private fun PulsanteVisore(simbolo: String, scritta: String, modifier: Modifier 
     val (sorgente, morbido) = rimbalzo()
     FilledTonalButton(
         onClick = azione,
-        modifier = modifier.height(72.dp).then(morbido),
+        modifier = modifier.heightIn(min = 72.dp).then(morbido),
         shape = MaterialTheme.shapes.medium,
         contentPadding = PaddingValues(4.dp),
         interactionSource = sorgente,
@@ -808,16 +879,16 @@ private fun EditorPixel(immagine: ImageBitmap, w: Int, h: Int, modifier: Modifie
                     FilterChip(selected = grande, onClick = { grande = true }, label = { Text("⬤ Pennello grande") })
                 }
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = esci, modifier = Modifier.weight(1f).height(52.dp)) { Text("✕ Esci") }
+                    OutlinedButton(onClick = esci, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("✕ Esci") }
                     OutlinedButton(
                         onClick = { celle.values.maxOrNull()?.let { ultimo -> celle.keys.filter { celle[it] == ultimo }.forEach(celle::remove) } },
                         enabled = celle.isNotEmpty(),
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) { Text("↶ Annulla") }
                     Button(
                         onClick = { salva(celle.keys.toSet(), lato) },
                         enabled = celle.isNotEmpty(),
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                     ) { Text("✓ Salva", fontWeight = FontWeight.Bold) }
                 }
             }
@@ -881,7 +952,7 @@ private fun ModificaArticolo(
     var rigaVeloce by remember { mutableStateOf("") }
     val immagine by fotoPerSchermo(foto)
 
-    Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Finestra(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
             // Sopra: la foto, ingrandibile (due dita / doppio tocco)
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
@@ -947,7 +1018,7 @@ private fun ModificaArticolo(
 private fun ModificaTesto(foto: File?, iniziale: String, manuale: Boolean, salva: (String?) -> Unit, annulla: () -> Unit) {
     var testo by remember { mutableStateOf(iniziale) }
     val immagine by fotoPerSchermo(foto)
-    Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    Finestra(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
                 immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize()) }

@@ -15,6 +15,9 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -82,12 +85,30 @@ val Foto.avvisi: List<String> get() = buildList {
     if (etichetteViste > articoli.size) add("ci sono etichette non lette")
 }
 
+/** Foto da guardare: avviso arancione o errore (quelle ancora in lavorazione no). */
+val Foto.daGuardare: Boolean get() = !inCorso && (errore != null || (!pubblicata && avvisi.isNotEmpty()))
+
 /** Tiene la lista delle foto ed esegue l'elaborazione una alla volta, in sottofondo. */
 class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     val foto = mutableStateListOf<Foto>()
-    var elaborate by mutableStateOf(0)
+    /** Quante foto hanno finito l'elaborazione. */
+    val elaborate: Int get() = foto.count { !it.inCorso }
+
+    /** Mostra solo le foto con l'avviso arancione. */
+    var soloDaControllare by mutableStateOf(false)
+    val fotoVisibili: List<Foto> get() = if (soloDaControllare) foto.filter { it.daGuardare } else foto
+
+    private val preferenze = app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE)
+    /** Scritte più grandi in tutta l'app (resta salvato). */
+    var scritteGrandi by mutableStateOf(preferenze.getBoolean("scritte_grandi", false))
         private set
+    fun cambiaScritte(grandi: Boolean) {
+        scritteGrandi = grandi
+        preferenze.edit().putBoolean("scritte_grandi", grandi).apply()
+    }
+
+    private val fileLista = File(app.filesDir, "lista.json")
 
     private val raddrizzatore by lazy { Raddrizzatore(app) }   // creato solo quando serve (prima foto)
     private val versoPreferito = VersoPreferito(app)
@@ -164,15 +185,32 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         if (uris.isEmpty()) return
         lavoro?.cancel()
         foto.clear()
-        elaborate = 0
+        soloDaControllare = false
+        // Le foto sistemate della lista vecchia non servono più
+        Raddrizzatore.cartella(getApplication()).listFiles()?.forEach { it.delete() }
         uris.forEachIndexed { i, uri -> foto.add(Foto(numero = i + 1, origine = uri)) }
+        elaboraInCoda()
+    }
 
+    /** Elabora, una alla volta e in ordine, le foto ancora "in lavorazione". */
+    private fun elaboraInCoda() {
         lavoro = viewModelScope.launch {
-            for (i in foto.indices) {
-                foto[i] = elabora(foto[i])
-                elaborate++
+            while (true) {
+                val prossima = foto.firstOrNull { it.inCorso } ?: break
+                val fatta = elabora(prossima)
+                // Se nel frattempo Elisa l'ha tolta dalla lista, il risultato si butta
+                val i = foto.indexOfFirst { it.numero == prossima.numero }
+                if (i >= 0) foto[i] = fatta
+                else fatta.fileAuto?.delete()
             }
         }
+    }
+
+    /** Toglie una foto dalla lista (resta nella Galleria del telefono). */
+    fun togli(numero: Int) {
+        val f = foto.firstOrNull { it.numero == numero } ?: return
+        foto.remove(f)
+        listOfNotNull(f.fileAuto, f.file).distinct().forEach { it.delete() }
     }
 
     private suspend fun elabora(f: Foto): Foto = withContext(Dispatchers.Default) {
@@ -212,6 +250,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
                 diario = diario,
             )
+        } catch (e: SecurityException) {
+            f.copy(inCorso = false, errore = "foto non più raggiungibile: sceglila di nuovo")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e   // lista sostituita: interrompi senza segnare errori
         } catch (e: Exception) {
@@ -286,5 +326,33 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         val scala = 600f / maxOf(b.width, b.height)
         if (scala >= 1f) return b
         return Bitmap.createScaledBitmap(b, (b.width * scala).toInt(), (b.height * scala).toInt(), true)
+    }
+
+    init {
+        // Ritrovo la lista com'era quando l'app si è chiusa
+        foto.addAll(ListaSalvata.leggi(fileLista.takeIf { it.exists() }?.readText().orEmpty()))
+        viewModelScope.launch {
+            // Miniature rifatte dalle foto salvate (in sottofondo)
+            for (f in foto.toList()) {
+                val file = f.file ?: continue
+                val mini = withContext(Dispatchers.IO) {
+                    runCatching { BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = 4 })?.let(::miniatura)?.asImageBitmap() }.getOrNull()
+                } ?: continue
+                val i = foto.indexOfFirst { it.numero == f.numero && it.file == file }
+                if (i >= 0) foto[i] = foto[i].copy(miniatura = mini)
+            }
+        }
+        if (foto.any { it.inCorso }) elaboraInCoda()
+        // Ogni cambiamento della lista si salva (poco dopo, per non scrivere a ogni tocco)
+        viewModelScope.launch {
+            snapshotFlow { foto.toList() }.collectLatest { lista ->
+                delay(300)
+                withContext(Dispatchers.IO) {
+                    val temporaneo = File(fileLista.path + ".tmp")
+                    temporaneo.writeText(ListaSalvata.scrivi(lista))
+                    temporaneo.renameTo(fileLista)
+                }
+            }
+        }
     }
 }

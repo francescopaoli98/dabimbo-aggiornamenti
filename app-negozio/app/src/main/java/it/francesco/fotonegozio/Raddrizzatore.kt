@@ -700,9 +700,11 @@ class Raddrizzatore(private val context: Context) {
         }
 
         /** Salva la foto raddrizzata come JPEG nella cartella temporanea dell'app. */
+        /** Cartella delle foto sistemate: nei file dell'app (non nella cache), così restano anche chiudendo l'app. */
+        fun cartella(context: Context) = File(context.filesDir, "raddrizzate").apply { mkdirs() }
+
         fun salva(context: Context, foto: Bitmap, nome: String): File {
-            val cartella = File(context.cacheDir, "raddrizzate").apply { mkdirs() }
-            val file = File(cartella, "$nome.jpg")
+            val file = File(cartella(context), "$nome.jpg")
             file.outputStream().use { foto.compress(Bitmap.CompressFormat.JPEG, 92, it) }
             return file
         }

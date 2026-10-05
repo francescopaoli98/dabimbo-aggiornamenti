@@ -47,6 +47,19 @@ class AppTest {
         )
     }
 
+    /** Ogni test riparte pulito: niente lista salvata né impostazioni dal test prima. */
+    @org.junit.After
+    fun pulisci() {
+        // Svuoto la lista e lascio finire il salvataggio, così il test dopo non la ritrova
+        regola.runOnUiThread { vm.foto.clear() }
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500))
+        Thread.sleep(200)
+        // Il simulatore dà al ViewModel sempre la prima Application dei test: uso quella
+        val app = vm.getApplication<android.app.Application>()
+        java.io.File(app.filesDir, "lista.json").delete()
+        app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
     private fun metti(vararg f: Foto) {
         regola.runOnUiThread { vm.foto.clear(); vm.foto.addAll(f) }
         regola.waitForIdle()
@@ -247,5 +260,63 @@ class AppTest {
         assertFalse(vm.dizionario.any { it.sigla == "zzz" })
         regola.onNodeWithText("✕ Chiudi").performClick()
         regola.onNodeWithText("+ Nuova sigla").assertDoesNotExist()
+    }
+
+    @Test
+    fun togliFotoDallaLista() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
+        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onNodeWithText("Togliere la Foto 1?").assertExists()
+        regola.onNodeWithText("Annulla").performClick()
+        assertEquals(2, vm.foto.size)
+        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onNodeWithText("Togli").performClick()
+        regola.waitForIdle()
+        assertEquals(listOf(2), vm.foto.map { it.numero })
+        regola.onNodeWithText("Foto 1").assertDoesNotExist()
+    }
+
+    @Test
+    fun filtroSoloDaControllare() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, emptyList()))
+        regola.onNodeWithText("⚠ Da controllare (1)").performClick()
+        regola.onNodeWithText("Foto 2").assertExists()
+        regola.onNodeWithText("Foto 1").assertDoesNotExist()
+        // Sistemata la foto 2, il filtro resta vuoto e lo dice
+        regola.runOnUiThread { vm.salvaArticolo(2, null, felpa.copy(codice = "1111111")) }
+        regola.onNodeWithText("Nessuna foto da controllare", substring = true).assertExists()
+        regola.onNodeWithText("Tutte (2)").performClick()
+        regola.onNodeWithText("Foto 1").assertExists()
+    }
+
+    @Test
+    fun scritteGrandiRestanoSalvate() {
+        regola.onNodeWithText("A+").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.scritteGrandi)
+        // Riaprendo l'app l'impostazione c'è ancora
+        assertTrue(FotoViewModel(vm.getApplication()).also { it.foto.clear() }.scritteGrandi)
+    }
+
+    @Test
+    fun laListaSiRitrovaRiaprendoLApp() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, emptyList()))
+        regola.runOnUiThread {
+            vm.segnaPubblicata(1)
+            vm.cambiaTesto(2, "Testo scritto a mano")
+        }
+        // Il salvataggio parte 0,3 s dopo l'ultimo cambiamento: faccio passare il tempo
+        regola.waitUntil(5_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(400))
+            java.io.File(vm.getApplication<android.app.Application>().filesDir, "lista.json").let { it.exists() && "Testo scritto a mano" in it.readText() }
+        }
+        // Come se il telefono avesse chiuso l'app: un ViewModel nuovo legge la lista salvata
+        val nuovo = FotoViewModel(vm.getApplication())
+        assertEquals(listOf(1, 2), nuovo.foto.map { it.numero })
+        assertTrue(nuovo.foto[0].pubblicata)
+        assertEquals(felpa, nuovo.foto[0].dati)
+        assertEquals("Testo scritto a mano", nuovo.foto[1].testoManuale)
+        assertTrue(nuovo.foto[0].file!!.exists())
+        nuovo.foto.clear()
     }
 }
