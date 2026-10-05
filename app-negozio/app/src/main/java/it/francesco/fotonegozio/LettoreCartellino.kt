@@ -21,8 +21,8 @@ data class DatiCartellino(
  *
  *   ||||||||||||||||||  A2954/14444..   <- prefisso: ignorato
  *   FELPA ZIP CAPP OKAI 1444496         <- descrizione (riga 1, ALLA STESSA ALTEZZA del codice)
- *   DI 8A RS MARGH FELP 8A      8A      <- descrizione + taglia (a destra, staccata: a volte qui...)
- *   € 4,00                      8A      <- prezzo (grande, a sinistra)   (...a volte qui)
+ *   DI 8A RS MARGH FELP 8A  8A          <- descrizione + taglia (nella colonna del codice: a volte qui...)
+ *   € 4,00                  8A          <- prezzo (grande, a sinistra)   (...a volte qui)
  *
  * È codice Kotlin puro (niente Android), così si può testare sul PC.
  */
@@ -60,9 +60,8 @@ object LettoreCartellino {
         val rigaPrezzo = sotto.filter { PREZZO.containsMatchIn(it.testo) }.maxByOrNull { it.altezza }
         val prezzo = rigaPrezzo?.let { r -> PREZZO.find(r.testo)!!.let { "€ ${it.groupValues[1]},${it.groupValues[2]}" } }
 
-        // 4. Ricostruisco le righe e le spezzo dove c'è un grande spazio vuoto.
-        //    Taglia = pezzo di testo a DESTRA del prezzo, staccato, vicino al prezzo (anche un po' più in alto).
-        //    Descrizione = tutto il resto sopra il prezzo (parte sempre da sinistra, parole attaccate).
+        // 4. Taglia = la scritta stampata nella COLONNA DEL CODICE (a destra), più in basso del codice,
+        //    staccata dalle parole a sinistra. Tutto il resto sopra il prezzo è descrizione.
         val ph = rigaPrezzo?.altezza ?: 0
         val candidati = sotto.filter { r ->
             r !== rigaPrezzo && (rigaPrezzo == null || r.centroY < rigaPrezzo.giu + ph)
@@ -70,15 +69,18 @@ object LettoreCartellino {
         val partiTaglia = mutableListOf<Riga>()
         val partiDescrizione = mutableListOf<Riga>()
         for (riga in raggruppaInRighe(candidati, h)) {
-            // Solo uno spazio MOLTO grande (6 volte l'altezza del testo) separa la taglia dalla descrizione
-            for (pezzo in spezzaSuiVuoti(riga, 6 * h)) {
-                val cy = pezzo.sumOf { it.centroY } / pezzo.size
-                val vicinoAlPrezzo = rigaPrezzo != null &&
-                    pezzo.first().sx > rigaPrezzo.dx &&
-                    cy > rigaPrezzo.su - ph && cy < rigaPrezzo.giu + ph
+            var inTaglia = false
+            for ((i, parola) in riga.withIndex()) {
+                if (!inTaglia && rigaPrezzo != null) {
+                    val spazioPrima = if (i == 0) Int.MAX_VALUE else parola.sx - riga[i - 1].dx
+                    inTaglia = parola.centroY > rigaCodice.giu &&          // sotto la riga del codice
+                        parola.sx >= rigaCodice.sx - cw / 2 &&             // nella colonna del codice
+                        parola.sx > rigaPrezzo.dx &&                       // a destra del prezzo
+                        spazioPrima > 3 * h / 2                            // staccata dalla parola prima
+                }
                 when {
-                    vicinoAlPrezzo -> partiTaglia += pezzo
-                    rigaPrezzo == null || cy < rigaPrezzo.su + ph / 3 -> partiDescrizione += pezzo
+                    inTaglia -> partiTaglia += parola   // anche le parole dopo (es. "NR" "34")
+                    rigaPrezzo == null || parola.centroY < rigaPrezzo.su + ph / 3 -> partiDescrizione += parola
                 }
             }
         }
@@ -110,15 +112,6 @@ object LettoreCartellino {
             else gruppi += mutableListOf(r)
         }
         return gruppi.map { g -> g.sortedBy { it.sx } }
-    }
-
-    /** Spezza una riga dove tra due parole c'è uno spazio più largo di [vuoto] pixel. */
-    private fun spezzaSuiVuoti(riga: List<Riga>, vuoto: Int): List<List<Riga>> {
-        val pezzi = mutableListOf(mutableListOf(riga.first()))
-        for (r in riga.drop(1)) {
-            if (r.sx - pezzi.last().last().dx > vuoto) pezzi += mutableListOf(r) else pezzi.last() += r
-        }
-        return pezzi
     }
 
     private fun abs(x: Int) = if (x < 0) -x else x

@@ -231,6 +231,20 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun felpa_vera_taglia_sulla_riga_di_MARGH_poco_a_sinistra_del_codice() {
+        // Misurato sulla foto della felpa: "8A" sulla riga di "MARGH FELP 8A", spazio ~5 volte il testo,
+        // inizia un po' a sinistra del codice
+        val righe = parole("1444496", 650, 455, 495, 26) +
+            parole("FELPA ZIP CAPP OKAIDI 8A RS", 85, 445, 482) +
+            parole("MARGH FELP 8A", 85, 520, 558) +
+            parole("8A", 600, 518, 556) +
+            parole("€4,00", 45, 575, 660, 50)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("FELPA ZIP CAPP OKAIDI 8A RS MARGH FELP 8A", dati.descrizione)
+        assertEquals("8A", dati.taglia)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)
