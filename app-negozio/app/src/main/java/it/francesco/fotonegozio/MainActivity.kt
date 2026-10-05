@@ -13,6 +13,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +69,7 @@ private fun Schermata(vm: FotoViewModel) {
     val scegli = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) {
         vm.carica(it)
     }
-    var ingrandita by remember { mutableStateOf<Foto?>(null) }
+    var ingrandita by remember { mutableStateOf<Int?>(null) }   // numero della foto aperta a schermo intero
 
     Scaffold { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
@@ -93,18 +95,24 @@ private fun Schermata(vm: FotoViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
-                items(vm.foto, key = { it.numero }) { f -> Scheda(f) { ingrandita = f } }
+                items(vm.foto, key = { it.numero }) { f ->
+                    Scheda(f, onClick = { ingrandita = f.numero }, gira = { gradi -> vm.gira(f.numero, gradi) })
+                }
             }
         }
     }
 
-    ingrandita?.let { f -> Ingrandimento(f) { ingrandita = null } }
+    // Cerco sempre la versione aggiornata, così dopo "Gira" l'ingrandimento cambia subito
+    vm.foto.firstOrNull { it.numero == ingrandita }?.let { f ->
+        Ingrandimento(f, gira = { gradi -> vm.gira(f.numero, gradi) }) { ingrandita = null }
+    }
 }
 
 /** Una riga della lista: miniatura + cosa ha fatto l'app. */
 @Composable
-private fun Scheda(f: Foto, onClick: () -> Unit) {
+private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(enabled = f.file != null, onClick = onClick)) {
+      Column {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
                 when {
@@ -118,7 +126,11 @@ private fun Scheda(f: Foto, onClick: () -> Unit) {
                     f.inCorso -> Text("In attesa…")
                     f.errore != null -> Text("Errore: ${f.errore}", color = MaterialTheme.colorScheme.error)
                     else -> {
-                        Text(if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°")
+                        Text(
+                            (if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°") +
+                                (if (f.messaInVerticale) " · messa in verticale" else "") +
+                                (if (f.rotazioneManuale != 0) " · girata a mano" else "")
+                        )
                         Text(
                             f.codice?.let { "Codice letto: $it" } ?: "Cartellino non trovato",
                             color = if (f.codice == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
@@ -128,16 +140,34 @@ private fun Scheda(f: Foto, onClick: () -> Unit) {
                 }
             }
         }
+        if (f.file != null) PulsantiGira(gira, Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp))
+      }
     }
 }
 
-/** Foto raddrizzata a schermo intero, per controllare il risultato. Tocca per chiudere. */
+/** "Gira" = 90° a destra; "Capovolgi" = 180°, un tocco solo se l'app ha scelto il verso sbagliato. */
 @Composable
-private fun Ingrandimento(f: Foto, chiudi: () -> Unit) {
+private fun PulsantiGira(gira: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = { gira(90) }, modifier = Modifier.weight(1f).height(48.dp)) {
+            Text("↻ Gira", fontSize = 16.sp)
+        }
+        OutlinedButton(onClick = { gira(180) }, modifier = Modifier.weight(1f).height(48.dp)) {
+            Text("⇅ Capovolgi", fontSize = 16.sp)
+        }
+    }
+}
+
+/** Foto a schermo intero, con i pulsanti per girarla. Tocca la foto per chiudere. */
+@Composable
+private fun Ingrandimento(f: Foto, gira: (Int) -> Unit, chiudi: () -> Unit) {
     val immagine = remember(f.file) { f.file?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
     Dialog(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(Modifier.fillMaxSize().clickable(onClick = chiudi), contentAlignment = Alignment.Center) {
-            immagine?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+        Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
+            Box(Modifier.weight(1f).fillMaxWidth().clickable(onClick = chiudi), contentAlignment = Alignment.Center) {
+                immagine?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+            }
+            Surface { PulsantiGira(gira, Modifier.padding(12.dp)) }
         }
     }
 }

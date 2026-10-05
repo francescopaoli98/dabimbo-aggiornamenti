@@ -208,11 +208,7 @@ class Raddrizzatore(private val context: Context) {
         return ruota(foto, gradiExif)
     }
 
-    private fun ruota(foto: Bitmap, gradi: Int): Bitmap {
-        if (gradi % 360 == 0) return foto
-        val matrice = Matrix().apply { postRotate(gradi.toFloat()) }
-        return Bitmap.createBitmap(foto, 0, 0, foto.width, foto.height, matrice, true)
-    }
+    private fun ruota(foto: Bitmap, gradi: Int): Bitmap = ruotaImmagine(foto, gradi)
 
     companion object {
         private const val LATO_MASSIMO = 4100   // 12 MP restano intere, 50 MP dimezzate
@@ -222,6 +218,13 @@ class Raddrizzatore(private val context: Context) {
         private val SETTE_CIFRE = Regex("\\d{7}")
         // 7 cifre esatte, non attaccate ad altre cifre (esclude i codici EAN a 13 cifre)
         private val REGEX_CODICE = Regex("(?<!\\d)\\d{7}(?!\\d)")
+
+        /** Gira la foto in senso orario di [gradi] (multipli di 90). */
+        fun ruotaImmagine(foto: Bitmap, gradi: Int): Bitmap {
+            if (gradi % 360 == 0) return foto
+            val matrice = Matrix().apply { postRotate(gradi.toFloat()) }
+            return Bitmap.createBitmap(foto, 0, 0, foto.width, foto.height, matrice, true)
+        }
 
         /** Salva la foto raddrizzata come JPEG nella cartella temporanea dell'app. */
         fun salva(context: Context, foto: Bitmap, nome: String): File {
