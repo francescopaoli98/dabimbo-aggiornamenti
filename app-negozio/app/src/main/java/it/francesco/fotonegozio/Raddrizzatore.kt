@@ -82,10 +82,10 @@ class Raddrizzatore(private val context: Context) {
                 null
             }
             val dati = try {
-                angoli?.let { leggiCartellino(dritta, it) }
+                angoli?.let { leggiCartellino(dritta, it, zona.codice ?: codiceDi(riga)) }
             } catch (e: Exception) {
                 null   // la lettura dei dati non deve mai bloccare il raddrizzamento
-            } ?: LettoreCartellino.analizza(righeDa(testoGirato)).takeIf { it.codice != null }
+            } ?: LettoreCartellino.analizza(righeDa(testoGirato), zona.codice ?: codiceDi(riga)).takeIf { it.codice != null }
             val codice = zona.codice ?: dati?.codice ?: codiceDi(riga)
 
             // Altri cartellini nella stessa foto (es. tanti librottini insieme)
@@ -107,7 +107,7 @@ class Raddrizzatore(private val context: Context) {
             val dritta = ruota(foto, totale)
             val m = matriceRotazione(zona.base.width, zona.base.height, gradi)
             val angoliDritti = angoliBase.map { p -> floatArrayOf(p.x, p.y).also { m.mapPoints(it) }.let { PointF(it[0], it[1]) } }
-            val dati = try { leggiCartellino(dritta, angoliDritti) } catch (e: Exception) { null }
+            val dati = try { leggiCartellino(dritta, angoliDritti, zona.codice) } catch (e: Exception) { null }
             val codice = zona.codice ?: dati?.codice
             val altri = try {
                 if (codice != null) altriCartellini(dritta, codice, angoliDritti) else null
@@ -266,7 +266,7 @@ class Raddrizzatore(private val context: Context) {
      * Pezzo 2: legge codice, descrizione, prezzo e taglia.
      * [angoli] = i 4 angoli della riga del codice nella foto dritta (in alto a sx, in alto a dx, in basso a dx, in basso a sx).
      */
-    private suspend fun leggiCartellino(dritta: Bitmap, angoli: List<PointF>): DatiCartellino? {
+    private suspend fun leggiCartellino(dritta: Bitmap, angoli: List<PointF>, codiceNoto: String? = null): DatiCartellino? {
         val (a, b, _, d) = angoli
         val larghezzaCodice = hypot(b.x - a.x, b.y - a.y)
         val altezzaCodice = hypot(d.x - a.x, d.y - a.y).coerceAtLeast(1f)
@@ -295,7 +295,7 @@ class Raddrizzatore(private val context: Context) {
             val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
             if (pezzoMigliore == null) pezzoMigliore = pezzo
             val testo = leggi(pezzo, "lettura cartellino, correzione ${correzione.roundToInt()}°")
-            val dati = LettoreCartellino.analizza(righeDa(testo))
+            val dati = LettoreCartellino.analizza(righeDa(testo), codiceNoto)
             if (dati.codice == null) continue
             // Quanto sono storte in media le righe lette (0 = perfettamente dritte)
             val linee = testo.textBlocks.flatMap { it.lines }
@@ -313,7 +313,7 @@ class Raddrizzatore(private val context: Context) {
         // Lettura incompleta (cartellino sbiadito o sfocato): riprovo con l'immagine "pulita"
         if (completezza(migliore) < 3) {
             pezzoMigliore?.let { p ->
-                val pulita = LettoreCartellino.analizza(righeDa(leggi(migliora(p), "lettura cartellino, immagine pulita")))
+                val pulita = LettoreCartellino.analizza(righeDa(leggi(migliora(p), "lettura cartellino, immagine pulita")), codiceNoto)
                 if (pulita.codice != null && completezza(pulita) > completezza(migliore)) migliore = pulita
             }
         }
@@ -504,7 +504,7 @@ class Raddrizzatore(private val context: Context) {
         // Leggo ogni cartellino e li metto in ordine di lettura (dall'alto, da sinistra)
         val dati = trovati.values
             .sortedWith(compareBy({ (it.angoli[0].y / (altezzaPrincipale * 6)).toInt() }, { it.angoli[0].x }))
-            .map { c -> leggiCartellino(dritta, c.angoli)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
+            .map { c -> leggiCartellino(dritta, c.angoli, c.codice)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
         val diagnostica = if (conta.isEmpty()) "" else "altri: " + conta.entries.joinToString(", ") { "${it.key} ${it.value}" }
         return AltriCartellini(dati, diagnostica)
     }

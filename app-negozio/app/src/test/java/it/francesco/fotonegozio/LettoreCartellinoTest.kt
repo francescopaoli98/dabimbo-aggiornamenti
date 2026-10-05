@@ -291,6 +291,23 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun codice_letto_male_ma_gia_noto() {
+        // Dalla diagnosi del gioco "Numeri da 1 a 10": il codice 1444108 letto "144410"
+        val righe = listOf(
+            r("Ar291/44416", 650, 400, 830, 440),
+            r("144410", 650, 455, 810, 495),
+            r("GIOCO", 85, 470, 200, 508), r("sCAT", 215, 470, 300, 508), r("NUMERI", 315, 470, 450, 508),
+            r("DA", 465, 470, 510, 508), r("1A10", 525, 470, 610, 508),
+            r("€3,50", 45, 560, 260, 650),
+        )
+        assertNull("senza codice noto non si fida", LettoreCartellino.analizza(righe).codice)
+        val dati = LettoreCartellino.analizza(righe, codiceNoto = "1444108")
+        assertEquals("1444108", dati.codice)
+        assertEquals("GIOCO sCAT NUMERI DA 1A10", dati.descrizione)
+        assertEquals("€ 3,50", dati.prezzo)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)

@@ -56,15 +56,22 @@ object LettoreCartellino {
         'S' to '5', 's' to '5', 'B' to '8', 'Z' to '2', 'z' to '2', 'G' to '6', 'b' to '6',
     )
 
-    fun analizza(paroleLette: List<Riga>): DatiCartellino {
+    /**
+     * [codiceNoto]: il codice già trovato prima (es. dal codice a barre o da un'altra lettura).
+     * Se qui il codice è letto male ("144410", "144410e"), si usa come riferimento la riga che gli
+     * somiglia di più, e il codice giusto resta quello noto.
+     */
+    fun analizza(paroleLette: List<Riga>, codiceNoto: String? = null): DatiCartellino {
         // Le parole che sembrano numeri vengono "ripulite" (I→1, O→0...) prima di tutto
         val righe = unisciPrezziSpezzati(paroleLette.map { it.copy(testo = cifre(it.testo)) })
 
         // 1. Codice: preferisco la riga fatta SOLO di 7 cifre (quella sotto il prefisso)
-        val rigaCodice = righe.firstOrNull { it.testo.trim().replace(" ", "").matches(Regex("\\d{7}")) }
+        val rigaEsatta = righe.firstOrNull { it.testo.trim().replace(" ", "").matches(Regex("\\d{7}")) }
             ?: righe.firstOrNull { CODICE.containsMatchIn(it.testo) }
+        val rigaCodice = rigaEsatta
+            ?: codiceNoto?.let { rigaSomigliante(righe, it) }
             ?: return DatiCartellino(null, null, null, null)
-        val codice = CODICE.find(rigaCodice.testo)!!.value
+        val codice = rigaEsatta?.let { CODICE.find(it.testo)!!.value } ?: codiceNoto!!
         val h = max(rigaCodice.altezza, 1)
         val cw = rigaCodice.dx - rigaCodice.sx
 
@@ -130,6 +137,17 @@ object LettoreCartellino {
         }
         return risultato
     }
+
+    /**
+     * La riga che somiglia di più al codice noto: una parola di 5-8 caratteri quasi tutta cifre
+     * (niente "/", che è il prefisso) che inizia con almeno 4 cifre uguali al codice.
+     */
+    private fun rigaSomigliante(righe: List<Riga>, codiceNoto: String): Riga? =
+        righe.filter { r ->
+            val t = r.testo.trim()
+            '/' !in t && t.length in 5..8 && t.count { it.isDigit() } >= t.length - 2
+        }.maxByOrNull { r -> r.testo.trim().zip(codiceNoto).takeWhile { (a, b) -> a == b }.size }
+            ?.takeIf { r -> r.testo.trim().zip(codiceNoto).takeWhile { (a, b) -> a == b }.size >= 4 }
 
     private fun List<Riga>.unisci(): String? =
         joinToString(" ") { it.testo.trim() }.replace(Regex("\\s+"), " ").trim().ifBlank { null }
