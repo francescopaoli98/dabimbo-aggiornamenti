@@ -138,6 +138,9 @@ class Raddrizzatore(private val context: Context) {
         ingrandisciZone(foto, 0, zoneTesto(testoIntero, Rect(0, 0, foto.width, foto.height)), provate)
             ?.let { return it }
 
+        // Prezzi letti (scritta grande): segnaposto dei cartellini, usati al punto 6
+        val prezzi = prezziNelTesto(testoIntero, Rect(0, 0, foto.width, foto.height), 1f).toMutableList()
+
         // 4. Foto divisa in tasselli, prima così com'è poi girata di 90° (per il testo in verticale)
         for (gradi in listOf(0, 90)) {
             val base = ruota(foto, gradi)
@@ -155,13 +158,25 @@ class Raddrizzatore(private val context: Context) {
                     return Zona(base, gradi, nellaFoto(it.boundingBox!!, t, scala), codiceDi(it), "tasselli", angoliDi(it, t, scala))
                 }
                 zoneTasselli += zoneTesto(testo, t, scala)
+                if (gradi == 0) prezzi += prezziNelTesto(testo, t, scala)
             }
             // 5. Come il punto 3, ma con le zone viste nei tasselli
             ingrandisciZone(base, gradi, zoneTasselli, if (gradi == 0) provate else mutableListOf())
                 ?.let { return it }
         }
 
-        // 6. Ultima spiaggia: rettangoli bianchi (etichette) trovati dalla forma, letti uno per uno
+        // 6. Attorno ai prezzi letti: ritaglio, raddrizzo, ingrandisco e cerco il codice
+        val prezziProvati = mutableListOf<PointF>()
+        for (p in prezzi) {
+            if (prezziProvati.size >= MAX_PREZZI_PRIMO) break
+            val centro = p.centro
+            if (prezziProvati.any { hypot(it.x - centro.x, it.y - centro.y) < 2 * p.altezza }) continue
+            prezziProvati += centro
+            val c = codiciAttornoAlPrezzo(foto, p).firstOrNull() ?: continue
+            return Zona(foto, 0, riquadroDi(c.angoli), c.codice, "prezzo", c.angoli)
+        }
+
+        // 7. Ultima spiaggia: rettangoli bianchi (etichette) trovati dalla forma, letti uno per uno
         //    ingranditi, in tutti i versi e, se serve, con l'immagine "pulita"
         for (r in etichetteIn(foto).take(MAX_ETICHETTE)) {
             val c = codiciNelRitaglio(foto, r, listOf(0, 90, 270, 180)).firstOrNull() ?: continue
@@ -216,14 +231,14 @@ class Raddrizzatore(private val context: Context) {
 
     /** Riga con il codice di 7 cifre (qualsiasi inclinazione), es. "1443984" o "A442/1443984". */
     private fun rigaCodice(testo: Text): Text.Line? =
-        testo.textBlocks.flatMap { it.lines }.firstOrNull { REGEX_CODICE.containsMatchIn(it.text) && it.boundingBox != null }
+        testo.textBlocks.flatMap { it.lines }.firstOrNull { REGEX_CODICE.containsMatchIn(LettoreCartellino.cifre(it.text)) && it.boundingBox != null }
 
-    private fun codiceDi(riga: Text.Line): String? = REGEX_CODICE.find(riga.text)?.value
+    private fun codiceDi(riga: Text.Line): String? = REGEX_CODICE.find(LettoreCartellino.cifre(riga.text))?.value
 
     /** Riga col codice scritta più in orizzontale che in verticale (cartellino anche un po' storto). */
     private fun rigaCodiceDritta(testo: Text): Text.Line? =
         testo.textBlocks.flatMap { it.lines }.firstOrNull {
-            REGEX_CODICE.containsMatchIn(it.text) && abs(it.angle) < 45f && it.cornerPoints != null
+            REGEX_CODICE.containsMatchIn(LettoreCartellino.cifre(it.text)) && abs(it.angle) < 45f && it.cornerPoints != null
         }
 
     /**
@@ -343,7 +358,7 @@ class Raddrizzatore(private val context: Context) {
             for (g in rotazioni) {
                 val inversa = Matrix().also { matriceRotazione(immagine.width, immagine.height, g).invert(it) }
                 val codici = leggi(ruota(immagine, g), "etichetta ${if (versione == 0) "" else "pulita "}$g°").textBlocks.flatMap { it.lines }.mapNotNull { l ->
-                    val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+                    val codice = REGEX_CODICE.find(LettoreCartellino.cifre(l.text))?.value ?: return@mapNotNull null
                     val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
                     CodiceTrovato(codice, angoli.map { q ->
                         val xy = floatArrayOf(q.x.toFloat(), q.y.toFloat())
@@ -469,7 +484,7 @@ class Raddrizzatore(private val context: Context) {
                     val inverso = Matrix().also { matriceRotazione(ritaglio.width, ritaglio.height, g).invert(it) }
                     val scalaRitaglio = ritaglio.width.toFloat() / area.width()
                     leggi(girato, "altri: zona $g°").textBlocks.flatMap { it.lines }.forEach { l ->
-                        val codice = REGEX_CODICE.find(l.text)?.value ?: return@forEach
+                        val codice = REGEX_CODICE.find(LettoreCartellino.cifre(l.text))?.value ?: return@forEach
                         val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@forEach
                         // dal ritaglio girato alla foto dritta
                         val nellaFoto = angoli.map { p ->
@@ -528,7 +543,7 @@ class Raddrizzatore(private val context: Context) {
         val inversa = Matrix().also { m.invert(it) }
 
         return leggi(pezzo, "altri: attorno al prezzo").textBlocks.flatMap { it.lines }.mapNotNull { l ->
-            val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+            val codice = REGEX_CODICE.find(LettoreCartellino.cifre(l.text))?.value ?: return@mapNotNull null
             val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
             CodiceTrovato(codice, angoli.map { q ->
                 val xy = floatArrayOf(q.x.toFloat(), q.y.toFloat())
@@ -541,7 +556,7 @@ class Raddrizzatore(private val context: Context) {
     /** Righe col codice (con qualsiasi inclinazione) lette in un pezzo di foto, riportate nelle coordinate della foto. */
     private fun codiciNelTesto(testo: Text, pezzo: Rect, scala: Float): List<CodiceTrovato> =
         testo.textBlocks.flatMap { it.lines }.mapNotNull { l ->
-            val codice = REGEX_CODICE.find(l.text)?.value ?: return@mapNotNull null
+            val codice = REGEX_CODICE.find(LettoreCartellino.cifre(l.text))?.value ?: return@mapNotNull null
             val angoli = l.cornerPoints?.takeIf { it.size == 4 } ?: return@mapNotNull null
             CodiceTrovato(codice, angoli.map { PointF(it.x / scala + pezzo.left, it.y / scala + pezzo.top) })
         }
@@ -657,7 +672,8 @@ class Raddrizzatore(private val context: Context) {
         private const val MAX_ZONE = 6
         private const val MAX_ETICHETTE = 10     // etichette (trovate dalla forma) lette al massimo per foto
         private const val LATO_ETICHETTA = 1400  // ogni etichetta viene ingrandita a questa misura prima di leggerla
-        private const val MAX_PREZZI = 15        // prezzi usati come segnaposto (foto con tanti articoli)
+        private const val MAX_PREZZI = 15
+        private const val MAX_PREZZI_PRIMO = 6   // prezzi provati come segnaposto per il primo cartellino        // prezzi usati come segnaposto (foto con tanti articoli)
         private const val MAX_ZONE_ALTRI = 12    // zone ingrandite per cercare gli altri cartellini (foto con tanti articoli)           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
         private val SETTE_CIFRE = Regex("\\d{7}")

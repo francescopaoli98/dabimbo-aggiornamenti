@@ -36,8 +36,29 @@ object LettoreCartellino {
     // Simboli che l'OCR può leggere al posto di "€" o che non servono
     private val SIMBOLI_EURO = Regex("[€£]|\\bEUR\\b|^[Ee€Cc](?=\\s?\\d)")
 
+    /**
+     * Corregge le lettere che l'OCR scambia per cifre (I→1, O→0, S→5, B→8...), ma SOLO nelle parole
+     * che sono quasi tutte cifre (es. "I444106" → "1444106", "144410o" → "1444100"). Le parole normali restano uguali.
+     */
+    fun cifre(testo: String): String = testo.split(" ").joinToString(" ") { parola ->
+        parola.split("/").joinToString("/") { pezzo ->
+            val cifreVere = pezzo.count { it.isDigit() }
+            val confondibili = pezzo.count { it in SCAMBI }
+            if (cifreVere >= 3 && cifreVere + confondibili == pezzo.length && confondibili <= 2)
+                pezzo.map { SCAMBI[it] ?: it }.joinToString("")
+            else pezzo
+        }
+    }
+
+    private val SCAMBI = mapOf(
+        'I' to '1', 'l' to '1', 'i' to '1', '|' to '1', '!' to '1',
+        'O' to '0', 'o' to '0', 'D' to '0', 'Q' to '0',
+        'S' to '5', 's' to '5', 'B' to '8', 'Z' to '2', 'z' to '2', 'G' to '6', 'b' to '6',
+    )
+
     fun analizza(paroleLette: List<Riga>): DatiCartellino {
-        val righe = unisciPrezziSpezzati(paroleLette)
+        // Le parole che sembrano numeri vengono "ripulite" (I→1, O→0...) prima di tutto
+        val righe = unisciPrezziSpezzati(paroleLette.map { it.copy(testo = cifre(it.testo)) })
 
         // 1. Codice: preferisco la riga fatta SOLO di 7 cifre (quella sotto il prefisso)
         val rigaCodice = righe.firstOrNull { it.testo.trim().replace(" ", "").matches(Regex("\\d{7}")) }

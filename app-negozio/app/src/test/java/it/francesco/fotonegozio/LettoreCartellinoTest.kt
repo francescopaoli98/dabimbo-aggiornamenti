@@ -268,6 +268,29 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun lettere_scambiate_per_cifre_nel_codice() {
+        // Visto nella diagnosi del Sapientino: "1444106" letto come "I444106" / "144410o"
+        assertEquals("1444106", LettoreCartellino.cifre("I444106"))
+        assertEquals("1444106", LettoreCartellino.cifre("14441o6"))
+        assertEquals("A1291/1444106", LettoreCartellino.cifre("A1291/I444106"))
+        // Le parole normali non cambiano
+        assertEquals("gioco Scat sapientino", LettoreCartellino.cifre("gioco Scat sapientino"))
+        assertEquals("BOTT IDO 7A", LettoreCartellino.cifre("BOTT IDO 7A"))
+        assertEquals("SOS", LettoreCartellino.cifre("SOS"))
+    }
+
+    @Test
+    fun codice_con_I_al_posto_dell_1() {
+        val dati = LettoreCartellino.analizza(listOf(
+            r("I444106", 300, 24, 380, 44),
+            r("gioco scat sapientino vocabolario", 20, 26, 290, 46),
+            r("€4,00", 20, 110, 130, 150),
+        ))
+        assertEquals("1444106", dati.codice)
+        assertEquals("€ 4,00", dati.prezzo)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)
