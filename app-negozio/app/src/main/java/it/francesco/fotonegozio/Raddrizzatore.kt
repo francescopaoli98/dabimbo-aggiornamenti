@@ -201,21 +201,33 @@ class Raddrizzatore(private val context: Context) {
         if (!area.intersect(0, 0, dritta.width, dritta.height)) return null
 
         // Ingrandisco (o rimpicciolisco) perché il testo del codice sia alto ~40 px, poi raddrizzo l'inclinazione.
-        // Il verso della correzione lo provo in tutti e due i sensi (e senza): tengo la lettura più completa.
+        // Provo la correzione nei due versi (e senza) e tengo quella con le righe più dritte.
         val scala = (ALTEZZA_TESTO / altezzaCodice).coerceIn(0.5f, 4f)
         val prove = if (abs(inclinazione) < 3f) listOf(0f) else listOf(-inclinazione, inclinazione, 0f)
         var migliore: DatiCartellino? = null
+        var stortoMigliore = Float.MAX_VALUE
         for (correzione in prove) {
             val matrice = Matrix().apply {
                 postScale(scala, scala)
                 postRotate(correzione)
             }
             val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
-            val dati = LettoreCartellino.analizza(righeDa(leggi(pezzo)))
-            if (completezza(dati) > completezza(migliore)) migliore = dati
-            if (completezza(migliore) == 3) break   // codice + descrizione + prezzo: basta così
+            val testo = leggi(pezzo)
+            val dati = LettoreCartellino.analizza(righeDa(testo))
+            if (dati.codice == null) continue
+            // Quanto sono storte in media le righe lette (0 = perfettamente dritte)
+            val linee = testo.textBlocks.flatMap { it.lines }
+            val storto = if (linee.isEmpty()) 90f else linee.map { abs(it.angle) }.average().toFloat()
+            // Meglio = più dritto; a parità (meno di 2°), quello con più dati
+            val meglio = migliore == null || storto < stortoMigliore - 2f ||
+                (storto < stortoMigliore + 2f && completezza(dati) > completezza(migliore))
+            if (meglio) {
+                migliore = dati
+                stortoMigliore = storto
+            }
+            if (stortoMigliore < 2f && completezza(migliore) == 3) break   // dritto e completo: basta così
         }
-        return migliore?.takeIf { it.codice != null }
+        return migliore
     }
 
     /** Quanti dati importanti ha la lettura (codice, descrizione, prezzo). */

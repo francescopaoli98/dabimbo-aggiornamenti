@@ -70,7 +70,8 @@ object LettoreCartellino {
         val partiTaglia = mutableListOf<Riga>()
         val partiDescrizione = mutableListOf<Riga>()
         for (riga in raggruppaInRighe(candidati, h)) {
-            for (pezzo in spezzaSuiVuoti(riga, 5 * h / 2)) {
+            // Solo uno spazio MOLTO grande (6 volte l'altezza del testo) separa la taglia dalla descrizione
+            for (pezzo in spezzaSuiVuoti(riga, 6 * h)) {
                 val cy = pezzo.sumOf { it.centroY } / pezzo.size
                 val vicinoAlPrezzo = rigaPrezzo != null &&
                     pezzo.first().sx > rigaPrezzo.dx &&

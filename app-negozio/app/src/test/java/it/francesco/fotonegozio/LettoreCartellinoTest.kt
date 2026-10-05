@@ -206,6 +206,31 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun maglione_spazi_normali_tra_parole_non_creano_una_taglia() {
+        // Errore visto sul telefono: "ARG" e "7/8A 7/8A" finivano nella taglia
+        val righe = parole("1444490", 650, 455, 495, 26) +
+            parole("MAGLIA ML N BRILL FILI", 85, 445, 482) + parole("ARG", 560, 446, 483) +   // spazio un po' largo
+            parole("PIAZZA ITALIA", 85, 520, 558) + parole("7/8A 7/8A", 470, 521, 559) +      // spazio un po' largo
+            parole("7/8A", 690, 575, 613) +
+            parole("€3,00", 45, 585, 650, 40)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("MAGLIA ML N BRILL FILI ARG PIAZZA ITALIA 7/8A 7/8A", dati.descrizione)
+        assertEquals("7/8A", dati.taglia)
+    }
+
+    @Test
+    fun coprispalla_fine_della_prima_riga_resta_nella_descrizione() {
+        val righe = parole("1444493", 650, 455, 495, 26) +
+            parole("COPRISPALLA 7A", 85, 445, 482) + parole("PANNA NO", 470, 447, 484) +
+            parole("BOTT IDO 7A", 85, 520, 558) +
+            parole("7A", 700, 560, 598) +
+            parole("€2,50", 45, 570, 650, 40)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("COPRISPALLA 7A PANNA NO BOTT IDO 7A", dati.descrizione)
+        assertEquals("7A", dati.taglia)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)
