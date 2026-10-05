@@ -103,6 +103,29 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         fileDizionario(getApplication()).writeText(Dizionario.scrivi(dizionario))
     }
 
+    /** Pixelatura a mano: applica i quadretti [celle] alla foto attuale e la salva come nuova foto. */
+    fun salvaPixelata(numero: Int, celle: Set<Long>, lato: Int) {
+        if (celle.isEmpty()) return
+        viewModelScope.launch {
+            bloccoRotazioni.withLock {
+                val i = foto.indexOfFirst { it.numero == numero }
+                val f = foto.getOrNull(i) ?: return@withLock
+                val attuale = f.file ?: return@withLock
+                val (nuovo, mini) = withContext(Dispatchers.Default) {
+                    val b = BitmapFactory.decodeFile(attuale.path)
+                    val w = b.width; val h = b.height
+                    val px = IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
+                    PixelManuale.applica(px, w, h, celle, lato)
+                    val pixelata = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+                    val file = Raddrizzatore.salva(getApplication(), pixelata, "foto_${numero}_px${System.currentTimeMillis() % 100_000}")
+                    file to miniatura(pixelata).asImageBitmap()
+                }
+                // La foto pixelata diventa la nuova base (le rotazioni a mano ripartono da qui)
+                foto[i] = f.copy(fileAuto = nuovo, file = nuovo, miniatura = mini, rotazioneManuale = 0, messaInVerticale = false, daControllare = false)
+            }
+        }
+    }
+
     /** Pezzo 6: la prossima foto da pubblicare, in ordine (null = tutte pubblicate o ancora in lavorazione). */
     val prossima: Foto? get() = foto.firstOrNull { !it.pubblicata && !it.inCorso && it.file != null && it.errore == null }
 
