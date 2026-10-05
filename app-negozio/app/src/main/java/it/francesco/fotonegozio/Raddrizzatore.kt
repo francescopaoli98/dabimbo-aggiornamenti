@@ -77,17 +77,59 @@ class Raddrizzatore(private val context: Context) {
         }
 
         // 2. Testo su tutta la foto (funziona se il cartellino è grande, foto da vicino)
-        rigaCodice(leggi(foto))?.let { return Zona(foto, 0, it.boundingBox!!, null, "testo") }
+        val testoIntero = leggi(foto)
+        rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, null, "testo") }
 
-        // 3. Foto divisa in tasselli, prima così com'è poi girata di 90° (per il testo in verticale)
+        // 3. Zone dove ML Kit ha visto del testo ma non è riuscito a leggerlo: ritaglio e ingrandisco
+        val provate = mutableListOf<Rect>()
+        ingrandisciZone(foto, 0, zoneTesto(testoIntero, Rect(0, 0, foto.width, foto.height)), provate)
+            ?.let { return it }
+
+        // 4. Foto divisa in tasselli, prima così com'è poi girata di 90° (per il testo in verticale)
         for (gradi in listOf(0, 90)) {
             val base = ruota(foto, gradi)
+            val zoneTasselli = mutableListOf<Rect>()
             for (t in tasselli(base)) {
                 val pezzo = Bitmap.createBitmap(base, t.left, t.top, t.width(), t.height())
-                val riga = rigaCodice(leggi(pezzo)) ?: continue
-                val r = riga.boundingBox!!
-                r.offset(t.left, t.top)   // coordinate dal tassello alla foto intera
-                return Zona(base, gradi, r, null, "tasselli")
+                val testo = leggi(pezzo)
+                rigaCodice(testo)?.let {
+                    val r = it.boundingBox!!
+                    r.offset(t.left, t.top)   // coordinate dal tassello alla foto intera
+                    return Zona(base, gradi, r, null, "tasselli")
+                }
+                zoneTasselli += zoneTesto(testo, t)
+            }
+            // 5. Come il punto 3, ma con le zone viste nei tasselli
+            ingrandisciZone(base, gradi, zoneTasselli, if (gradi == 0) provate else mutableListOf())
+                ?.let { return it }
+        }
+        return null
+    }
+
+    /**
+     * Riquadri dei blocchi di testo (anche illeggibili), già spostati nelle coordinate della foto.
+     * Prima quelli con più cifre: il cartellino ha codice e prezzo.
+     */
+    private fun zoneTesto(testo: Text, tassello: Rect): List<Rect> =
+        testo.textBlocks
+            .filter { it.boundingBox != null }
+            .sortedByDescending { b -> b.text.count { it.isDigit() } }
+            .map { b -> Rect(b.boundingBox!!).apply { offset(tassello.left, tassello.top) } }
+
+    /** Ritaglia e ingrandisce fino a [MAX_ZONE] zone, cercando il codice in orizzontale e in verticale. */
+    private suspend fun ingrandisciZone(base: Bitmap, gradi: Int, zone: List<Rect>, provate: MutableList<Rect>): Zona? {
+        var tentativi = 0
+        for (z in zone) {
+            if (tentativi >= MAX_ZONE) break
+            // Zona già coperta da un ritaglio precedente: inutile rileggerla
+            if (provate.any { it.contains(z.centerX(), z.centerY()) }) continue
+            tentativi++
+            val (ritaglio, area) = ritagliaConArea(base, z)
+            provate += area
+            for (g in listOf(0, 90)) {
+                if (rigaCodice(leggi(ruota(ritaglio, g))) != null) {
+                    return Zona(base, gradi, z, null, "ingrandimento")
+                }
             }
         }
         return null
@@ -125,16 +167,21 @@ class Raddrizzatore(private val context: Context) {
      * Ritaglio quadrato attorno alla zona trovata, abbastanza grande da contenere
      * tutto il cartellino, ingrandito se piccolo (ML Kit legge meglio).
      */
-    private fun ritaglia(b: Bitmap, zona: Rect): Bitmap {
-        val lato = max(zona.width(), zona.height()) * 3
+    private fun ritaglia(b: Bitmap, zona: Rect): Bitmap = ritagliaConArea(b, zona).first
+
+    /** Come [ritaglia], ma restituisce anche l'area della foto ritagliata. */
+    private fun ritagliaConArea(b: Bitmap, zona: Rect): Pair<Bitmap, Rect> {
+        // Almeno 1/5 della foto: se la zona è una sola parola, il ritaglio prende comunque tutto il cartellino
+        val lato = max(max(zona.width(), zona.height()) * 3, max(b.width, b.height) / 5)
         val cx = zona.centerX()
         val cy = zona.centerY()
         val r = Rect(cx - lato / 2, cy - lato / 2, cx + lato / 2, cy + lato / 2)
         r.intersect(0, 0, b.width, b.height)
         val pezzo = Bitmap.createBitmap(b, r.left, r.top, r.width(), r.height())
         val scala = LATO_RITAGLIO.toFloat() / max(pezzo.width, pezzo.height)
-        return if (scala > 1f) Bitmap.createScaledBitmap(pezzo, (pezzo.width * scala).toInt(), (pezzo.height * scala).toInt(), true)
+        val finale = if (scala > 1f) Bitmap.createScaledBitmap(pezzo, (pezzo.width * scala).toInt(), (pezzo.height * scala).toInt(), true)
         else pezzo
+        return finale to r
     }
 
     /** Legge la foto (max ~4000 px per lato) e applica l'orientamento EXIF. */
@@ -168,6 +215,7 @@ class Raddrizzatore(private val context: Context) {
     companion object {
         private const val LATO_MASSIMO = 4100   // 12 MP restano intere, 50 MP dimezzate
         private const val LATO_RITAGLIO = 1200
+        private const val MAX_ZONE = 6           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
         private val SETTE_CIFRE = Regex("\\d{7}")
         // 7 cifre esatte, non attaccate ad altre cifre (esclude i codici EAN a 13 cifre)

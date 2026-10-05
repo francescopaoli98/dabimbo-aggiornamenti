@@ -68,7 +68,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 file = file,
                 rotazione = r.rotazioneApplicata,
                 codice = r.codiceLetto,
-                metodo = r.metodo,
+                metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}",
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
