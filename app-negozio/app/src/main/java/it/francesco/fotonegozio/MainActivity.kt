@@ -73,6 +73,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
@@ -177,7 +179,7 @@ private fun Schermata(vm: FotoViewModel) {
         bottomBar = { if (vm.foto.isNotEmpty()) BarraPubblica(vm) { vm.prossima?.let { chiediEPubblica(it) } } },
     ) { padding ->
       Box(Modifier.fillMaxSize()) {
-        SfondoNuvole()
+        SfondoNuvole()   // ferme: belle e senza consumare
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -187,7 +189,7 @@ private fun Schermata(vm: FotoViewModel) {
             item {
                 Image(
                     painterResource(R.drawable.logo), "Da bimbo a bimbo",
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).galleggia()
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                         .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
                     contentScale = ContentScale.FillWidth,
                 )
@@ -236,7 +238,7 @@ private fun Schermata(vm: FotoViewModel) {
             items(vm.foto, key = { it.numero }) { f ->
                 Scheda(
                     f,
-                    modifier = Modifier.animateItem().entrata(),
+                    modifier = Modifier.animateItem(),
                     prove = vm.prove,
                     testo = vm.testo(f),
                     ingrandisci = { ingrandita = f.numero },
@@ -340,7 +342,7 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
             Button(
                 onClick = pubblica,
                 enabled = prossima != null,
-                modifier = Modifier.fillMaxWidth().height(62.dp).pulsa(prossima != null).then(morbido),
+                modifier = Modifier.fillMaxWidth().height(62.dp).then(morbido),
                 shape = MaterialTheme.shapes.large,
                 interactionSource = sorgente,
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
@@ -407,7 +409,7 @@ private fun Scheda(
     Surface(
         color = Color.White,
         shape = MaterialTheme.shapes.large,
-        shadowElevation = 6.dp,
+        shadowElevation = 2.dp,
         border = BorderStroke(1.5.dp, BordoScheda),
         modifier = modifier.fillMaxWidth().alpha(trasparenza),
     ) {
@@ -701,26 +703,14 @@ private fun DatiLetti(dati: DatiCartellino) {
     Campo("Taglia", dati.taglia, obbligatorio = false)   // i giochi non ce l'hanno
 }
 
-/** "Gira" = 90° a destra; "Capovolgi" = 180°, un tocco solo se l'app ha scelto il verso sbagliato. */
-@Composable
-private fun PulsantiGira(gira: (Int) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { gira(90) }, modifier = Modifier.weight(1f).height(46.dp), shape = MaterialTheme.shapes.medium) {
-            Text("↻ Gira", fontSize = 15.sp)
-        }
-        OutlinedButton(onClick = { gira(180) }, modifier = Modifier.weight(1f).height(46.dp), shape = MaterialTheme.shapes.medium) {
-            Text("⇅ Capovolgi", fontSize = 15.sp)
-        }
-    }
-}
-
 /**
  * Foto a schermo intero: si ingrandisce con le dita. In basso: Gira, Capovolgi, Pixela, Testo.
  * "Pixela" apre l'editor: col dito si coprono a quadrettoni le parti da nascondere.
  */
 @Composable
 private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) -> Unit, testo: () -> Unit, chiudi: () -> Unit) {
-    val immagine = remember(f.file) { f.file?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
+    val immagine by fotoPerSchermo(f.file)
+    val misure = remember(f.file) { f.file?.let(::misureFoto) }   // grandezza vera, per i quadretti della pixelatura
     var pixela by remember { mutableStateOf(false) }
     Dialog(onDismissRequest = { if (pixela) pixela = false else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
@@ -731,16 +721,18 @@ private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) ->
                 )
                 if (!pixela) TextButton(onClick = chiudi) { Text("✕ Chiudi", color = Color.White, fontSize = 18.sp) }
             }
-            if (immagine == null) return@Column
-            if (pixela) {
+            val img = immagine
+            if (pixela && img != null && misure != null) {
                 EditorPixel(
-                    immagine, Modifier.weight(1f),
+                    img, misure.first, misure.second, Modifier.weight(1f),
                     salva = { celle, lato -> salvaPixel(celle, lato); pixela = false },
                     esci = { pixela = false },
                 )
             } else {
                 // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
-                key(f.file) { FotoZoomabile(immagine, Modifier.weight(1f).fillMaxWidth()) }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize()) }
+                }
                 Surface(color = Color.White, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PulsanteVisore("↻", "Gira", Modifier.weight(1f)) { gira(90) }
@@ -775,8 +767,8 @@ private fun PulsanteVisore(simbolo: String, scritta: String, modifier: Modifier 
 
 /** Editor della pixelatura a mano: col dito si "dipingono" quadrettoni sulle parti da nascondere. */
 @Composable
-private fun EditorPixel(immagine: ImageBitmap, modifier: Modifier, salva: (Set<Long>, Int) -> Unit, esci: () -> Unit) {
-    val w = immagine.width; val h = immagine.height
+private fun EditorPixel(immagine: ImageBitmap, w: Int, h: Int, modifier: Modifier, salva: (Set<Long>, Int) -> Unit, esci: () -> Unit) {
+    // w, h = grandezza vera della foto (quella mostrata può essere rimpicciolita)
     val lato = remember(immagine) { PixelManuale.lato(w, h) }
     // Colori di anteprima: la foto rimpicciolita, un pixel per quadretto
     val piccola = remember(immagine) {
@@ -925,7 +917,7 @@ private fun ModificaArticolo(
     var prezzo by remember { mutableStateOf(iniziale?.prezzo?.removePrefix("€")?.trim().orEmpty()) }
     var taglia by remember { mutableStateOf(iniziale?.taglia.orEmpty()) }
     var rigaVeloce by remember { mutableStateOf("") }
-    val immagine = remember(foto) { foto?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
+    val immagine by fotoPerSchermo(foto)
 
     Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
@@ -992,7 +984,7 @@ private fun ModificaArticolo(
 @Composable
 private fun ModificaTesto(foto: File?, iniziale: String, manuale: Boolean, salva: (String?) -> Unit, annulla: () -> Unit) {
     var testo by remember { mutableStateOf(iniziale) }
-    val immagine = remember(foto) { foto?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
+    val immagine by fotoPerSchermo(foto)
     Dialog(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
@@ -1018,6 +1010,28 @@ private fun ModificaTesto(foto: File?, iniziale: String, manuale: Boolean, salva
             }
         }
     }
+}
+
+/**
+ * Foto per lo schermo: caricata in sottofondo (lo schermo non si blocca) e rimpicciolita
+ * a circa 2000 px, che bastano anche ingrandendo e pesano molto meno in memoria.
+ */
+@Composable
+private fun fotoPerSchermo(file: File?): State<ImageBitmap?> = produceState<ImageBitmap?>(null, file) {
+    value = file?.let { withContext(Dispatchers.IO) { caricaRidotta(it, 2048) } }
+}
+
+private fun misureFoto(file: File): Pair<Int, Int> {
+    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(file.path, o)
+    return o.outWidth to o.outHeight
+}
+
+private fun caricaRidotta(file: File, lato: Int): ImageBitmap? {
+    val (w, h) = misureFoto(file)
+    var campione = 1
+    while (maxOf(w, h) / (campione * 2) >= lato) campione *= 2
+    return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = campione })?.asImageBitmap()
 }
 
 /** "2,5" → "€ 2,50"; "3" → "€ 3,00"; vuoto → null. */

@@ -12,11 +12,34 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 46
-        versionName = "2.1"
+        versionCode = 47
+        versionName = "2.2"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk { abiFilters += "arm64-v8a" }
+    }
+
+    // Firma: la stessa chiave usata finora, così l'app si aggiorna sopra quella già installata
+    signingConfigs {
+        create("negozio") {
+            storeFile = rootProject.file("firma/chiave-negozio.jks")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+        // Versione da installare: compattata e ottimizzata (R8), molto più fluida della versione di prova
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("negozio")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("negozio")
+        }
     }
 
     buildFeatures {

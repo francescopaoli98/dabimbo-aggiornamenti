@@ -22,12 +22,10 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.sin
 import kotlin.random.Random
 
-/** Nuvolette bianche che scorrono lentissime sullo sfondo, come nel logo. */
+/** Nuvolette bianche sullo sfondo, come nel logo. Ferme: si disegnano una volta sola (leggero). */
 @Composable
 fun SfondoNuvole(modifier: Modifier = Modifier) {
-    val tempo by rememberInfiniteTransition(label = "nuvole").animateFloat(
-        0f, 1f, infiniteRepeatable(tween(60_000, easing = LinearEasing)), label = "t",
-    )
+    val tempo = 0.2f
     // posizione verticale (0..1), grandezza, velocità
     val nuvole = remember { List(7) { i -> Triple(0.06f + i * 0.14f, 0.7f + (i % 3) * 0.25f, 0.6f + (i % 4) * 0.25f) } }
     Canvas(modifier.fillMaxSize()) {
@@ -46,16 +44,6 @@ fun SfondoNuvole(modifier: Modifier = Modifier) {
     }
 }
 
-/** Fa "galleggiare" piano (su e giù). */
-@Composable
-fun Modifier.galleggia(ampiezza: Dp = 4.dp, durataMs: Int = 2600): Modifier {
-    val v by rememberInfiniteTransition(label = "galleggia").animateFloat(
-        -1f, 1f, infiniteRepeatable(tween(durataMs, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "v",
-    )
-    val px = with(LocalDensity.current) { ampiezza.toPx() }
-    return graphicsLayer { translationY = v * px }
-}
-
 /** Pulsante "morbido": premuto si schiaccia un po' e torna su con un rimbalzo. */
 @Composable
 fun rimbalzo(): Pair<MutableInteractionSource, Modifier> {
@@ -69,20 +57,11 @@ fun rimbalzo(): Pair<MutableInteractionSource, Modifier> {
     return sorgente to Modifier.graphicsLayer { scaleX = scala; scaleY = scala }
 }
 
-/** Pulsa piano (per attirare l'attenzione sul pulsante giusto). */
-@Composable
-fun Modifier.pulsa(attivo: Boolean): Modifier {
-    val v by rememberInfiniteTransition(label = "pulsa").animateFloat(
-        1f, 1.035f, infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "v",
-    )
-    return if (attivo) graphicsLayer { scaleX = v; scaleY = v } else this
-}
-
 /** Entrata della scheda: dal basso, con un piccolo rimbalzo. */
 @Composable
 fun Modifier.entrata(): Modifier {
     val v = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { v.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow)) }
+    LaunchedEffect(Unit) { v.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)) }
     return graphicsLayer {
         alpha = v.value.coerceIn(0f, 1f)
         translationY = (1f - v.value) * 60.dp.toPx()
