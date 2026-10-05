@@ -30,6 +30,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.KeyboardType
 
 class MainActivity : ComponentActivity() {
 
@@ -70,6 +79,7 @@ private fun Schermata(vm: FotoViewModel) {
         vm.carica(it)
     }
     var ingrandita by remember { mutableStateOf<Int?>(null) }   // numero della foto aperta a schermo intero
+    var inModifica by remember { mutableStateOf<Pair<Int, Int?>?>(null) }   // (foto, articolo) - articolo null = nuovo
 
     Scaffold { padding ->
         Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
@@ -96,13 +106,33 @@ private fun Schermata(vm: FotoViewModel) {
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
                 items(vm.foto, key = { it.numero }) { f ->
-                    Scheda(f, onClick = { ingrandita = f.numero }, gira = { gradi -> vm.gira(f.numero, gradi) })
+                    Scheda(
+                        f,
+                        onClick = { ingrandita = f.numero },
+                        gira = { gradi -> vm.gira(f.numero, gradi) },
+                        modifica = { indice -> inModifica = f.numero to indice },
+                    )
                 }
             }
         }
     }
 
-    // Cerco sempre la versione aggiornata, così dopo "Gira" l'ingrandimento cambia subito
+    // Modifica / aggiunta di un articolo a mano
+    inModifica?.let { (numero, indice) ->
+        val f = vm.foto.firstOrNull { it.numero == numero }
+        if (f != null) {
+            ModificaArticolo(
+                iniziale = indice?.let { f.articoli.getOrNull(it) },
+                nuovo = indice == null,
+                guardaFoto = { ingrandita = numero },
+                salva = { d -> vm.salvaArticolo(numero, indice, d); inModifica = null },
+                annulla = { inModifica = null },
+            )
+        }
+    }
+
+    // Cerco sempre la versione aggiornata, così dopo "Gira" l'ingrandimento cambia subito.
+    // Viene dopo la modifica: così dalla modifica si può aprire la foto e leggerla bene.
     vm.foto.firstOrNull { it.numero == ingrandita }?.let { f ->
         Ingrandimento(f, gira = { gradi -> vm.gira(f.numero, gradi) }) { ingrandita = null }
     }
@@ -110,13 +140,13 @@ private fun Schermata(vm: FotoViewModel) {
 
 /** Una foto nella lista: foto grande, avviso se il verso è da controllare, articoli letti, pulsanti. */
 @Composable
-private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
+private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit, modifica: (Int?) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
                 if (f.daControllare && !f.inCorso) {
-                    Text("⚠ Controlla il verso", color = Color(0xFFE65100), fontWeight = FontWeight.Bold)
+                    Text("⚠ Controlla il verso", color = ARANCIONE, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -136,17 +166,26 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
                 f.inCorso -> Text("In attesa…")
                 f.errore != null -> Text("Errore: ${f.errore}", color = MaterialTheme.colorScheme.error)
                 else -> {
-                    if (f.codice == null) Text("Cartellino non trovato", color = MaterialTheme.colorScheme.error)
-                    val articoli = listOfNotNull(f.dati) + f.altri
-                    if (f.codice != null && articoli.isEmpty()) {
-                        Text("Codice: ${f.codice}")
-                        Text("Dati del cartellino non letti", color = MaterialTheme.colorScheme.error)
+                    val articoli = f.articoli
+                    if (articoli.isEmpty()) {
+                        Avviso(
+                            if (f.codice == null) "⚠ Cartellino non letto: aggiungi l'articolo a mano"
+                            else "⚠ Cartellino ${f.codice} non leggibile: aggiungi l'articolo a mano"
+                        )
                     }
                     articoli.forEachIndexed { i, d ->
-                        if (articoli.size > 1) {
-                            Text("Articolo ${i + 1} di ${articoli.size}", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                if (articoli.size > 1) "Articolo ${i + 1} di ${articoli.size}" else "Articolo",
+                                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { modifica(i) }) { Text("✏ Modifica") }
                         }
+                        if (d.daCompletare) Avviso("⚠ Da completare: tocca la foto per leggere meglio il cartellino")
                         DatiLetti(d)
+                    }
+                    OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        Text("+ Aggiungi articolo")
                     }
                     // Per le prove: come ha lavorato l'app (sparirà nella versione finale)
                     Text(
@@ -162,6 +201,12 @@ private fun Scheda(f: Foto, onClick: () -> Unit, gira: (Int) -> Unit) {
         }
     }
 }
+
+/** Scritta arancione: qui Elisa deve guardare. */
+@Composable
+private fun Avviso(testo: String) = Text(testo, color = ARANCIONE, fontWeight = FontWeight.Bold)
+
+private val ARANCIONE = Color(0xFFE65100)
 
 /** I dati di UN articolo, così come sono letti dal cartellino (le sigle le espande il pezzo 3). */
 @Composable
@@ -192,16 +237,116 @@ private fun PulsantiGira(gira: (Int) -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** Foto a schermo intero, con i pulsanti per girarla. Tocca la foto per chiudere. */
+/** Foto a schermo intero: si ingrandisce con due dita o con doppio tocco; pulsanti per girarla. */
 @Composable
 private fun Ingrandimento(f: Foto, gira: (Int) -> Unit, chiudi: () -> Unit) {
     val immagine = remember(f.file) { f.file?.let { BitmapFactory.decodeFile(it.path)?.asImageBitmap() } }
     Dialog(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
-            Box(Modifier.weight(1f).fillMaxWidth().clickable(onClick = chiudi), contentAlignment = Alignment.Center) {
-                immagine?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Due dita o doppio tocco per ingrandire", color = Color.LightGray, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = chiudi) { Text("✕ Chiudi", color = Color.White, fontSize = 18.sp) }
+            }
+            // key: se la foto viene girata, lo zoom riparte da capo
+            key(f.file) {
+                immagine?.let { FotoZoomabile(it, Modifier.weight(1f).fillMaxWidth()) }
             }
             Surface { PulsantiGira(gira, Modifier.padding(12.dp)) }
         }
     }
+}
+
+/** Immagine che si ingrandisce con due dita (fino a 8 volte) e si sposta col dito. Doppio tocco: zoom avanti/indietro. */
+@Composable
+private fun FotoZoomabile(immagine: ImageBitmap, modifier: Modifier) {
+    var scala by remember { mutableFloatStateOf(1f) }
+    var spostamento by remember { mutableStateOf(Offset.Zero) }
+    Box(
+        modifier
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { punto ->
+                    if (scala > 1f) {
+                        scala = 1f; spostamento = Offset.Zero
+                    } else {
+                        // Porto il punto toccato al centro, ingrandito 3 volte
+                        val centro = Offset(size.width / 2f, size.height / 2f)
+                        scala = 3f; spostamento = (centro - punto) * 3f
+                    }
+                })
+            }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, sposta, zoom, _ ->
+                    scala = (scala * zoom).coerceIn(1f, 8f)
+                    spostamento = if (scala == 1f) Offset.Zero else spostamento + sposta
+                }
+            }
+    ) {
+        Image(
+            immagine, null,
+            Modifier.fillMaxSize().graphicsLayer {
+                scaleX = scala; scaleY = scala
+                translationX = spostamento.x; translationY = spostamento.y
+            },
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+/** Finestra per scrivere o correggere a mano un articolo. */
+@Composable
+private fun ModificaArticolo(
+    iniziale: DatiCartellino?,
+    nuovo: Boolean,
+    guardaFoto: () -> Unit,
+    salva: (DatiCartellino?) -> Unit,
+    annulla: () -> Unit,
+) {
+    var codice by remember { mutableStateOf(iniziale?.codice.orEmpty()) }
+    var descrizione by remember { mutableStateOf(iniziale?.descrizione.orEmpty()) }
+    var prezzo by remember { mutableStateOf(iniziale?.prezzo?.removePrefix("€")?.trim().orEmpty()) }
+    var taglia by remember { mutableStateOf(iniziale?.taglia.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = annulla,
+        title = { Text(if (nuovo) "Nuovo articolo" else "Modifica articolo") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = guardaFoto, modifier = Modifier.fillMaxWidth()) { Text("🔍 Guarda la foto") }
+                OutlinedTextField(codice, { codice = it.filter(Char::isDigit).take(7) }, label = { Text("Codice") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true)
+                OutlinedTextField(descrizione, { descrizione = it }, label = { Text("Descrizione") })
+                OutlinedTextField(prezzo, { prezzo = it }, label = { Text("Prezzo (es. 2,50)") }, prefix = { Text("€ ") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
+                OutlinedTextField(taglia, { taglia = it }, label = { Text("Taglia (se c'è)") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                salva(
+                    DatiCartellino(
+                        codice = codice.ifBlank { null },
+                        descrizione = descrizione.trim().ifBlank { null },
+                        prezzo = prezzoInFormato(prezzo),
+                        taglia = taglia.trim().ifBlank { null },
+                    )
+                )
+            }) { Text("Salva") }
+        },
+        dismissButton = {
+            Row {
+                if (!nuovo) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = annulla) { Text("Annulla") }
+            }
+        },
+    )
+}
+
+/** "2,5" → "€ 2,50"; "3" → "€ 3,00"; vuoto → null. */
+private fun prezzoInFormato(testo: String): String? {
+    val pulito = testo.replace("€", "").replace(" ", "").replace('.', ',').ifBlank { return null }
+    val parti = pulito.split(",")
+    val euro = parti[0].ifBlank { "0" }
+    val centesimi = parti.getOrNull(1).orEmpty().padEnd(2, '0').take(2)
+    return "€ $euro,$centesimi"
 }

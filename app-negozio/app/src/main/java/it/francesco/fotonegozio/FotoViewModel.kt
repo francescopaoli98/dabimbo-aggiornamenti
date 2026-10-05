@@ -41,6 +41,12 @@ data class Foto(
     val errore: String? = null,
 )
 
+/** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
+val Foto.articoli: List<DatiCartellino> get() = listOfNotNull(dati) + altri
+
+/** Un articolo è "da completare" se manca la descrizione o il prezzo (es. cartellino sfocato). */
+val DatiCartellino.daCompletare: Boolean get() = descrizione == null || prezzo == null
+
 /** Tiene la lista delle foto ed esegue l'elaborazione una alla volta, in sottofondo. */
 class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -140,6 +146,22 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 foto[i] = f.copy(file = file, miniatura = mini, rotazioneManuale = nuovaManuale, daControllare = false)
             }
         }
+    }
+
+    /**
+     * Elisa corregge o aggiunge un articolo a mano.
+     * [indice] = posizione dell'articolo nella foto, null = articolo nuovo; [nuovo] = null per eliminarlo.
+     */
+    fun salvaArticolo(numero: Int, indice: Int?, nuovo: DatiCartellino?) {
+        val i = foto.indexOfFirst { it.numero == numero }
+        val f = foto.getOrNull(i) ?: return
+        val lista = f.articoli.toMutableList()
+        when {
+            indice == null && nuovo != null -> lista += nuovo
+            indice != null && nuovo != null -> lista[indice] = nuovo
+            indice != null -> lista.removeAt(indice)
+        }
+        foto[i] = f.copy(dati = lista.firstOrNull(), altri = lista.drop(1), codice = lista.firstOrNull()?.codice ?: f.codice)
     }
 
     /** Versione piccola (max 600 px) per la lista, così la memoria non si riempie. */
