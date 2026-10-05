@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
@@ -76,6 +77,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 
 class MainActivity : ComponentActivity() {
@@ -147,6 +149,18 @@ private fun Schermata(vm: FotoViewModel) {
         if (f.avvisi.isEmpty()) pubblica(f) else daConfermare = f.numero
     }
     fun scegliFoto() = scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+
+    // Tasto Indietro: la prima volta avvisa, la seconda (entro 2 secondi) esce.
+    // Così un tocco per sbaglio non fa perdere le foto in lista.
+    var ultimoIndietro by remember { mutableLongStateOf(0L) }
+    BackHandler {
+        val adesso = System.currentTimeMillis()
+        if (adesso - ultimoIndietro < 2000) (context as? android.app.Activity)?.finish()
+        else {
+            ultimoIndietro = adesso
+            android.widget.Toast.makeText(context, "Premi ancora Indietro per uscire", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         containerColor = SfondoLista,
@@ -572,8 +586,26 @@ private fun SchermataDizionario(voci: List<VoceDizionario>, salva: (String?, Voc
     var nuova by remember { mutableStateOf(false) }
     val filtrate = voci.filter { cerca.isBlank() || it.sigla.contains(cerca.lowercase()) || it.significatoTesto.contains(cerca, ignoreCase = true) }
 
-    Dialog(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    val inScheda = nuova || inModifica != null
+    fun chiudiScheda() { nuova = false; inModifica = null }
+
+    // Una finestra sola: la scheda della sigla prende il posto dell'elenco (niente finestre una sopra l'altra)
+    Dialog(
+        onDismissRequest = { if (inScheda) chiudiScheda() else chiudi() },   // Indietro: prima chiude la scheda
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding().padding(16.dp)) {
+            if (inScheda) {
+                // key: ogni sigla aperta riparte con i suoi valori
+                key(inModifica?.sigla) {
+                    ModificaSigla(
+                        iniziale = inModifica,
+                        salva = { v -> salva(inModifica?.sigla, v); chiudiScheda() },
+                        annulla = ::chiudiScheda,
+                    )
+                }
+                return@Column
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("📖 Dizionario (${voci.size} sigle)", fontWeight = FontWeight.Bold, fontSize = 20.sp, modifier = Modifier.weight(1f))
                 TextButton(onClick = chiudi) { Text("✕ Chiudi", fontSize = 16.sp) }
@@ -597,58 +629,41 @@ private fun SchermataDizionario(voci: List<VoceDizionario>, salva: (String?, Voc
             }
         }
     }
-
-    if (nuova || inModifica != null) {
-        ModificaSigla(
-            iniziale = inModifica,
-            salva = { v -> salva(inModifica?.sigla, v); nuova = false; inModifica = null },
-            annulla = { nuova = false; inModifica = null },
-        )
-    }
 }
 
-/** Finestra per una sigla: sigla, significato (con le forme separate da "/"), oppure "togli dal testo". */
+/** Scheda di una sigla: sigla, significato (con le forme separate da "/"), oppure "togli dal testo". */
 @Composable
 private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) -> Unit, annulla: () -> Unit) {
     var sigla by remember { mutableStateOf(iniziale?.sigla.orEmpty()) }
     var significato by remember { mutableStateOf(iniziale?.significatoTesto.orEmpty()) }
     var togli by remember { mutableStateOf(iniziale?.daTogliere ?: false) }
-    AlertDialog(
-        onDismissRequest = annulla,
-        title = { Text(if (iniziale == null) "Nuova sigla" else "Modifica sigla") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(sigla, { sigla = it.trim() }, label = { Text("Sigla (es. gri)") }, singleLine = true)
-                if (!togli) {
-                    OutlinedTextField(significato, { significato = it }, label = { Text("Significato") })
-                    Text(
-                        "Se cambia con maschile/femminile scrivi le 4 forme:\ngrigio / grigia / grigi / grigie\n" +
-                            "Se cambia solo col plurale: verde / verdi",
-                        fontSize = 12.sp, color = Color.Gray,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = togli, onCheckedChange = { togli = it })
-                    Text("Togli dal testo (es. marchio da non scrivere)")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
+    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(if (iniziale == null) "Nuova sigla" else "Modifica sigla", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        OutlinedTextField(sigla, { sigla = it.trim() }, label = { Text("Sigla (es. gri)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (!togli) {
+            OutlinedTextField(significato, { significato = it }, label = { Text("Significato") }, modifier = Modifier.fillMaxWidth())
+            Text(
+                "Se cambia con maschile/femminile scrivi le 4 forme:\ngrigio / grigia / grigi / grigie\n" +
+                    "Se cambia solo col plurale: verde / verdi",
+                fontSize = 12.sp, color = Color.Gray,
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = togli, onCheckedChange = { togli = it })
+            Text("Togli dal testo (es. marchio da non scrivere)")
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            if (iniziale != null) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = annulla) { Text("Annulla") }
+            Button(
                 enabled = sigla.isNotBlank() && (togli || significato.isNotBlank()),
                 onClick = {
                     val forme = if (togli) emptyList() else significato.split("/").map { it.trim() }.filter { it.isNotEmpty() }
                     salva(VoceDizionario(sigla.lowercase(), forme))
                 },
             ) { Text("Salva") }
-        },
-        dismissButton = {
-            Row {
-                if (iniziale != null) TextButton(onClick = { salva(null) }) { Text("Elimina", color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = annulla) { Text("Annulla") }
-            }
-        },
-    )
+        }
+    }
 }
 
 /** Scritta arancione: qui Elisa deve guardare. */
@@ -773,12 +788,13 @@ private fun EditorPixel(immagine: ImageBitmap, modifier: Modifier, salva: (Set<L
             }
             Image(immagine, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             Canvas(
-                Modifier.fillMaxSize()
+                Modifier.fillMaxSize().testTag("tela")
                     .pointerInput(grande) {
                         detectTapGestures(onPress = { tratto++; dipingi(it) })
                     }
                     .pointerInput(grande) {
-                        detectDragGestures(onDragStart = { tratto++; dipingi(it) }) { cambio, _ -> dipingi(cambio.position) }
+                        // il tratto è già contato da onPress
+                        detectDragGestures(onDragStart = { dipingi(it) }) { cambio, _ -> dipingi(cambio.position) }
                     }
             ) {
                 val l = lato * scala

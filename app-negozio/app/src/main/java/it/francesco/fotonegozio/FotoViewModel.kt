@@ -75,7 +75,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var elaborate by mutableStateOf(0)
         private set
 
-    private val raddrizzatore = Raddrizzatore(app)
+    private val raddrizzatore by lazy { Raddrizzatore(app) }   // creato solo quando serve (prima foto)
     private val versoPreferito = VersoPreferito(app)
 
     private var lavoro: Job? = null

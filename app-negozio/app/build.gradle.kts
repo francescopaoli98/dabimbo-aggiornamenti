@@ -12,8 +12,8 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 42
-        versionName = "1.7"
+        versionCode = 43
+        versionName = "1.8"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk { abiFilters += "arm64-v8a" }
@@ -25,6 +25,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
     kotlinOptions {
         jvmTarget = "17"
@@ -50,4 +53,9 @@ dependencies {
 
     // Test sul PC (analizzatore del cartellino)
     testImplementation("junit:junit:4.13.2")
+
+    // Test generale dell'app sul PC, senza telefono (Robolectric simula Android)
+    testImplementation("org.robolectric:robolectric:4.15.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
