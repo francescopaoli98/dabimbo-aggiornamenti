@@ -12,11 +12,15 @@ class Suoni(context: Context) {
         .setMaxStreams(2)
         .setAudioAttributes(
             AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                // Volume "contenuti multimediali": si sente anche col cursore OnePlus su vibrazione
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build()
         )
         .build()
+    // Un suono si può suonare solo quando è caricato
+    private val caricati = mutableSetOf<Int>()
+    init { pool.setOnLoadCompleteListener { _, id, stato -> if (stato == 0) caricati += id } }
     private val pronte = pool.load(context, R.raw.pronte, 1)
     private val inviata = pool.load(context, R.raw.inviata, 1)
     private val festa = pool.load(context, R.raw.festa, 1)
@@ -30,6 +34,6 @@ class Suoni(context: Context) {
     fun tuttePubblicate() = suona(festa)
 
     private fun suona(id: Int) {
-        if (attivi) pool.play(id, 0.45f, 0.45f, 1, 0, 1f)   // volume basso: suoni leggeri
+        if (attivi && id in caricati) pool.play(id, 0.9f, 0.9f, 1, 0, 1f)
     }
 }
