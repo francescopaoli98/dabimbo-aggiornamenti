@@ -63,7 +63,8 @@ class Raddrizzatore(private val context: Context) {
         val (ritaglio, area) = ritagliaConArea(zona.base, zona.riquadro)
         for (gradi in listOf(0, 90, 270, 180)) {
             val ritaglioGirato = ruota(ritaglio, gradi)
-            val riga = rigaCodiceDritta(leggi(ritaglioGirato)) ?: continue
+            val testoGirato = leggi(ritaglioGirato)
+            val riga = rigaCodiceDritta(testoGirato) ?: continue
             val totale = (zona.rotazione + gradi) % 360
             val dritta = ruota(foto, totale)
 
@@ -73,7 +74,7 @@ class Raddrizzatore(private val context: Context) {
                 if (angoli != null && angoli.size == 4) leggiCartellino(dritta, angoli) else null
             } catch (e: Exception) {
                 null   // la lettura dei dati non deve mai bloccare il raddrizzamento
-            }
+            } ?: LettoreCartellino.analizza(righeDa(testoGirato)).takeIf { it.codice != null }
             val codice = zona.codice ?: dati?.codice ?: codiceDi(riga)
             return FotoRaddrizzata(dritta, totale, codice, zona.metodo, dati)
         }
@@ -199,20 +200,37 @@ class Raddrizzatore(private val context: Context) {
         val area = Rect((cx - meta).toInt(), (cy - meta).toInt(), (cx + meta).toInt(), (cy + meta).toInt())
         if (!area.intersect(0, 0, dritta.width, dritta.height)) return null
 
-        // Ingrandisco (o rimpicciolisco) perché il testo del codice sia alto ~40 px, e raddrizzo l'inclinazione
+        // Ingrandisco (o rimpicciolisco) perché il testo del codice sia alto ~40 px, poi raddrizzo l'inclinazione.
+        // Il verso della correzione lo provo in tutti e due i sensi (e senza): tengo la lettura più completa.
         val scala = (ALTEZZA_TESTO / altezzaCodice).coerceIn(0.5f, 4f)
-        val matrice = Matrix().apply {
-            postScale(scala, scala)
-            postRotate(-inclinazione)
+        val prove = if (abs(inclinazione) < 3f) listOf(0f) else listOf(-inclinazione, inclinazione, 0f)
+        var migliore: DatiCartellino? = null
+        for (correzione in prove) {
+            val matrice = Matrix().apply {
+                postScale(scala, scala)
+                postRotate(correzione)
+            }
+            val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
+            val dati = LettoreCartellino.analizza(righeDa(leggi(pezzo)))
+            if (completezza(dati) > completezza(migliore)) migliore = dati
+            if (completezza(migliore) == 3) break   // codice + descrizione + prezzo: basta così
         }
-        val pezzo = Bitmap.createBitmap(dritta, area.left, area.top, area.width(), area.height(), matrice, true)
-
-        // Leggo e passo le righe all'analizzatore (che ragiona sulle posizioni)
-        val righe = leggi(pezzo).textBlocks.flatMap { it.lines }.mapNotNull { l ->
-            l.boundingBox?.let { Riga(l.text, it.left, it.top, it.right, it.bottom) }
-        }
-        return LettoreCartellino.analizza(righe).takeIf { it.codice != null }
+        return migliore?.takeIf { it.codice != null }
     }
+
+    /** Quanti dati importanti ha la lettura (codice, descrizione, prezzo). */
+    private fun completezza(d: DatiCartellino?): Int =
+        if (d == null) 0 else listOf(d.codice, d.descrizione, d.prezzo).count { it != null }
+
+    /**
+     * Le singole PAROLE lette da ML Kit, con la loro posizione.
+     * Non uso le righe di ML Kit perché a volte attaccano la taglia all'ultima riga della descrizione:
+     * le righe le ricostruisce l'analizzatore guardando le posizioni.
+     */
+    private fun righeDa(testo: Text): List<Riga> =
+        testo.textBlocks.flatMap { it.lines }.flatMap { it.elements }.mapNotNull { e ->
+            e.boundingBox?.let { Riga(e.text, it.left, it.top, it.right, it.bottom) }
+        }
 
     /** 9 tasselli che si sovrappongono a metà (griglia 3x3, ognuno grande metà foto). */
     private fun tasselli(b: Bitmap): List<Rect> {

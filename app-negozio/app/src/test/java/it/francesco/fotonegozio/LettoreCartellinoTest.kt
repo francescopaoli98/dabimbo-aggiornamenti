@@ -140,6 +140,45 @@ class LettoreCartellinoTest {
         assertNull(dati.taglia)
     }
 
+    /** Parola per parola, come arrivano ora da ML Kit (posizioni misurate sul cartellino delle scarpe Diadora). */
+    private fun parole(testo: String, sx: Int, su: Int, giu: Int, larghezzaLettera: Int = 22): List<Riga> {
+        var x = sx
+        return testo.split(" ").map { p ->
+            val dx = x + p.length * larghezzaLettera
+            Riga(p, x, su, dx, giu).also { x = dx + larghezzaLettera }
+        }
+    }
+
+    @Test
+    fun scarpe_parola_per_parola_taglia_separata() {
+        val righe = parole("A2954/14444", 650, 385, 425) +
+            parole("1444488", 650, 455, 495, 26) +
+            parole("SCARPE GINN DIADORA B LOGO", 85, 445, 482) +
+            parole("FUX brill lacci rs vell 31 31", 70, 520, 560) +
+            parole("€", 45, 625, 680) + parole("9,00", 110, 600, 690, 50) +
+            parole("31", 660, 668, 705)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("1444488", dati.codice)
+        assertEquals("SCARPE GINN DIADORA B LOGO FUX brill lacci rs vell 31 31", dati.descrizione)
+        assertEquals("€ 9,00", dati.prezzo)
+        assertEquals("31", dati.taglia)
+    }
+
+    @Test
+    fun parole_della_stessa_riga_un_po_sfalsate() {
+        // Cartellino non perfettamente dritto: le parole della stessa riga non hanno la stessa altezza
+        val righe = listOf(
+            r("1444490", 650, 455, 830, 495),
+            r("MAGLIA", 80, 440, 200, 478), r("ML", 220, 446, 270, 484), r("N", 290, 450, 310, 488),
+            r("PIAZZA", 80, 515, 200, 553), r("ITALIA", 220, 520, 330, 558), r("7/8A", 350, 525, 420, 563),
+            r("€3,00", 45, 600, 320, 690),
+            r("7/8A", 650, 665, 730, 705),
+        )
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("MAGLIA ML N PIAZZA ITALIA 7/8A", dati.descrizione)
+        assertEquals("7/8A", dati.taglia)
+    }
+
     @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
