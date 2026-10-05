@@ -19,6 +19,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -122,6 +127,12 @@ private fun Schermata(vm: FotoViewModel) {
 
     // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
     val vibra = LocalHapticFeedback.current
+    // Coriandoli quando sono tutte pubblicate
+    val tuttePubblicate = vm.foto.isNotEmpty() && vm.quantePubblicate == vm.foto.size
+    var festa by remember { mutableStateOf(false) }
+    LaunchedEffect(tuttePubblicate) {
+        if (tuttePubblicate) { festa = true; kotlinx.coroutines.delay(3400); festa = false }
+    }
     fun pubblica(f: Foto) {
         val file = f.file ?: return
         vibra.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -137,6 +148,8 @@ private fun Schermata(vm: FotoViewModel) {
         containerColor = SfondoLista,
         bottomBar = { if (vm.foto.isNotEmpty()) BarraPubblica(vm) { vm.prossima?.let { chiediEPubblica(it) } } },
     ) { padding ->
+      Box(Modifier.fillMaxSize()) {
+        SfondoNuvole()
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -146,27 +159,34 @@ private fun Schermata(vm: FotoViewModel) {
             item {
                 Image(
                     painterResource(R.drawable.logo), "Da bimbo a bimbo",
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp).galleggia()
                         .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
                     contentScale = ContentScale.FillWidth,
                 )
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val (s1, m1) = rimbalzo()
+                    val (s2, m2) = rimbalzo()
+                    val (s3, m3) = rimbalzo()
                     Button(
                         onClick = ::scegliFoto,
-                        modifier = Modifier.weight(1f).height(60.dp),
+                        modifier = Modifier.weight(1f).height(60.dp).then(m1),
                         shape = MaterialTheme.shapes.large,
+                        interactionSource = s1,
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
                     ) { Text("📷  Scegli foto", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
                     FilledTonalButton(
                         onClick = { dizionarioAperto = true },
-                        modifier = Modifier.height(60.dp),
+                        modifier = Modifier.height(60.dp).then(m2),
+                        interactionSource = s2,
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
                     ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
                     FilledTonalButton(
                         onClick = vm::cambiaSuoni,
-                        modifier = Modifier.height(60.dp).width(60.dp),
+                        modifier = Modifier.height(60.dp).width(60.dp).then(m3),
+                        interactionSource = s3,
                         shape = MaterialTheme.shapes.large,
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color.White, contentColor = BluNotte),
@@ -197,7 +217,7 @@ private fun Schermata(vm: FotoViewModel) {
             items(vm.foto, key = { it.numero }) { f ->
                 Scheda(
                     f,
-                    modifier = Modifier.animateItem(),
+                    modifier = Modifier.animateItem().entrata(),
                     prove = vm.prove,
                     testo = vm.testo(f),
                     ingrandisci = { ingrandita = f.numero },
@@ -210,6 +230,8 @@ private fun Schermata(vm: FotoViewModel) {
                 )
             }
         }
+        if (festa) Coriandoli()
+      }
     }
 
     if (dizionarioAperto) {
@@ -280,11 +302,14 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
                 color = Verde, trackColor = Cielo,
             )
+            val (sorgente, morbido) = rimbalzo()
             Button(
                 onClick = pubblica,
                 enabled = prossima != null,
-                modifier = Modifier.fillMaxWidth().height(62.dp),
+                modifier = Modifier.fillMaxWidth().height(62.dp).pulsa(prossima != null).then(morbido),
                 shape = MaterialTheme.shapes.large,
+                interactionSource = sorgente,
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
             ) {
                 AnimatedContent(
                     targetState = when {
@@ -303,8 +328,19 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
 /** Schermata vuota: cosa fare per cominciare. */
 @Composable
 private fun Benvenuto() {
-    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 2.dp) {
+    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 4.dp, modifier = Modifier.entrata()) {
         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Il bimbo del logo gattona avanti e indietro
+            val t by rememberInfiniteTransition(label = "gattona").animateFloat(
+                0f, 2f, infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "t",
+            )
+            BoxWithConstraints(Modifier.fillMaxWidth().height(70.dp)) {
+                val pos = if (t < 1f) t else 2f - t
+                BimboCheGattona(
+                    60.dp, verso = if (t < 1f) 1 else -1,
+                    modifier = Modifier.offset(x = (maxWidth - 90.dp) * pos),
+                )
+            }
             Text("Ciao! 👋", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BluNotte)
             Text(
                 "Tocca «Scegli foto» e seleziona le foto da pubblicare.\n\n" +
@@ -321,8 +357,13 @@ private fun Avanzamento(fatte: Int, tutte: Int) {
     Surface(color = Cielo, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text("Sto sistemando le foto… ${fatte + 1} di $tutte", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp)
+            // Il bimbo gattona lungo la barra, fino alla fine
+            val avanzamento by animateFloatAsState(fatte / tutte.toFloat(), tween(800), label = "avanzamento")
+            BoxWithConstraints(Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp)) {
+                BimboCheGattona(40.dp, verso = 1, modifier = Modifier.offset(x = (maxWidth - 60.dp) * avanzamento))
+            }
             LinearProgressIndicator(
-                progress = { fatte / tutte.toFloat() },
+                progress = { avanzamento },
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(8.dp).clip(RoundedCornerShape(4.dp)),
                 color = BluNotte, trackColor = Color.White,
             )
@@ -399,7 +440,7 @@ private fun Scheda(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         when {
                             mini != null -> Image(mini, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                            f.inCorso -> CircularProgressIndicator(color = BluNotte)
+                            f.inCorso -> Luccichio()
                         }
                     }
                 }
