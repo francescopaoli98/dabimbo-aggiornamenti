@@ -26,6 +26,8 @@ data class Foto(
     val file: File? = null,              // foto raddrizzata salvata
     val rotazione: Int = 0,
     val codice: String? = null,
+    val metodo: String = "",             // per le prove: come è stato trovato il cartellino
+    val secondi: Float = 0f,             // per le prove: tempo di elaborazione
     val errore: String? = null,
 )
 
@@ -57,6 +59,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun elabora(f: Foto): Foto = withContext(Dispatchers.Default) {
         try {
+            val inizio = System.currentTimeMillis()
             val r = raddrizzatore.raddrizza(f.origine)
             val file = Raddrizzatore.salva(getApplication(), r.immagine, "foto_${f.numero}")
             f.copy(
@@ -65,9 +68,15 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 file = file,
                 rotazione = r.rotazioneApplicata,
                 codice = r.codiceLetto,
+                metodo = r.metodo,
+                secondi = (System.currentTimeMillis() - inizio) / 1000f,
             )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e   // lista sostituita: interrompi senza segnare errori
         } catch (e: Exception) {
             f.copy(inCorso = false, errore = e.message ?: "Errore sconosciuto")
+        } catch (e: OutOfMemoryError) {
+            f.copy(inCorso = false, errore = "Foto troppo grande per la memoria")
         }
     }
 

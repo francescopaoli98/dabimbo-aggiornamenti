@@ -12,8 +12,8 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1 (pezzo 1)"
+        versionCode = 2
+        versionName = "0.2 (pezzo 1)"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk { abiFilters += "arm64-v8a" }
@@ -43,7 +43,8 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
 
-    // ML Kit: lettura testo, gratis e senza internet (modello incluso nell'app)
+    // ML Kit: lettura testo e codici a barre, gratis e senza internet (modello incluso nell'app)
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 }

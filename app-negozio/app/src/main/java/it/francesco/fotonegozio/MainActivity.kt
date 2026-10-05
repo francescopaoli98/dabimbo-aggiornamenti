@@ -123,6 +123,7 @@ private fun Scheda(f: Foto, onClick: () -> Unit) {
                             f.codice?.let { "Codice letto: $it" } ?: "Cartellino non trovato",
                             color = if (f.codice == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         )
+                        Text("Metodo: ${f.metodo} · ${"%.1f".format(f.secondi)} s", fontSize = 12.sp)
                     }
                 }
             }
