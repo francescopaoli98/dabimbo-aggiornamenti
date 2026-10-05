@@ -3,7 +3,8 @@ package it.francesco.fotonegozio
 /**
  * Compone il testo per lo stato WhatsApp partendo dai dati del cartellino e dal dizionario:
  *   "FELPA ZIP CAPP OKAIDI 8A RS MARGH FELP 8A" + taglia 8A + € 4,00 + 1444496
- *   → "Felpa zip con cappuccio Okaidi rosa margherite felpata - 8 anni - € 4,00 - cod. 1444496"
+ *   → "Felpa zip con cappuccio Okaidi rosa margherite felpata - 8 anni - cod. 1444496 - € 4,00"
+ * Ordine scelto da Elisa: descrizione - taglia - codice - prezzo
  *
  * Kotlin puro: testabile sul PC.
  */
@@ -28,8 +29,8 @@ object TestoFinale {
         val parti = listOfNotNull(
             descrizione?.ifBlank { null },
             tagliaPerEsteso(taglia, descrizione),
-            d.prezzo,
             d.codice?.let { "cod. $it" },
+            d.prezzo,
         )
         return parti.joinToString(" - ")
     }
