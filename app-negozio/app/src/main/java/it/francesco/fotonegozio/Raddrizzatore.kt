@@ -78,7 +78,7 @@ class Raddrizzatore(private val context: Context) {
 
         // 2. Testo su tutta la foto (funziona se il cartellino è grande, foto da vicino)
         val testoIntero = leggi(foto)
-        rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, null, "testo") }
+        rigaCodice(testoIntero)?.let { return Zona(foto, 0, it.boundingBox!!, codiceDi(it), "testo") }
 
         // 3. Zone dove ML Kit ha visto del testo ma non è riuscito a leggerlo: ritaglio e ingrandisco
         val provate = mutableListOf<Rect>()
@@ -95,7 +95,7 @@ class Raddrizzatore(private val context: Context) {
                 rigaCodice(testo)?.let {
                     val r = it.boundingBox!!
                     r.offset(t.left, t.top)   // coordinate dal tassello alla foto intera
-                    return Zona(base, gradi, r, null, "tasselli")
+                    return Zona(base, gradi, r, codiceDi(it), "tasselli")
                 }
                 zoneTasselli += zoneTesto(testo, t)
             }
@@ -127,8 +127,8 @@ class Raddrizzatore(private val context: Context) {
             val (ritaglio, area) = ritagliaConArea(base, z)
             provate += area
             for (g in listOf(0, 90)) {
-                if (rigaCodice(leggi(ruota(ritaglio, g))) != null) {
-                    return Zona(base, gradi, z, null, "ingrandimento")
+                rigaCodice(leggi(ruota(ritaglio, g)))?.let {
+                    return Zona(base, gradi, z, codiceDi(it), "ingrandimento")
                 }
             }
         }
@@ -141,11 +141,13 @@ class Raddrizzatore(private val context: Context) {
     private fun rigaCodice(testo: Text): Text.Line? =
         testo.textBlocks.flatMap { it.lines }.firstOrNull { REGEX_CODICE.containsMatchIn(it.text) && it.boundingBox != null }
 
-    /** Codice di 7 cifre; con [soloDritto] solo se la riga è quasi orizzontale. */
+    private fun codiceDi(riga: Text.Line): String? = REGEX_CODICE.find(riga.text)?.value
+
+    /** Codice di 7 cifre; con [soloDritto] solo se la riga è più orizzontale che verticale (cartellino anche un po' storto). */
     private fun cercaCodice(testo: Text, soloDritto: Boolean): String? {
         for (riga in testo.textBlocks.flatMap { it.lines }) {
             val trovato = REGEX_CODICE.find(riga.text) ?: continue
-            if (!soloDritto || abs(riga.angle) < 30f) return trovato.value
+            if (!soloDritto || abs(riga.angle) < 45f) return trovato.value
         }
         return null
     }
