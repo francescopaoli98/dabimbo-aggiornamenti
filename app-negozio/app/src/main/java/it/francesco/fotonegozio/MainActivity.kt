@@ -320,10 +320,10 @@ private fun Schermata(vm: FotoViewModel) {
     daTogliere?.let { numero ->
         AlertDialog(
             onDismissRequest = { daTogliere = null },
-            title = { Text("Togliere la Foto $numero?") },
-            text = { Text("Sparisce solo da questa lista: nella Galleria del telefono resta.") },
-            confirmButton = { TextButton(onClick = { vm.togli(numero); daTogliere = null }) { Text("Togli", color = MaterialTheme.colorScheme.error) } },
-            dismissButton = { TextButton(onClick = { daTogliere = null }) { Text("Annulla") } },
+            title = { Text("Stai per rimuovere la Foto $numero") },
+            text = { Text("Sei sicura?\n\nSparisce solo da questa lista: nella Galleria del telefono resta.") },
+            confirmButton = { TextButton(onClick = { vm.togli(numero); daTogliere = null }) { Text("Sì, rimuovi", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = { daTogliere = null }) { Text("No") } },
         )
     }
 
