@@ -14,6 +14,8 @@ val Azzurro = Color(0xFF1E9AD6)     // metà bassa delle lettere
 val Cielo = Color(0xFFA8D8F2)       // nuvole celesti
 val Rosa = Color(0xFFF6C1CC)        // metà alta delle lettere
 val Sfondo = Color(0xFFF4FAFE)      // bianco-celeste delle nuvole
+val SfondoLista = Color(0xFFDCEBF7) // dietro le schede: abbastanza scuro da staccarle bene
+val BordoScheda = Color(0xFFB9D3EC) // bordo delle schede
 val Arancione = Color(0xFFE65100)   // avvisi
 val Verde = Color(0xFF2E7D32)       // pubblicata
 

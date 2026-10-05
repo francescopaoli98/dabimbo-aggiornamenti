@@ -14,6 +14,24 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
@@ -103,8 +121,10 @@ private fun Schermata(vm: FotoViewModel) {
     val context = LocalContext.current
 
     // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
+    val vibra = LocalHapticFeedback.current
     fun pubblica(f: Foto) {
         val file = f.file ?: return
+        vibra.performHapticFeedback(HapticFeedbackType.LongPress)
         if (Condivisione.pubblica(context, file, vm.testo(f))) vm.segnaPubblicata(f.numero)
         else vm.messaggio = "WhatsApp non trovato sul telefono"
     }
@@ -114,13 +134,13 @@ private fun Schermata(vm: FotoViewModel) {
     fun scegliFoto() = scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
     Scaffold(
-        containerColor = Sfondo,
+        containerColor = SfondoLista,
         bottomBar = { if (vm.foto.isNotEmpty()) BarraPubblica(vm) { vm.prossima?.let { chiediEPubblica(it) } } },
     ) { padding ->
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             // Logo (tenuto premuto: modalità prove, solo per chi sistema l'app)
             item {
@@ -144,6 +164,13 @@ private fun Schermata(vm: FotoViewModel) {
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
                     ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                    FilledTonalButton(
+                        onClick = vm::cambiaSuoni,
+                        modifier = Modifier.height(60.dp).width(60.dp),
+                        shape = MaterialTheme.shapes.large,
+                        contentPadding = PaddingValues(0.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color.White, contentColor = BluNotte),
+                    ) { Text(if (vm.suoniAttivi) "🔊" else "🔇", fontSize = 22.sp) }
                 }
             }
             // Solo in modalità prove
@@ -170,10 +197,11 @@ private fun Schermata(vm: FotoViewModel) {
             items(vm.foto, key = { it.numero }) { f ->
                 Scheda(
                     f,
+                    modifier = Modifier.animateItem(),
                     prove = vm.prove,
                     testo = vm.testo(f),
                     ingrandisci = { ingrandita = f.numero },
-                    gira = { gradi -> vm.gira(f.numero, gradi) },
+                    gira = { gradi -> vibra.performHapticFeedback(HapticFeedbackType.TextHandleMove); vm.gira(f.numero, gradi) },
                     modifica = { indice -> inModifica = f.numero to indice },
                     modificaTesto = { testoInModifica = f.numero },
                     automatico = { vm.cambiaTesto(f.numero, null) },
@@ -246,8 +274,9 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
                 Text("Pubblicate $fatte di $tutte", fontSize = 14.sp, color = BluNotte, modifier = Modifier.weight(1f))
                 if (fatte == tutte) Text("🎉", fontSize = 18.sp)
             }
+            val avanzamento by animateFloatAsState(if (tutte == 0) 0f else fatte / tutte.toFloat(), label = "pubblicate")
             LinearProgressIndicator(
-                progress = { if (tutte == 0) 0f else fatte / tutte.toFloat() },
+                progress = { avanzamento },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
                 color = Verde, trackColor = Cielo,
             )
@@ -257,14 +286,15 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().height(62.dp),
                 shape = MaterialTheme.shapes.large,
             ) {
-                Text(
-                    when {
+                AnimatedContent(
+                    targetState = when {
                         prossima != null -> "📤  Pubblica la prossima · Foto ${prossima.numero}"
                         fatte == tutte -> "✓  Tutte pubblicate!"
                         else -> "Un attimo, preparo le foto…"
                     },
-                    fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                )
+                    transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
+                    label = "pulsante",
+                ) { t -> Text(t, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -305,6 +335,7 @@ private fun Avanzamento(fatte: Int, tutte: Int) {
 @Composable
 private fun Scheda(
     f: Foto,
+    modifier: Modifier = Modifier,
     prove: Boolean,
     testo: String,
     ingrandisci: () -> Unit,
@@ -321,29 +352,56 @@ private fun Scheda(
     var dettagli by remember(f.numero) { mutableStateOf(false) }
     val daSistemare = !f.inCorso && f.errore == null && (articoli.isEmpty() || articoli.any { it.daCompletare } || mancanti > 0)
 
-    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 2.dp) {
-        Column(Modifier.padding(14.dp)) {
-            // Intestazione: numero + stato
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Etichetta("Foto ${f.numero}", Rosa, BluNotte)
-                Spacer(Modifier.weight(1f))
-                when {
-                    f.pubblicata -> Etichetta("✓ Pubblicata", Color(0xFFE3F4E5), Verde)
-                    f.inCorso -> Etichetta("In lavorazione…", Cielo, BluNotte)
-                    f.avvisi.isNotEmpty() -> Etichetta("⚠ Da controllare", Color(0xFFFFEFE3), Arancione)
-                    else -> Etichetta("Pronta", Color(0xFFE3F4E5), Verde)
+    // Le schede pubblicate si "spengono" un po': si vede subito cosa resta da fare
+    val trasparenza by animateFloatAsState(if (f.pubblicata) 0.72f else 1f, label = "pubblicata")
+    Surface(
+        color = Color.White,
+        shape = MaterialTheme.shapes.large,
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.5.dp, BordoScheda),
+        modifier = modifier.fillMaxWidth().alpha(trasparenza),
+    ) {
+      Column(Modifier.animateContentSize()) {
+        // Fascia colorata in cima: separa bene una foto dall'altra
+        Row(
+            Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Foto ${f.numero}", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte)
+            Spacer(Modifier.weight(1f))
+            AnimatedContent(
+                targetState = when {
+                    f.pubblicata -> 0
+                    f.inCorso -> 1
+                    f.avvisi.isNotEmpty() -> 2
+                    else -> 3
+                },
+                transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.8f)) togetherWith fadeOut() },
+                label = "stato",
+            ) { stato ->
+                when (stato) {
+                    0 -> Etichetta("✓ Pubblicata", Color.White, Verde)
+                    1 -> Etichetta("In lavorazione…", Color.White, BluNotte)
+                    2 -> Etichetta("⚠ Da controllare", Color.White, Arancione)
+                    else -> Etichetta("Pronta", Color.White, Verde)
                 }
             }
+        }
+        Column(Modifier.padding(14.dp)) {
 
-            // Foto grande (toccala per ingrandire)
+            // Foto grande (toccala per ingrandire); quando la giri sfuma nella nuova
             Box(
-                Modifier.fillMaxWidth().padding(top = 12.dp).height(300.dp).clip(MaterialTheme.shapes.medium)
+                Modifier.fillMaxWidth().height(300.dp).clip(MaterialTheme.shapes.medium)
                     .background(Color(0xFFEAF5FC)).clickable(enabled = f.file != null, onClick = ingrandisci),
                 contentAlignment = Alignment.Center,
             ) {
-                when {
-                    f.miniatura != null -> Image(f.miniatura, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    f.inCorso -> CircularProgressIndicator(color = BluNotte)
+                Crossfade(targetState = f.miniatura, label = "foto") { mini ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        when {
+                            mini != null -> Image(mini, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            f.inCorso -> CircularProgressIndicator(color = BluNotte)
+                        }
+                    }
                 }
                 if (f.file != null) Text(
                     "🔍", fontSize = 20.sp,
@@ -398,7 +456,8 @@ private fun Scheda(
                             fontWeight = FontWeight.Bold,
                         )
                     }
-                    if (aperti) {
+                    AnimatedVisibility(visible = aperti, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+                      Column {
                         articoli.forEachIndexed { i, d ->
                             Surface(color = Sfondo, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
                                 Column(Modifier.padding(12.dp)) {
@@ -417,6 +476,7 @@ private fun Scheda(
                         OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = MaterialTheme.shapes.medium) {
                             Text("+ Aggiungi articolo")
                         }
+                      }
                     }
 
                     // Solo in modalità prove: come ha lavorato l'app
@@ -442,6 +502,7 @@ private fun Scheda(
                 OutlinedButton(onClick = salvaDiagnosi, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("📷 Salva diagnosi in Galleria") }
             }
         }
+      }
     }
 }
 

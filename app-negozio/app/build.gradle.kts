@@ -12,8 +12,8 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 35
-        versionName = "1.0"
+        versionCode = 36
+        versionName = "1.1"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk { abiFilters += "arm64-v8a" }

@@ -77,6 +77,15 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     private val raddrizzatore = Raddrizzatore(app)
     private val versoPreferito = VersoPreferito(app)
+    val suoni = Suoni(app)
+    /** Suoni attivi sì/no (pulsante 🔊 in alto), ricordato anche chiudendo l'app. */
+    var suoniAttivi by mutableStateOf(suoni.attivi)
+        private set
+
+    fun cambiaSuoni() {
+        suoniAttivi = !suoniAttivi
+        suoni.attivi = suoniAttivi
+    }
     private var lavoro: Job? = null
     private val bloccoRotazioni = Mutex()   // un tocco su "Gira" alla volta
 
@@ -109,7 +118,13 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun segnaPubblicata(numero: Int, pubblicata: Boolean = true) {
         val i = foto.indexOfFirst { it.numero == numero }
-        if (i >= 0) foto[i] = foto[i].copy(pubblicata = pubblicata)
+        if (i < 0) return
+        val primaTutte = quantePubblicate == foto.size
+        foto[i] = foto[i].copy(pubblicata = pubblicata)
+        if (pubblicata) {
+            // Festa quando si arriva all'ultima, altrimenti il "whoosh" della foto che parte
+            if (!primaTutte && quantePubblicate == foto.size) suoni.tuttePubblicate() else suoni.fotoInviata()
+        }
     }
 
     /** Modalità prove (logo tenuto premuto): mostra le informazioni tecniche e la diagnosi. */
@@ -133,6 +148,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 foto[i] = elabora(foto[i])
                 elaborate++
             }
+            suoni.fotoPronte()   // "pop": tutte le foto sono pronte
         }
     }
 
