@@ -1,7 +1,6 @@
 package it.francesco.fotonegozio
 
 import kotlin.math.max
-import kotlin.math.min
 
 /** Una riga di testo letta da ML Kit, con la sua posizione (in pixel) sul cartellino già dritto. */
 data class Riga(val testo: String, val sx: Int, val su: Int, val dx: Int, val giu: Int) {
@@ -22,8 +21,8 @@ data class DatiCartellino(
  *
  *   ||||||||||||||||||  A2954/14444..   <- prefisso: ignorato
  *   FELPA ZIP CAPP OKAI 1444496         <- descrizione (riga 1, ALLA STESSA ALTEZZA del codice)
- *   DI 8A RS MARGH FELP 8A              <- descrizione (righe successive)
- *   € 4,00              8A              <- prezzo (grande, a sinistra) + taglia (a destra)
+ *   DI 8A RS MARGH FELP 8A      8A      <- descrizione + taglia (a destra, staccata: a volte qui...)
+ *   € 4,00                      8A      <- prezzo (grande, a sinistra)   (...a volte qui)
  *
  * È codice Kotlin puro (niente Android), così si può testare sul PC.
  */
@@ -61,32 +60,38 @@ object LettoreCartellino {
         val rigaPrezzo = sotto.filter { PREZZO.containsMatchIn(it.testo) }.maxByOrNull { it.altezza }
         val prezzo = rigaPrezzo?.let { r -> PREZZO.find(r.testo)!!.let { "€ ${it.groupValues[1]},${it.groupValues[2]}" } }
 
-        // 4. Taglia: a destra del prezzo, più o meno alla stessa altezza (o poco sotto)
-        val taglia = rigaPrezzo?.let { trovaTaglia(it, sotto) }
-
-        // 5. Descrizione: tutto quello che sta tra il codice e il prezzo, in ordine di lettura
-        val limiteBasso = rigaPrezzo?.let { it.su + it.altezza / 3 } ?: Int.MAX_VALUE
-        val righeDescrizione = sotto.filter { r ->
-            r !== rigaPrezzo && r.centroY < limiteBasso && !(taglia != null && eTaglia(r, rigaPrezzo))
+        // 4. Ricostruisco le righe e le spezzo dove c'è un grande spazio vuoto.
+        //    Taglia = pezzo di testo a DESTRA del prezzo, staccato, vicino al prezzo (anche un po' più in alto).
+        //    Descrizione = tutto il resto sopra il prezzo (parte sempre da sinistra, parole attaccate).
+        val ph = rigaPrezzo?.altezza ?: 0
+        val candidati = sotto.filter { r ->
+            r !== rigaPrezzo && (rigaPrezzo == null || r.centroY < rigaPrezzo.giu + ph)
         }
-        val descrizione = inOrdineDiLettura(righeDescrizione, h)
-            .joinToString(" ") { it.testo.trim() }
-            .replace(Regex("\\s+"), " ")
-            .ifBlank { null }
+        val partiTaglia = mutableListOf<Riga>()
+        val partiDescrizione = mutableListOf<Riga>()
+        for (riga in raggruppaInRighe(candidati, h)) {
+            for (pezzo in spezzaSuiVuoti(riga, 5 * h / 2)) {
+                val cy = pezzo.sumOf { it.centroY } / pezzo.size
+                val vicinoAlPrezzo = rigaPrezzo != null &&
+                    pezzo.first().sx > rigaPrezzo.dx &&
+                    cy > rigaPrezzo.su - ph && cy < rigaPrezzo.giu + ph
+                when {
+                    vicinoAlPrezzo -> partiTaglia += pezzo
+                    rigaPrezzo == null || cy < rigaPrezzo.su + ph / 3 -> partiDescrizione += pezzo
+                }
+            }
+        }
+        val taglia = partiTaglia.unisci() ?: rigaPrezzo?.let { tagliaDopoIlPrezzo(it) }
+        val descrizione = partiDescrizione.unisci()
 
         return DatiCartellino(codice, descrizione, prezzo, taglia)
     }
 
-    /** La taglia è un testo corto a destra del prezzo; a volte ML Kit la attacca alla riga del prezzo. */
-    private fun trovaTaglia(rigaPrezzo: Riga, righe: List<Riga>): String? {
-        // Caso A: riga separata a destra del prezzo
-        righe.filter { it !== rigaPrezzo && eTaglia(it, rigaPrezzo) }
-            .sortedBy { it.sx }
-            .joinToString(" ") { it.testo.trim() }
-            .ifBlank { null }
-            ?.let { return it }
+    private fun List<Riga>.unisci(): String? =
+        joinToString(" ") { it.testo.trim() }.replace(Regex("\\s+"), " ").trim().ifBlank { null }
 
-        // Caso B: stessa riga, dopo il prezzo (es. "€4,00     8A")
+    /** Caso raro: ML Kit attacca la taglia al prezzo (es. "€4,00     8A"). */
+    private fun tagliaDopoIlPrezzo(rigaPrezzo: Riga): String? {
         val m = PREZZO.find(rigaPrezzo.testo) ?: return null
         return rigaPrezzo.testo.substring(m.range.last + 1)
             .replace(SIMBOLI_EURO, "")
@@ -94,43 +99,26 @@ object LettoreCartellino {
             .ifBlank { null }
     }
 
-    /** Vero se [r] sta a destra del prezzo, tra la sua metà e poco sotto il suo fondo. */
-    private fun eTaglia(r: Riga, prezzo: Riga?): Boolean {
-        if (prezzo == null) return false
-        val ph = max(prezzo.altezza, 1)
-        return r.sx > prezzo.dx &&
-            r.centroY > prezzo.su + ph / 4 &&
-            r.centroY < prezzo.giu + ph
-    }
-
-    /** Ordina come si legge: per righe (dall'alto), e nella stessa riga da sinistra a destra. */
-    private fun inOrdineDiLettura(righe: List<Riga>, altezzaTesto: Int): List<Riga> {
-        val ordinate = righe.sortedBy { it.centroY }
+    /** Raggruppa le parole in righe (dall'alto in basso), ogni riga ordinata da sinistra a destra. */
+    private fun raggruppaInRighe(parole: List<Riga>, altezzaTesto: Int): List<List<Riga>> {
         val gruppi = mutableListOf<MutableList<Riga>>()
-        for (r in ordinate) {
+        for (r in parole.sortedBy { it.centroY }) {
             val ultimo = gruppi.lastOrNull()
             // Stessa riga se i centri distano meno di mezza altezza di testo
             if (ultimo != null && abs(r.centroY - ultimo.first().centroY) < altezzaTesto / 2 + 1) ultimo += r
             else gruppi += mutableListOf(r)
         }
-        return gruppi.flatMap { g -> g.sortedBy { it.sx } }
+        return gruppi.map { g -> g.sortedBy { it.sx } }
+    }
+
+    /** Spezza una riga dove tra due parole c'è uno spazio più largo di [vuoto] pixel. */
+    private fun spezzaSuiVuoti(riga: List<Riga>, vuoto: Int): List<List<Riga>> {
+        val pezzi = mutableListOf(mutableListOf(riga.first()))
+        for (r in riga.drop(1)) {
+            if (r.sx - pezzi.last().last().dx > vuoto) pezzi += mutableListOf(r) else pezzi.last() += r
+        }
+        return pezzi
     }
 
     private fun abs(x: Int) = if (x < 0) -x else x
-
-    /**
-     * Zona del cartellino nella foto dritta, stimata dalla riga del codice:
-     * il codice sta in alto a destra, il prezzo in basso a sinistra.
-     * Restituisce (sinistra, sopra, destra, sotto), già limitata alla foto.
-     */
-    fun zonaDaCodice(codice: Riga, larghezzaFoto: Int, altezzaFoto: Int): IntArray {
-        val cw = codice.dx - codice.sx
-        val ch = max(codice.altezza, 1)
-        return intArrayOf(
-            max(0, codice.sx - 5 * cw),
-            max(0, codice.su - 6 * ch),
-            min(larghezzaFoto, codice.dx + 3 * cw / 2),
-            min(altezzaFoto, codice.giu + 10 * ch),
-        )
-    }
 }

@@ -180,6 +180,32 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun felpa_taglia_piu_in_alto_del_prezzo_sulla_riga_della_descrizione() {
+        // Sul cartellino vero della felpa la taglia "8A" sta quasi all'altezza di "MARGH FELP 8A"
+        val righe = parole("1444496", 650, 455, 495, 26) +
+            parole("FELPA ZIP CAPP OKAIDI 8A RS", 85, 445, 482) +
+            parole("MARGH FELP 8A", 85, 520, 558) +
+            parole("8A", 700, 512, 550) +
+            parole("€4,00", 45, 575, 660, 50)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("FELPA ZIP CAPP OKAIDI 8A RS MARGH FELP 8A", dati.descrizione)
+        assertEquals("€ 4,00", dati.prezzo)
+        assertEquals("8A", dati.taglia)
+    }
+
+    @Test
+    fun scarpe_taglia_NR_34_su_riga_propria_tra_descrizione_e_prezzo() {
+        val righe = parole("1444487", 650, 455, 495, 26) +
+            parole("SCARPE GINN RS DIS N GRI", 85, 445, 482) +
+            parole("ARTENGO NR 34 NR 34", 85, 520, 558) +
+            parole("NR 34", 640, 580, 618) +
+            parole("€8,00", 45, 590, 680, 50)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("SCARPE GINN RS DIS N GRI ARTENGO NR 34 NR 34", dati.descrizione)
+        assertEquals("NR 34", dati.taglia)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)
