@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Colori del logo "Da bimbo a bimbo" -->
+    <color name="cielo">#FFA8D8F2</color>
+    <color name="sfondo">#FFF4FAFE</color>
+</resources>

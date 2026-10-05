@@ -8,11 +8,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -50,10 +58,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // App sempre chiara: icone di sistema (ora, batteria) sempre scure, anche col telefono in modalità scura
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.WHITE, android.graphics.Color.WHITE),
+        )
         // Foto arrivate dal tasto "Condividi" della Galleria (solo al primo avvio, non dopo una rotazione schermo)
         if (savedInstanceState == null) viewModel.carica(fotoDaIntent(intent))
-        setContent { MaterialTheme { Schermata(viewModel) } }
+        setContent { TemaBimbo { Schermata(viewModel) } }
     }
 
     // App già aperta e Elisa condivide altre foto dalla Galleria
@@ -76,6 +88,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Schermata(vm: FotoViewModel) {
     // Selettore foto di sistema, più foto insieme, nessun permesso richiesto
@@ -89,7 +102,7 @@ private fun Schermata(vm: FotoViewModel) {
     var daConfermare by remember { mutableStateOf<Int?>(null) }      // foto con avvisi: chiedo prima di pubblicare
     val context = LocalContext.current
 
-    // Pezzo 6: foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
+    // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
     fun pubblica(f: Foto) {
         val file = f.file ?: return
         if (Condivisione.pubblica(context, file, vm.testo(f))) vm.segnaPubblicata(f.numero)
@@ -98,84 +111,75 @@ private fun Schermata(vm: FotoViewModel) {
     fun chiediEPubblica(f: Foto) {
         if (f.avvisi.isEmpty()) pubblica(f) else daConfermare = f.numero
     }
+    fun scegliFoto() = scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
     Scaffold(
-        bottomBar = {
-            // Pulsante grande sempre visibile: la prossima foto da pubblicare
-            if (vm.foto.isNotEmpty()) {
-                Surface(shadowElevation = 8.dp) {
-                    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
-                        val prossima = vm.prossima
-                        val tutte = vm.foto.size
-                        Text("Pubblicate ${vm.quantePubblicate} di $tutte", fontSize = 14.sp, color = Color.Gray)
-                        Button(
-                            onClick = { prossima?.let { chiediEPubblica(it) } },
-                            enabled = prossima != null,
-                            modifier = Modifier.fillMaxWidth().height(64.dp).padding(top = 4.dp),
-                        ) {
-                            Text(
-                                when {
-                                    prossima != null -> "📤 Pubblica la prossima · Foto ${prossima.numero}"
-                                    vm.quantePubblicate == tutte -> "✓ Tutte pubblicate"
-                                    else -> "Attendi, sto preparando le foto…"
-                                },
-                                fontSize = 18.sp,
-                            )
-                        }
+        containerColor = Sfondo,
+        bottomBar = { if (vm.foto.isNotEmpty()) BarraPubblica(vm) { vm.prossima?.let { chiediEPubblica(it) } } },
+    ) { padding ->
+        LazyColumn(
+            Modifier.padding(padding).fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            // Logo (tenuto premuto: modalità prove, solo per chi sistema l'app)
+            item {
+                Image(
+                    painterResource(R.drawable.logo), "Da bimbo a bimbo",
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                        .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
+                    contentScale = ContentScale.FillWidth,
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = ::scegliFoto,
+                        modifier = Modifier.weight(1f).height(60.dp),
+                        shape = MaterialTheme.shapes.large,
+                    ) { Text("📷  Scegli foto", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+                    FilledTonalButton(
+                        onClick = { dizionarioAperto = true },
+                        modifier = Modifier.height(60.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
+                    ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                }
+            }
+            // Solo in modalità prove
+            if (vm.prove) item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Diagnosi (modalità prove)", Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray)
+                    Switch(checked = vm.diagnosi, onCheckedChange = { vm.diagnosi = it })
+                }
+            }
+            vm.messaggio?.let { m ->
+                item {
+                    Surface(onClick = { vm.messaggio = null }, color = Cielo, shape = MaterialTheme.shapes.medium) {
+                        Text(m, Modifier.fillMaxWidth().padding(14.dp), color = BluNotte, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        },
-    ) { padding ->
-        Column(Modifier.padding(padding).padding(horizontal = 16.dp).fillMaxSize()) {
-            Button(
-                onClick = { scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(56.dp),
-            ) { Text("Scegli foto", fontSize = 18.sp) }
-            OutlinedButton(onClick = { dizionarioAperto = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text("📖 Dizionario delle sigle")
+
+            if (vm.foto.isEmpty()) {
+                item { Benvenuto() }
+            } else if (vm.elaborate < vm.foto.size) {
+                item { Avanzamento(vm.elaborate, vm.foto.size) }
             }
 
-            // Modalità diagnosi (per le prove): vale per le foto scelte DOPO averla accesa
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Diagnosi (per le prove)", Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray)
-                Switch(checked = vm.diagnosi, onCheckedChange = { vm.diagnosi = it })
-            }
-            vm.messaggio?.let { m ->
-                Text(m, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { vm.messaggio = null }.padding(vertical = 4.dp))
-            }
-
-            // Avanzamento: "Elaboro 3 di 50"
-            if (vm.foto.isNotEmpty()) {
-                val totale = vm.foto.size
-                Text(
-                    if (vm.elaborate < totale) "Elaboro ${vm.elaborate + 1} di $totale…" else "Fatto: $totale foto",
-                    Modifier.padding(vertical = 8.dp), fontWeight = FontWeight.Bold,
+            items(vm.foto, key = { it.numero }) { f ->
+                Scheda(
+                    f,
+                    prove = vm.prove,
+                    testo = vm.testo(f),
+                    ingrandisci = { ingrandita = f.numero },
+                    gira = { gradi -> vm.gira(f.numero, gradi) },
+                    modifica = { indice -> inModifica = f.numero to indice },
+                    modificaTesto = { testoInModifica = f.numero },
+                    automatico = { vm.cambiaTesto(f.numero, null) },
+                    pubblica = { chiediEPubblica(f) },
+                    salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                 )
-                LinearProgressIndicator(
-                    progress = { vm.elaborate / totale.toFloat() },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 12.dp),
-            ) {
-                items(vm.foto, key = { it.numero }) { f ->
-                    Scheda(
-                        f,
-                        onClick = { ingrandita = f.numero },
-                        gira = { gradi -> vm.gira(f.numero, gradi) },
-                        modifica = { indice -> inModifica = f.numero to indice },
-                        salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
-                        testo = vm.testo(f),
-                        cambiaTesto = { t -> vm.cambiaTesto(f.numero, t) },
-                        modificaTesto = { testoInModifica = f.numero },
-                        pubblica = { chiediEPubblica(f) },
-                    )
-                }
             }
         }
     }
@@ -230,98 +234,193 @@ private fun Schermata(vm: FotoViewModel) {
     }
 }
 
-/** Una foto nella lista: foto grande, avviso se il verso è da controllare, articoli letti, pulsanti. */
+/** Barra in basso: quante pubblicate e il pulsante grande per la prossima. */
+@Composable
+private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
+    val prossima = vm.prossima
+    val tutte = vm.foto.size
+    val fatte = vm.quantePubblicate
+    Surface(color = Color.White, shadowElevation = 12.dp, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Pubblicate $fatte di $tutte", fontSize = 14.sp, color = BluNotte, modifier = Modifier.weight(1f))
+                if (fatte == tutte) Text("🎉", fontSize = 18.sp)
+            }
+            LinearProgressIndicator(
+                progress = { if (tutte == 0) 0f else fatte / tutte.toFloat() },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                color = Verde, trackColor = Cielo,
+            )
+            Button(
+                onClick = pubblica,
+                enabled = prossima != null,
+                modifier = Modifier.fillMaxWidth().height(62.dp),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Text(
+                    when {
+                        prossima != null -> "📤  Pubblica la prossima · Foto ${prossima.numero}"
+                        fatte == tutte -> "✓  Tutte pubblicate!"
+                        else -> "Un attimo, preparo le foto…"
+                    },
+                    fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+    }
+}
+
+/** Schermata vuota: cosa fare per cominciare. */
+@Composable
+private fun Benvenuto() {
+    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 2.dp) {
+        Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Ciao! 👋", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BluNotte)
+            Text(
+                "Tocca «Scegli foto» e seleziona le foto da pubblicare.\n\n" +
+                    "Oppure dalla Galleria: seleziona le foto, tocca Condividi e scegli «Da bimbo a bimbo».",
+                fontSize = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp), color = Color(0xFF3A4660),
+            )
+        }
+    }
+}
+
+/** "Sto sistemando le foto… 3 di 31" */
+@Composable
+private fun Avanzamento(fatte: Int, tutte: Int) {
+    Surface(color = Cielo, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("Sto sistemando le foto… ${fatte + 1} di $tutte", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp)
+            LinearProgressIndicator(
+                progress = { fatte / tutte.toFloat() },
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = BluNotte, trackColor = Color.White,
+            )
+            Text("Puoi già pubblicare quelle pronte.", fontSize = 13.sp, color = BluNotte, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+/** Una foto: foto grande, testo per lo stato in evidenza, dettagli degli articoli che si aprono, pulsanti. */
 @Composable
 private fun Scheda(
     f: Foto,
-    onClick: () -> Unit,
+    prove: Boolean,
+    testo: String,
+    ingrandisci: () -> Unit,
     gira: (Int) -> Unit,
     modifica: (Int?) -> Unit,
-    salvaDiagnosi: () -> Unit,
-    testo: String,
-    cambiaTesto: (String?) -> Unit,
     modificaTesto: () -> Unit,
+    automatico: () -> Unit,
     pubblica: () -> Unit,
+    salvaDiagnosi: () -> Unit,
 ) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
+    val articoli = f.articoli
+    val mancanti = f.etichetteViste - articoli.size
+    // I dettagli si aprono da soli se c'è qualcosa da sistemare
+    var dettagli by remember(f.numero) { mutableStateOf(false) }
+    val daSistemare = !f.inCorso && f.errore == null && (articoli.isEmpty() || articoli.any { it.daCompletare } || mancanti > 0)
+
+    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 2.dp) {
+        Column(Modifier.padding(14.dp)) {
+            // Intestazione: numero + stato
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.weight(1f))
-                if (f.pubblicata) {
-                    Text("✓ Pubblicata", color = VERDE, fontWeight = FontWeight.Bold)
-                } else if (f.daControllare && !f.inCorso) {
-                    Text("⚠ Controlla il verso", color = ARANCIONE, fontWeight = FontWeight.Bold)
+                Etichetta("Foto ${f.numero}", Rosa, BluNotte)
+                Spacer(Modifier.weight(1f))
+                when {
+                    f.pubblicata -> Etichetta("✓ Pubblicata", Color(0xFFE3F4E5), Verde)
+                    f.inCorso -> Etichetta("In lavorazione…", Cielo, BluNotte)
+                    f.avvisi.isNotEmpty() -> Etichetta("⚠ Da controllare", Color(0xFFFFEFE3), Arancione)
+                    else -> Etichetta("Pronta", Color(0xFFE3F4E5), Verde)
                 }
             }
 
-            // Foto grande, a tutta larghezza: si vede subito se è dritta. Toccala per lo schermo intero.
+            // Foto grande (toccala per ingrandire)
             Box(
-                Modifier.fillMaxWidth().height(280.dp).padding(vertical = 8.dp)
-                    .clickable(enabled = f.file != null, onClick = onClick),
+                Modifier.fillMaxWidth().padding(top = 12.dp).height(300.dp).clip(MaterialTheme.shapes.medium)
+                    .background(Color(0xFFEAF5FC)).clickable(enabled = f.file != null, onClick = ingrandisci),
                 contentAlignment = Alignment.Center,
             ) {
                 when {
                     f.miniatura != null -> Image(f.miniatura, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    f.inCorso -> CircularProgressIndicator()
+                    f.inCorso -> CircularProgressIndicator(color = BluNotte)
                 }
+                if (f.file != null) Text(
+                    "🔍", fontSize = 20.sp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp).background(Color.White.copy(alpha = 0.85f), CircleShape).padding(8.dp),
+                )
             }
+            if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
+            if (f.daControllare && !f.inCorso && !f.pubblicata) Avviso("⚠ Controlla che la foto sia dritta")
 
             when {
-                f.inCorso -> Text("In attesa…")
-                f.errore != null -> Text("Errore: ${f.errore}", color = MaterialTheme.colorScheme.error)
+                f.inCorso -> {}
+                f.errore != null -> Avviso("Errore: ${f.errore}")
                 else -> {
-                    val articoli = f.articoli
-                    if (articoli.isEmpty()) {
-                        Avviso(
-                            if (f.codice == null) "⚠ Cartellino non letto: aggiungi l'articolo a mano"
-                            else "⚠ Cartellino ${f.codice} non leggibile: aggiungi l'articolo a mano"
-                        )
-                    }
-                    articoli.forEachIndexed { i, d ->
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                if (articoli.size > 1) "Articolo ${i + 1} di ${articoli.size}" else "Articolo",
-                                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { modifica(i) }) { Text("✏ Modifica") }
-                        }
-                        if (d.daCompletare) Avviso("⚠ Da completare: tocca la foto per leggere meglio il cartellino")
-                        DatiLetti(d)
-                    }
-                    // Si vedono più cartellini di quelli letti: Elisa deve aggiungere i mancanti
-                    val mancanti = f.etichetteViste - articoli.size
-                    if (mancanti > 0) {
-                        Avviso(
-                            if (mancanti == 1) "⚠ C'è ancora 1 etichetta non letta: aggiungila a mano"
-                            else "⚠ Ci sono ancora $mancanti etichette non lette: aggiungile a mano"
-                        )
-                    }
-                    OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        Text("+ Aggiungi articolo")
-                    }
-
-                    // Pezzo 3: il testo che andrà nello stato (si può correggere a mano)
-                    if (testo.isNotBlank() || f.testoManuale != null) {
-                        Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Testo per lo stato", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            if (f.testoManuale != null) TextButton(onClick = { cambiaTesto(null) }) { Text("↺ Automatico") }
-                        }
-                        // Toccando il testo si apre lo schermo diviso: foto ingrandibile sopra, testo sotto
+                    // Il testo per lo stato, in evidenza
+                    if (testo.isNotBlank()) {
                         Surface(
                             onClick = modificaTesto,
-                            shape = MaterialTheme.shapes.small,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier.fillMaxWidth(),
+                            color = Color(0xFFEAF5FC),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         ) {
-                            Column(Modifier.padding(12.dp)) {
-                                Text(testo, style = MaterialTheme.typography.bodyLarge)
-                                Text("✏ Tocca per correggere", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp))
+                            Column(Modifier.padding(14.dp)) {
+                                Text("Testo per lo stato", fontSize = 13.sp, color = Azzurro, fontWeight = FontWeight.Bold)
+                                Text(testo, fontSize = 17.sp, modifier = Modifier.padding(top = 4.dp), color = Color(0xFF1B1F2A))
+                                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("✏ Tocca per correggere", fontSize = 13.sp, color = BluNotte, modifier = Modifier.weight(1f))
+                                    if (f.testoManuale != null) TextButton(onClick = automatico) { Text("↺ Automatico") }
+                                }
                             }
                         }
-                        if (f.testoManuale != null) Text("Corretto a mano: le modifiche agli articoli non lo cambiano più", fontSize = 12.sp, color = Color.Gray)
                     }
-                    // Per le prove: come ha lavorato l'app (sparirà nella versione finale)
-                    Text(
+
+                    // Avvisi sugli articoli
+                    if (articoli.isEmpty()) Avviso(
+                        if (f.codice == null) "⚠ Cartellino non letto: aggiungi l'articolo a mano"
+                        else "⚠ Cartellino ${f.codice} non leggibile: aggiungi l'articolo a mano"
+                    )
+                    if (mancanti > 0) Avviso(
+                        if (mancanti == 1) "⚠ C'è ancora 1 etichetta non letta: aggiungila a mano"
+                        else "⚠ Ci sono ancora $mancanti etichette non lette: aggiungile a mano"
+                    )
+
+                    // Dettagli degli articoli (si aprono a richiesta, o da soli se c'è da sistemare)
+                    val aperti = dettagli || daSistemare
+                    TextButton(onClick = { dettagli = !dettagli }, modifier = Modifier.padding(top = 4.dp)) {
+                        Text(
+                            (if (aperti) "▾ " else "▸ ") + when (articoli.size) {
+                                0 -> "Articoli"
+                                1 -> "Dettagli articolo"
+                                else -> "Dettagli ${articoli.size} articoli"
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    if (aperti) {
+                        articoli.forEachIndexed { i, d ->
+                            Surface(color = Sfondo, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            if (articoli.size > 1) "Articolo ${i + 1}" else "Articolo",
+                                            fontWeight = FontWeight.Bold, color = BluNotte, modifier = Modifier.weight(1f),
+                                        )
+                                        TextButton(onClick = { modifica(i) }) { Text("✏ Modifica") }
+                                    }
+                                    if (d.daCompletare) Avviso("⚠ Da completare: tocca Modifica e guarda la foto")
+                                    DatiLetti(d)
+                                }
+                            }
+                        }
+                        OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = MaterialTheme.shapes.medium) {
+                            Text("+ Aggiungi articolo")
+                        }
+                    }
+
+                    // Solo in modalità prove: come ha lavorato l'app
+                    if (prove) Text(
                         (if (f.rotazione == 0) "Già dritta" else "Ruotata di ${f.rotazione}°") +
                             (if (f.messaInVerticale) " · messa in verticale" else "") +
                             (if (f.rotazioneManuale != 0) " · girata a mano" else "") +
@@ -330,17 +429,29 @@ private fun Scheda(
                     )
                 }
             }
-            if (f.file != null) PulsantiGira(gira, Modifier.padding(top = 8.dp))
+
             if (f.file != null && !f.inCorso) {
-                Button(onClick = pubblica, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Text(if (f.pubblicata) "↺ Pubblica di nuovo" else "📤 Pubblica questa")
-                }
+                FilledTonalButton(
+                    onClick = pubblica,
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(52.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = Cielo, contentColor = BluNotte),
+                ) { Text(if (f.pubblicata) "↺  Pubblica di nuovo" else "📤  Pubblica questa", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
             }
-            if (f.diario != null && !f.diario.vuoto) {
+            if (prove && f.diario != null && !f.diario.vuoto) {
                 OutlinedButton(onClick = salvaDiagnosi, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text("📷 Salva diagnosi in Galleria") }
             }
         }
     }
+}
+
+/** Pastiglia colorata con una scritta corta (es. "Foto 3", "✓ Pubblicata"). */
+@Composable
+private fun Etichetta(testo: String, sfondo: Color, colore: Color) {
+    Text(
+        testo, color = colore, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+        modifier = Modifier.background(sfondo, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 5.dp),
+    )
 }
 
 /** Elenco delle sigle: cerca, aggiungi, correggi, elimina. Si salva da solo nel file di testo. */
@@ -432,10 +543,12 @@ private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) ->
 
 /** Scritta arancione: qui Elisa deve guardare. */
 @Composable
-private fun Avviso(testo: String) = Text(testo, color = ARANCIONE, fontWeight = FontWeight.Bold)
+private fun Avviso(testo: String) = Text(
+    testo, color = Arancione, fontWeight = FontWeight.Bold,
+    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(Color(0xFFFFEFE3), RoundedCornerShape(14.dp)).padding(12.dp),
+)
 
-private val ARANCIONE = Color(0xFFE65100)
-private val VERDE = Color(0xFF2E7D32)
+private val ARANCIONE = Arancione
 
 /** I dati di UN articolo, così come sono letti dal cartellino (le sigle le espande il pezzo 3). */
 @Composable
@@ -457,11 +570,11 @@ private fun DatiLetti(dati: DatiCartellino) {
 @Composable
 private fun PulsantiGira(gira: (Int) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { gira(90) }, modifier = Modifier.weight(1f).height(48.dp)) {
-            Text("↻ Gira", fontSize = 16.sp)
+        OutlinedButton(onClick = { gira(90) }, modifier = Modifier.weight(1f).height(46.dp), shape = MaterialTheme.shapes.medium) {
+            Text("↻ Gira", fontSize = 15.sp)
         }
-        OutlinedButton(onClick = { gira(180) }, modifier = Modifier.weight(1f).height(48.dp)) {
-            Text("⇅ Capovolgi", fontSize = 16.sp)
+        OutlinedButton(onClick = { gira(180) }, modifier = Modifier.weight(1f).height(46.dp), shape = MaterialTheme.shapes.medium) {
+            Text("⇅ Capovolgi", fontSize = 15.sp)
         }
     }
 }

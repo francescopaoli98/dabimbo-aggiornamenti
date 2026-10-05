@@ -112,6 +112,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         if (i >= 0) foto[i] = foto[i].copy(pubblicata = pubblicata)
     }
 
+    /** Modalità prove (logo tenuto premuto): mostra le informazioni tecniche e la diagnosi. */
+    var prove by mutableStateOf(false)
+
     /** Modalità diagnosi: l'app si annota ogni lettura, per mandarla a chi sistema l'app. */
     var diagnosi by mutableStateOf(false)
     /** Messaggio breve da mostrare (es. "Diagnosi salvata in Galleria"). */
