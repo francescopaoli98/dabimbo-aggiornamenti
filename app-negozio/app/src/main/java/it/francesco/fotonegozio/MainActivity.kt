@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // I tasti del volume, dentro l'app, regolano i contenuti multimediali (quelli dei suoni dell'app)
+        volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         // App sempre chiara: icone di sistema (ora, batteria) sempre scure, anche col telefono in modalità scura
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
@@ -330,17 +332,6 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
 private fun Benvenuto() {
     Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 4.dp, modifier = Modifier.entrata()) {
         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            // Il bimbo del logo gattona avanti e indietro
-            val t by rememberInfiniteTransition(label = "gattona").animateFloat(
-                0f, 2f, infiniteRepeatable(tween(9000, easing = LinearEasing)), label = "t",
-            )
-            BoxWithConstraints(Modifier.fillMaxWidth().height(70.dp)) {
-                val pos = if (t < 1f) t else 2f - t
-                BimboCheGattona(
-                    60.dp, verso = if (t < 1f) 1 else -1,
-                    modifier = Modifier.offset(x = (maxWidth - 90.dp) * pos),
-                )
-            }
             Text("Ciao! 👋", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BluNotte)
             Text(
                 "Tocca «Scegli foto» e seleziona le foto da pubblicare.\n\n" +
@@ -357,16 +348,9 @@ private fun Avanzamento(fatte: Int, tutte: Int) {
     Surface(color = Cielo, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text("Sto sistemando le foto… ${fatte + 1} di $tutte", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp)
-            // Il bimbo gattona lungo la barra, fino alla fine
+            // Nuvolette che si riempiono di colore man mano che le foto sono pronte
             val avanzamento by animateFloatAsState(fatte / tutte.toFloat(), tween(800), label = "avanzamento")
-            BoxWithConstraints(Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp)) {
-                BimboCheGattona(40.dp, verso = 1, modifier = Modifier.offset(x = (maxWidth - 60.dp) * avanzamento))
-            }
-            LinearProgressIndicator(
-                progress = { avanzamento },
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = BluNotte, trackColor = Color.White,
-            )
+            NuvoleAvanzamento(avanzamento, Modifier.padding(top = 10.dp))
             Text("Puoi già pubblicare quelle pronte.", fontSize = 13.sp, color = BluNotte, modifier = Modifier.padding(top = 6.dp))
         }
     }

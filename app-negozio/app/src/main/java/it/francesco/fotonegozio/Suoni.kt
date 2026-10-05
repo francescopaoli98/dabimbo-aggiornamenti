@@ -34,6 +34,6 @@ class Suoni(context: Context) {
     fun tuttePubblicate() = suona(festa)
 
     private fun suona(id: Int) {
-        if (attivi && id in caricati) pool.play(id, 0.9f, 0.9f, 1, 0, 1f)
+        if (attivi && id in caricati) pool.play(id, 0.35f, 0.35f, 1, 0, 1f)   // piano: suoni leggeri
     }
 }

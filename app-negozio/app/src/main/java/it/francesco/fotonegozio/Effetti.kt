@@ -2,7 +2,6 @@ package it.francesco.fotonegozio
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -13,10 +12,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.sin
@@ -108,20 +108,41 @@ fun Luccichio(modifier: Modifier = Modifier) {
     }
 }
 
-/** Il bimbo del logo che gattona: [verso] 1 = verso destra, -1 = verso sinistra. Dondola un po' mentre "cammina". */
+/**
+ * Barra di caricamento a nuvolette: una fila di nuvole bianche che si riempiono di colore
+ * da sinistra (dal rosa all'azzurro, come le lettere del logo). Ogni nuvola piena fa "boing".
+ */
 @Composable
-fun BimboCheGattona(altezza: Dp, verso: Int, modifier: Modifier = Modifier) {
-    val passo by rememberInfiniteTransition(label = "passo").animateFloat(
-        0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(700, easing = LinearEasing)), label = "p",
+fun NuvoleAvanzamento(avanzamento: Float, modifier: Modifier = Modifier, quante: Int = 8) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(quante) { i ->
+            val pieno = (avanzamento * quante - i).coerceIn(0f, 1f)
+            val colore = lerp(Rosa, Azzurro, i / (quante - 1f).coerceAtLeast(1f))
+            Nuvoletta(pieno, colore, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun Nuvoletta(pieno: Float, colore: Color, modifier: Modifier) {
+    val scala by animateFloatAsState(
+        if (pieno >= 1f) 1f else 0.86f,
+        spring(dampingRatio = 0.35f, stiffness = Spring.StiffnessLow),
+        label = "boing",
     )
-    Image(
-        painterResource(R.drawable.bimbo), null,
-        modifier.height(altezza).graphicsLayer {
-            scaleX = if (verso > 0) -1f else 1f    // nel logo guarda a sinistra
-            translationY = sin(passo) * 2.dp.toPx()
-            rotationZ = sin(passo) * 2.5f
-        },
-    )
+    Canvas(modifier.aspectRatio(1.5f).graphicsLayer { scaleX = scala; scaleY = scala }) {
+        val w = size.width; val h = size.height
+        // una nuvola = 3 cerchi + base arrotondata
+        fun nuvola(colore: Color, dy: Float = 0f) {
+            drawCircle(colore, h * 0.30f, Offset(w * 0.30f, h * 0.58f + dy))
+            drawCircle(colore, h * 0.40f, Offset(w * 0.52f, h * 0.44f + dy))
+            drawCircle(colore, h * 0.28f, Offset(w * 0.74f, h * 0.60f + dy))
+            drawRoundRect(colore, Offset(w * 0.12f, h * 0.55f + dy), Size(w * 0.76f, h * 0.33f), CornerRadius(h * 0.16f, h * 0.16f))
+        }
+        nuvola(BluNotte.copy(alpha = 0.18f), dy = h * 0.06f)   // ombra morbida
+        nuvola(Color.White)
+        if (pieno > 0f) clipRect(right = w * (0.1f + 0.8f * pieno)) { nuvola(colore) }
+    }
 }
 
 /** Coriandoli rosa, azzurri e blu che cadono su tutto lo schermo (quando sono tutte pubblicate). */
