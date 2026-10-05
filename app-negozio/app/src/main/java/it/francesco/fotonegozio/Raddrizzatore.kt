@@ -104,14 +104,18 @@ class Raddrizzatore(private val context: Context) {
             val base = ruota(foto, gradi)
             val zoneTasselli = mutableListOf<Rect>()
             for (t in tasselli(base)) {
-                val pezzo = Bitmap.createBitmap(base, t.left, t.top, t.width(), t.height())
+                // Foto piccole (es. già ritagliate): ingrandisco il tassello, così il testo minuscolo si legge
+                val scala = (LATO_TASSELLO.toFloat() / max(t.width(), t.height())).coerceAtLeast(1f)
+                val pezzo = Bitmap.createBitmap(base, t.left, t.top, t.width(), t.height()).let {
+                    if (scala > 1f) Bitmap.createScaledBitmap(it, (it.width * scala).toInt(), (it.height * scala).toInt(), true)
+                    else it
+                }
                 val testo = leggi(pezzo)
                 rigaCodice(testo)?.let {
-                    val r = it.boundingBox!!
-                    r.offset(t.left, t.top)   // coordinate dal tassello alla foto intera
-                    return Zona(base, gradi, r, codiceDi(it), "tasselli")
+                    // coordinate dal tassello alla foto intera
+                    return Zona(base, gradi, nellaFoto(it.boundingBox!!, t, scala), codiceDi(it), "tasselli")
                 }
-                zoneTasselli += zoneTesto(testo, t)
+                zoneTasselli += zoneTesto(testo, t, scala)
             }
             // 5. Come il punto 3, ma con le zone viste nei tasselli
             ingrandisciZone(base, gradi, zoneTasselli, if (gradi == 0) provate else mutableListOf())
@@ -124,11 +128,17 @@ class Raddrizzatore(private val context: Context) {
      * Riquadri dei blocchi di testo (anche illeggibili), già spostati nelle coordinate della foto.
      * Prima quelli con più cifre: il cartellino ha codice e prezzo.
      */
-    private fun zoneTesto(testo: Text, tassello: Rect): List<Rect> =
+    private fun zoneTesto(testo: Text, tassello: Rect, scala: Float = 1f): List<Rect> =
         testo.textBlocks
             .filter { it.boundingBox != null }
             .sortedByDescending { b -> b.text.count { it.isDigit() } }
-            .map { b -> Rect(b.boundingBox!!).apply { offset(tassello.left, tassello.top) } }
+            .map { b -> nellaFoto(b.boundingBox!!, tassello, scala) }
+
+    /** Riquadro dal tassello (eventualmente ingrandito di [scala]) alla foto intera. */
+    private fun nellaFoto(r: Rect, tassello: Rect, scala: Float) = Rect(
+        (r.left / scala).toInt() + tassello.left, (r.top / scala).toInt() + tassello.top,
+        (r.right / scala).toInt() + tassello.left, (r.bottom / scala).toInt() + tassello.top,
+    )
 
     /** Ritaglia e ingrandisce fino a [MAX_ZONE] zone, cercando il codice in orizzontale e in verticale. */
     private suspend fun ingrandisciZone(base: Bitmap, gradi: Int, zone: List<Rect>, provate: MutableList<Rect>): Zona? {
@@ -312,6 +322,7 @@ class Raddrizzatore(private val context: Context) {
     companion object {
         private const val LATO_MASSIMO = 4100   // 12 MP restano intere, 50 MP dimezzate
         private const val LATO_RITAGLIO = 1200
+        private const val LATO_TASSELLO = 1600   // tasselli più piccoli di così vengono ingranditi
         private const val ALTEZZA_TESTO = 40f    // altezza (px) a cui porto il testo piccolo del cartellino prima di leggerlo
         private const val MAX_ZONE = 6           // zone ingrandite al massimo per ogni giro (tiene basso il tempo)
 
