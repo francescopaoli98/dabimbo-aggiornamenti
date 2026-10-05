@@ -30,6 +30,6 @@ class Suoni(context: Context) {
     fun tuttePubblicate() = suona(festa)
 
     private fun suona(id: Int) {
-        if (attivi) pool.play(id, 0.7f, 0.7f, 1, 0, 1f)
+        if (attivi) pool.play(id, 0.45f, 0.45f, 1, 0, 1f)   // volume basso: suoni leggeri
     }
 }
