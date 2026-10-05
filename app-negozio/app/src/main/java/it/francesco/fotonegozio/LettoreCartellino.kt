@@ -36,7 +36,9 @@ object LettoreCartellino {
     // Simboli che l'OCR può leggere al posto di "€" o che non servono
     private val SIMBOLI_EURO = Regex("[€£]|\\bEUR\\b|^[Ee€Cc](?=\\s?\\d)")
 
-    fun analizza(righe: List<Riga>): DatiCartellino {
+    fun analizza(paroleLette: List<Riga>): DatiCartellino {
+        val righe = unisciPrezziSpezzati(paroleLette)
+
         // 1. Codice: preferisco la riga fatta SOLO di 7 cifre (quella sotto il prefisso)
         val rigaCodice = righe.firstOrNull { it.testo.trim().replace(" ", "").matches(Regex("\\d{7}")) }
             ?: righe.firstOrNull { CODICE.containsMatchIn(it.testo) }
@@ -73,7 +75,7 @@ object LettoreCartellino {
             for ((i, parola) in riga.withIndex()) {
                 if (!inTaglia && rigaPrezzo != null) {
                     val spazioPrima = if (i == 0) Int.MAX_VALUE else parola.sx - riga[i - 1].dx
-                    inTaglia = parola.centroY > rigaCodice.giu &&          // sotto la riga del codice
+                    inTaglia = parola.centroY > rigaCodice.giu + h / 2 &&  // chiaramente sotto la riga del codice
                         parola.sx >= rigaCodice.sx - cw / 2 &&             // nella colonna del codice
                         parola.sx > rigaPrezzo.dx &&                       // a destra del prezzo
                         spazioPrima > 3 * h / 2                            // staccata dalla parola prima
@@ -88,6 +90,24 @@ object LettoreCartellino {
         val descrizione = partiDescrizione.unisci()
 
         return DatiCartellino(codice, descrizione, prezzo, taglia)
+    }
+
+    /**
+     * A volte ML Kit spezza il prezzo in due parole: "2," + "00". Se sono vicine e alla stessa altezza le riunisco.
+     */
+    private fun unisciPrezziSpezzati(parole: List<Riga>): List<Riga> {
+        val risultato = parole.toMutableList()
+        for (prima in parole.filter { it.testo.trim().matches(Regex("\\d{1,3}[,.]")) }) {
+            val dopo = parole.firstOrNull { d ->
+                d.testo.trim().matches(Regex("\\d{2}")) &&
+                    d.sx >= prima.dx && d.sx - prima.dx < prima.altezza &&       // subito dopo
+                    abs(d.centroY - prima.centroY) < prima.altezza / 2           // stessa altezza
+            } ?: continue
+            risultato.remove(prima)
+            risultato.remove(dopo)
+            risultato += Riga(prima.testo.trim() + dopo.testo.trim(), prima.sx, minOf(prima.su, dopo.su), dopo.dx, maxOf(prima.giu, dopo.giu))
+        }
+        return risultato
     }
 
     private fun List<Riga>.unisci(): String? =

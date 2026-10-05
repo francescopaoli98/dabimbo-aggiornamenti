@@ -245,6 +245,29 @@ class LettoreCartellinoTest {
     }
 
     @Test
+    fun librottino_frozen_II_poco_sotto_il_codice_resta_descrizione() {
+        // Errore visto sul telefono: "II" finiva nella taglia
+        val righe = parole("1444112", 650, 455, 495, 26) +
+            parole("LIBROTTINO FROZEN", 85, 468, 506) + parole("II", 560, 470, 508) +
+            parole("€1,00", 45, 560, 640, 45)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("LIBROTTINO FROZEN II", dati.descrizione)
+        assertNull(dati.taglia)
+    }
+
+    @Test
+    fun prezzo_spezzato_in_due_parole() {
+        // Errore visto sul telefono: "e 2, 00" finiva nella descrizione
+        val righe = parole("1444092", 650, 455, 495, 26) +
+            parole("ciuchino shreck", 85, 445, 482) +
+            parole("peluche", 85, 520, 558) +
+            parole("e", 45, 610, 650, 30) + Riga("2,", 90, 590, 160, 670) + Riga("00", 175, 590, 260, 670)
+        val dati = LettoreCartellino.analizza(righe)
+        assertEquals("ciuchino shreck peluche", dati.descrizione)
+        assertEquals("€ 2,00", dati.prezzo)
+    }
+
+    @Test
     fun nessun_codice_nessun_dato() {
         val dati = LettoreCartellino.analizza(listOf(r("Okaidi", 0, 0, 50, 20)))
         assertNull(dati.codice)
