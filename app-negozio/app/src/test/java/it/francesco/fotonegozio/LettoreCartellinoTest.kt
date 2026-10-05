@@ -277,6 +277,12 @@ class LettoreCartellinoTest {
         assertEquals("gioco Scat sapientino", LettoreCartellino.cifre("gioco Scat sapientino"))
         assertEquals("BOTT IDO 7A", LettoreCartellino.cifre("BOTT IDO 7A"))
         assertEquals("SOS", LettoreCartellino.cifre("SOS"))
+        // Dalla diagnosi del Sapientino: "t4441 06" (t al posto di 1, spazio in mezzo)
+        assertEquals("1444106", LettoreCartellino.cifre("t4441 06"))
+        // Numeri normali non vengono incollati se non fanno 7 cifre
+        assertEquals("puzzle 100 pezzi", LettoreCartellino.cifre("puzzle 100 pezzi"))
+        assertEquals("NR 34 NR 34", LettoreCartellino.cifre("NR 34 NR 34"))
+        assertEquals("TT", LettoreCartellino.cifre("TT"))
     }
 
     @Test
@@ -305,6 +311,20 @@ class LettoreCartellinoTest {
         assertEquals("1444108", dati.codice)
         assertEquals("GIOCO sCAT NUMERI DA 1A10", dati.descrizione)
         assertEquals("€ 3,50", dati.prezzo)
+    }
+
+    @Test
+    fun sapientino_codice_spezzato_in_due_parole() {
+        val dati = LettoreCartellino.analizza(listOf(
+            r("A1291/1444tt", 650, 400, 860, 440),
+            r("t4441", 650, 455, 760, 495), r("06", 775, 455, 820, 495),
+            r("gioco", 85, 470, 180, 508), r("scat", 195, 470, 270, 508), r("sapientino", 285, 470, 470, 508),
+            r("divertente", 85, 520, 270, 558),
+            r("€4,00", 45, 580, 300, 670),
+        ))
+        assertEquals("1444106", dati.codice)
+        assertEquals("gioco scat sapientino divertente", dati.descrizione)
+        assertEquals("€ 4,00", dati.prezzo)
     }
 
     @Test

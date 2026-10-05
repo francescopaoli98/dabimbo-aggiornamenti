@@ -40,18 +40,45 @@ object LettoreCartellino {
      * Corregge le lettere che l'OCR scambia per cifre (I→1, O→0, S→5, B→8...), ma SOLO nelle parole
      * che sono quasi tutte cifre (es. "I444106" → "1444106", "144410o" → "1444100"). Le parole normali restano uguali.
      */
-    fun cifre(testo: String): String = testo.split(" ").joinToString(" ") { parola ->
-        parola.split("/").joinToString("/") { pezzo ->
-            val cifreVere = pezzo.count { it.isDigit() }
-            val confondibili = pezzo.count { it in SCAMBI }
-            if (cifreVere >= 3 && cifreVere + confondibili == pezzo.length && confondibili <= 2)
-                pezzo.map { SCAMBI[it] ?: it }.joinToString("")
-            else pezzo
+    fun cifre(testo: String): String {
+        val parole = testo.split(" ").map { parola ->
+            parola.split("/").joinToString("/") { pezzo ->
+                val cifreVere = pezzo.count { it.isDigit() }
+                val confondibili = pezzo.count { it in SCAMBI }
+                if (cifreVere >= 2 && cifreVere + confondibili == pezzo.length && confondibili <= 2 && confondibili < cifreVere)
+                    pezzo.map { SCAMBI[it] ?: it }.joinToString("")
+                else pezzo
+            }
         }
+        return unisciNumeriSpezzati(parole).joinToString(" ")
+    }
+
+    /**
+     * L'OCR a volte mette uno spazio dentro il codice ("14441 06"): numeri vicini che insieme
+     * fanno esattamente 7 cifre vengono riuniti.
+     */
+    private fun unisciNumeriSpezzati(parole: List<String>): List<String> {
+        val risultato = mutableListOf<String>()
+        var i = 0
+        while (i < parole.size) {
+            var unito: String? = null
+            var fine = i
+            if (parole[i].all { it.isDigit() } && parole[i].length < 7) {
+                var accumulo = parole[i]
+                var j = i + 1
+                while (j < parole.size && parole[j].isNotEmpty() && parole[j].all { it.isDigit() } && accumulo.length + parole[j].length <= 7) {
+                    accumulo += parole[j]
+                    if (accumulo.length == 7) { unito = accumulo; fine = j; break }
+                    j++
+                }
+            }
+            if (unito != null) { risultato += unito; i = fine + 1 } else { risultato += parole[i]; i++ }
+        }
+        return risultato
     }
 
     private val SCAMBI = mapOf(
-        'I' to '1', 'l' to '1', 'i' to '1', '|' to '1', '!' to '1',
+        'I' to '1', 'l' to '1', 'i' to '1', '|' to '1', '!' to '1', 't' to '1', 'T' to '1',
         'O' to '0', 'o' to '0', 'D' to '0', 'Q' to '0',
         'S' to '5', 's' to '5', 'B' to '8', 'Z' to '2', 'z' to '2', 'G' to '6', 'b' to '6',
     )
@@ -63,7 +90,7 @@ object LettoreCartellino {
      */
     fun analizza(paroleLette: List<Riga>, codiceNoto: String? = null): DatiCartellino {
         // Le parole che sembrano numeri vengono "ripulite" (I→1, O→0...) prima di tutto
-        val righe = unisciPrezziSpezzati(paroleLette.map { it.copy(testo = cifre(it.testo)) })
+        val righe = unisciCodiciSpezzati(unisciPrezziSpezzati(paroleLette.map { it.copy(testo = cifre(it.testo)) }))
 
         // 1. Codice: preferisco la riga fatta SOLO di 7 cifre (quella sotto il prefisso)
         val rigaEsatta = righe.firstOrNull { it.testo.trim().replace(" ", "").matches(Regex("\\d{7}")) }
@@ -148,6 +175,24 @@ object LettoreCartellino {
             '/' !in t && t.length in 5..8 && t.count { it.isDigit() } >= t.length - 2
         }.maxByOrNull { r -> r.testo.trim().zip(codiceNoto).takeWhile { (a, b) -> a == b }.size }
             ?.takeIf { r -> r.testo.trim().zip(codiceNoto).takeWhile { (a, b) -> a == b }.size >= 4 }
+
+    /** Come sopra per il codice: "14441" + "06" vicini alla stessa altezza diventano "1444106". */
+    private fun unisciCodiciSpezzati(parole: List<Riga>): List<Riga> {
+        val risultato = parole.toMutableList()
+        for (prima in parole.filter { it.testo.trim().let { t -> t.length in 1..6 && t.all(Char::isDigit) } }) {
+            if (prima !in risultato) continue
+            val dopo = risultato.firstOrNull { d ->
+                d !== prima && d.testo.trim().all(Char::isDigit) &&
+                    prima.testo.trim().length + d.testo.trim().length == 7 &&
+                    d.sx >= prima.dx && d.sx - prima.dx < prima.altezza * 3 / 2 &&
+                    abs(d.centroY - prima.centroY) < prima.altezza / 2
+            } ?: continue
+            risultato.remove(prima)
+            risultato.remove(dopo)
+            risultato += Riga(prima.testo.trim() + dopo.testo.trim(), prima.sx, minOf(prima.su, dopo.su), dopo.dx, maxOf(prima.giu, dopo.giu))
+        }
+        return risultato
+    }
 
     private fun List<Riga>.unisci(): String? =
         joinToString(" ") { it.testo.trim() }.replace(Regex("\\s+"), " ").trim().ifBlank { null }
