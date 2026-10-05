@@ -40,7 +40,8 @@ data class Foto(
     val secondi: Float = 0f,             // per le prove: tempo di elaborazione
     val errore: String? = null,
     val diario: Diario? = null,          // modalità diagnosi: cosa ha provato a leggere
-    val testoManuale: String? = null,    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
+    val testoManuale: String? = null,
+    val etichetteViste: Int = 0,         // cartellini che si vedono nella foto (contati dai prezzi)    // testo per lo stato scritto/corretto da Elisa (null = quello automatico)
 )
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
@@ -145,6 +146,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 codice = r.codiceLetto,
                 dati = r.dati,
                 altri = r.altri,
+                etichetteViste = r.etichetteViste,
                 metodo = "${r.metodo} · ${r.immagine.width}×${r.immagine.height}",
                 secondi = (System.currentTimeMillis() - inizio) / 1000f,
                 diario = diario,

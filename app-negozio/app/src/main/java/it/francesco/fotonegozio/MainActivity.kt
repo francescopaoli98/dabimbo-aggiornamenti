@@ -231,6 +231,14 @@ private fun Scheda(
                         if (d.daCompletare) Avviso("⚠ Da completare: tocca la foto per leggere meglio il cartellino")
                         DatiLetti(d)
                     }
+                    // Si vedono più cartellini di quelli letti: Elisa deve aggiungere i mancanti
+                    val mancanti = f.etichetteViste - articoli.size
+                    if (mancanti > 0) {
+                        Avviso(
+                            if (mancanti == 1) "⚠ C'è ancora 1 etichetta non letta: aggiungila a mano"
+                            else "⚠ Ci sono ancora $mancanti etichette non lette: aggiungile a mano"
+                        )
+                    }
                     OutlinedButton(onClick = { modifica(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                         Text("+ Aggiungi articolo")
                     }

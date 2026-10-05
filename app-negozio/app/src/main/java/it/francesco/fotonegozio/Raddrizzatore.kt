@@ -34,6 +34,7 @@ class FotoRaddrizzata(
     val dati: DatiCartellino? = null, // descrizione, prezzo, taglia letti dal cartellino principale
     val altri: List<DatiCartellino> = emptyList(), // altri cartellini nella stessa foto (es. 9 librottini)
     val versoSicuro: Boolean = false,  // true = il verso è stato deciso leggendo il cartellino dritto
+    val etichetteViste: Int = 0,       // cartellini che si vedono nella foto (contati dai prezzi)
 )
 
 /**
@@ -95,7 +96,7 @@ class Raddrizzatore(private val context: Context) {
                 AltriCartellini(emptyList(), "altri: errore ${e.javaClass.simpleName}")
             }
             val metodo = zona.metodo + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
-            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true)
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = true, etichetteViste = altri?.etichetteViste ?: 0)
         }
         // Il ritaglio non ha funzionato, ma se conosco la riga del codice so in che direzione è scritta:
         // giro la foto in modo che la riga venga orizzontale e leggo il cartellino da lì
@@ -113,7 +114,7 @@ class Raddrizzatore(private val context: Context) {
                 if (codice != null) altriCartellini(dritta, codice, angoliDritti) else null
             } catch (e: Exception) { null }
             val metodo = zona.metodo + ", verso dalla riga" + (altri?.diagnostica?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
-            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = false)
+            return FotoRaddrizzata(dritta, totale, codice, metodo, dati, altri?.dati.orEmpty(), versoSicuro = false, etichetteViste = altri?.etichetteViste ?: 0)
         }
         // Verso incerto e riga sconosciuta: applico almeno la rotazione con cui il cartellino è stato trovato
         return FotoRaddrizzata(ruota(foto, zona.rotazione), zona.rotazione, zona.codice, zona.metodo + ", verso incerto")
@@ -398,7 +399,7 @@ class Raddrizzatore(private val context: Context) {
     }
 
     /** Altri cartellini trovati nella foto, più un riassunto per le prove ("cosa ha trovato e cosa ha scartato"). */
-    private class AltriCartellini(val dati: List<DatiCartellino>, val diagnostica: String)
+    private class AltriCartellini(val dati: List<DatiCartellino>, val diagnostica: String, val etichetteViste: Int = 0)
 
     /**
      * Cerca gli ALTRI cartellini nella foto già dritta e li legge tutti.
@@ -506,7 +507,14 @@ class Raddrizzatore(private val context: Context) {
             .sortedWith(compareBy({ (it.angoli[0].y / (altezzaPrincipale * 6)).toInt() }, { it.angoli[0].x }))
             .map { c -> leggiCartellino(dritta, c.angoli, c.codice)?.copy(codice = c.codice) ?: DatiCartellino(c.codice, null, null, null) }
         val diagnostica = if (conta.isEmpty()) "" else "altri: " + conta.entries.joinToString(", ") { "${it.key} ${it.value}" }
-        return AltriCartellini(dati, diagnostica)
+        // Quanti cartellini si vedono nella foto: ogni prezzo letto (non minuscolo, non doppio) è un cartellino
+        val prezziDistinti = mutableListOf<PrezzoTrovato>()
+        for (p in prezzi) {
+            if (p.altezza < altezzaPrincipale) continue   // prezzo minuscolo: cartellino sullo sfondo
+            val c = p.centro
+            if (prezziDistinti.none { q -> hypot(q.centro.x - c.x, q.centro.y - c.y) < 3 * max(p.altezza, q.altezza) }) prezziDistinti += p
+        }
+        return AltriCartellini(dati, diagnostica + (if (prezziDistinti.isNotEmpty()) " · prezzi visti ${prezziDistinti.size}" else ""), prezziDistinti.size)
     }
 
     /** Un prezzo ("1,50") letto nella foto: segna dove sta un cartellino. */
