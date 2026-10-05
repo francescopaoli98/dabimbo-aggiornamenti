@@ -80,14 +80,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.animation.core.animateOffsetAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
-import androidx.compose.ui.composed
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 
@@ -449,7 +441,7 @@ private fun Scheda(
                 Crossfade(targetState = f.miniatura, label = "foto") { mini ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         when {
-                            mini != null -> Image(mini, null, Modifier.fillMaxSize().zoomConDueDita(), contentScale = ContentScale.Fit)
+                            mini != null -> AnteprimaZoomabile(mini, f.file, Modifier.fillMaxSize())
                             f.inCorso -> Luccichio()
                         }
                     }
@@ -831,36 +823,6 @@ private fun EditorPixel(immagine: ImageBitmap, w: Int, h: Int, modifier: Modifie
             }
         }
     }
-}
-
-/**
- * Anteprima nella lista: con due dita si ingrandisce (finché le dita sono giù), poi torna com'era.
- * Un dito solo resta alla lista, che così scorre normalmente; il tocco apre la foto grande.
- */
-private fun Modifier.zoomConDueDita(): Modifier = composed {
-    var attivo by remember { mutableStateOf(false) }
-    var scala by remember { mutableFloatStateOf(1f) }
-    var spostamento by remember { mutableStateOf(Offset.Zero) }
-    // Mentre pizzica segue le dita; quando lascia torna dolcemente a posto
-    val s by animateFloatAsState(if (attivo) scala else 1f, if (attivo) snap() else spring(), label = "zoom")
-    val p by animateOffsetAsState(if (attivo) spostamento else Offset.Zero, if (attivo) snap() else spring(), label = "sposta")
-    this
-        .pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                do {
-                    val evento = awaitPointerEvent()
-                    if (evento.changes.count { it.pressed } >= 2) {
-                        attivo = true
-                        scala = (scala * evento.calculateZoom()).coerceIn(1f, 5f)
-                        spostamento += evento.calculatePan()
-                        evento.changes.forEach { it.consume() }   // la lista non scorre e il tocco non apre la foto
-                    }
-                } while (evento.changes.any { it.pressed })
-                attivo = false; scala = 1f; spostamento = Offset.Zero
-            }
-        }
-        .graphicsLayer { scaleX = s; scaleY = s; translationX = p.x; translationY = p.y }
 }
 
 /** Immagine che si ingrandisce con due dita (fino a 8 volte) e si sposta col dito. Doppio tocco: zoom avanti/indietro. */
