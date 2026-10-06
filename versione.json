@@ -1,6 +1,6 @@
 {
-  "versionCode": 61,
-  "versionName": "3.6",
+  "versionCode": 62,
+  "versionName": "3.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Oggetti dritti come li vede una persona: se le scritte dicono il verso, la foto non viene più girata di lato."
+  "note": "Riepilogo della giornata (articoli pubblicati e valore) e foto preparate 2 alla volta, più in fretta."
 }
