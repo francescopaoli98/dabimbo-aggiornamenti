@@ -647,4 +647,26 @@ class AppTest {
         regola.waitForIdle()
         assertFalse(vm.avvisoPronte)
     }
+
+    @Test
+    fun zoomDellAnteprimaResta() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        // Di partenza: resta ingrandita dopo aver tolto le dita, con ↺ per tornare normale
+        regola.onNodeWithText("🔍 Tocca").performTouchInput { pinch(center - Offset(20f, 0f), center - Offset(200f, 0f), center + Offset(20f, 0f), center + Offset(200f, 0f)) }
+        regola.waitForIdle()
+        regola.onNodeWithTag("zoom_normale").assertExists().performClick()
+        regola.onNodeWithTag("zoom_normale").assertDoesNotExist()
+        // "Torna normale": dopo le dita torna com'era
+        regola.runOnUiThread { vm.cambiaZoomAnteprima(ZoomAnteprima.TORNA) }
+        regola.onNodeWithText("🔍 Tocca").performTouchInput { pinch(center - Offset(20f, 0f), center - Offset(200f, 0f), center + Offset(20f, 0f), center + Offset(200f, 0f)) }
+        regola.waitForIdle()
+        regola.onNodeWithTag("zoom_normale").assertDoesNotExist()
+        // "Spento": niente zoom (e il tocco apre comunque la foto grande)
+        regola.runOnUiThread { vm.cambiaZoomAnteprima(ZoomAnteprima.SPENTO) }
+        regola.onNodeWithText("🔍 Tocca").performTouchInput { pinch(center - Offset(20f, 0f), center - Offset(200f, 0f), center + Offset(20f, 0f), center + Offset(200f, 0f)) }
+        regola.waitForIdle()
+        regola.onNodeWithTag("zoom_normale").assertDoesNotExist()
+        // Resta salvato
+        assertEquals(ZoomAnteprima.SPENTO, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.zoomAnteprima)
+    }
 }

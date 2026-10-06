@@ -167,6 +167,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         get() = preferenze.getBoolean("permesso_avvisi_chiesto", false)
         set(v) { preferenze.edit().putBoolean("permesso_avvisi_chiesto", v).apply() }
 
+    /** Zoom con due dita nell'anteprima della lista: resta ingrandita (di partenza), torna normale, o spento. */
+    var zoomAnteprima by mutableStateOf(ZoomAnteprima.entries.getOrElse(preferenze.getInt("zoom_anteprima", 0)) { ZoomAnteprima.RESTA })
+        private set
+    fun cambiaZoomAnteprima(v: ZoomAnteprima) { zoomAnteprima = v; preferenze.edit().putInt("zoom_anteprima", v.ordinal).apply() }
+
     fun cambiaDueAllaVolta(v: Boolean) { dueAllaVolta = v; preferenze.edit().putBoolean("due_alla_volta", v).apply() }
 
     fun cambiaScalaTesto(v: Float) { scalaTesto = v; preferenze.edit().putFloat("scala_testo", v).apply() }

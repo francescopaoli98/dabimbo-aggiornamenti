@@ -13,6 +13,15 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.runtime.*
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -112,54 +121,70 @@ fun DrawScope.disegnaZoom(img: ImageBitmap, vera: IntSize, s: Float, p: Offset, 
     )
 }
 
+/** Come si comporta lo zoom con due dita nell'anteprima della lista (scelta nelle impostazioni). */
+enum class ZoomAnteprima { RESTA, TORNA, SPENTO }
+
 /**
- * Anteprima nella lista: con due dita si ingrandisce (finché le dita sono giù), poi torna com'era.
- * Mentre si ingrandisce, il pezzo inquadrato arriva nitido dalla foto originale.
- * Un dito solo resta alla lista (scorre normalmente); il tocco apre la foto grande.
+ * Anteprima nella lista: con due dita si ingrandisce e si sposta.
+ * - RESTA: togliendo le dita resta ingrandita; il pulsantino ↺ la rimette normale;
+ * - TORNA: togliendo le dita torna com'era;
+ * - SPENTO: niente zoom (la lista scorre e basta).
+ * Il pezzo inquadrato arriva nitido dalla foto originale. Un dito solo resta sempre alla lista
+ * (scorre normalmente); il tocco apre la foto grande.
  */
 @Composable
-fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier = Modifier) {
-    var attivo by remember { mutableStateOf(false) }
+fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier = Modifier, modo: ZoomAnteprima = ZoomAnteprima.RESTA) {
+    var dita by remember { mutableStateOf(false) }          // le due dita sono appoggiate adesso
     var scala by remember { mutableFloatStateOf(1f) }
     var spostamento by remember { mutableStateOf(Offset.Zero) }
     var riquadro by remember { mutableStateOf(IntSize.Zero) }
     val nitidezza = ricordaNitidezza(file)
     val misure = misureVere(file)
     val scope = rememberCoroutineScope()
+    val ingrandita = scala > 1.01f
 
-    // Mentre pizzica segue le dita; quando lascia torna dolcemente a posto
-    val s by animateFloatAsState(if (attivo) scala else 1f, if (attivo) snap() else spring(), label = "zoom")
-    val p by animateOffsetAsState(if (attivo) spostamento else Offset.Zero, if (attivo) snap() else spring(), label = "sposta")
+    // Segue le dita subito; quando si torna normali, ci torna dolcemente
+    val s by animateFloatAsState(scala, if (dita) snap() else spring(), label = "zoom")
+    val p by animateOffsetAsState(spostamento, if (dita) snap() else spring(), label = "sposta")
 
-    LaunchedEffect(attivo, scala, spostamento, riquadro) {
-        if (!attivo) nitidezza.pezzo = null else nitidezza.aggiorna(scala, spostamento, riquadro)
+    LaunchedEffect(scala, spostamento, riquadro) {
+        if (!ingrandita) nitidezza.pezzo = null else nitidezza.aggiorna(scala, spostamento, riquadro)
     }
 
-    Canvas(
-        modifier
-            .clipToBounds()
-            .pointerInput(Unit) {
-                riquadro = size
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    do {
-                        val evento = awaitPointerEvent()
-                        if (evento.changes.count { it.pressed } >= 2) {
-                            // Due dita: apro la foto originale (una volta sola; scorrendo la lista con un dito no)
-                            if (!attivo) scope.launch { nitidezza.prepara() }
-                            attivo = true
-                            scala = (scala * evento.calculateZoom()).coerceIn(1f, 8f)
-                            spostamento += evento.calculatePan()
-                            evento.changes.forEach { it.consume() }   // la lista non scorre e il tocco non apre la foto
-                        }
-                    } while (evento.changes.any { it.pressed })
-                    attivo = false; scala = 1f; spostamento = Offset.Zero
-                }
-            }
-    ) {
-        val vera = misure ?: IntSize(miniatura.width, miniatura.height)
-        disegnaZoom(miniatura, vera, s, p)
-        if (attivo) nitidezza.pezzo?.let { disegnaZoom(it.immagine, vera, s, p, it.zona) }
+    Box(modifier) {
+        Canvas(
+            Modifier.fillMaxSize()
+                .clipToBounds()
+                .then(if (modo == ZoomAnteprima.SPENTO) Modifier else Modifier.pointerInput(modo) {
+                    riquadro = size
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val evento = awaitPointerEvent()
+                            if (evento.changes.count { it.pressed } >= 2) {
+                                // Due dita: apro la foto originale (una volta sola; scorrendo la lista con un dito no)
+                                if (!dita && !ingrandita) scope.launch { nitidezza.prepara() }
+                                dita = true
+                                scala = (scala * evento.calculateZoom()).coerceIn(1f, 8f)
+                                spostamento = if (scala <= 1.01f) Offset.Zero else spostamento + evento.calculatePan()
+                                evento.changes.forEach { it.consume() }   // la lista non scorre e il tocco non apre la foto
+                            }
+                        } while (evento.changes.any { it.pressed })
+                        dita = false
+                        if (modo == ZoomAnteprima.TORNA) { scala = 1f; spostamento = Offset.Zero }
+                    }
+                })
+        ) {
+            val vera = misure ?: IntSize(miniatura.width, miniatura.height)
+            disegnaZoom(miniatura, vera, s, p)
+            if (scala > 1.01f) nitidezza.pezzo?.let { disegnaZoom(it.immagine, vera, s, p, it.zona) }
+        }
+        // ↺: torna normale (solo se resta ingrandita)
+        if (ingrandita && !dita) Surface(
+            onClick = { scala = 1f; spostamento = Offset.Zero },
+            shape = CircleShape, color = Superficie.copy(alpha = 0.92f), shadowElevation = 2.dp,
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(38.dp).testTag("zoom_normale"),
+        ) { Box(contentAlignment = Alignment.Center) { Text("↺", fontSize = 18.sp, color = BluNotte, fontWeight = FontWeight.Bold) } }
     }
 }
 

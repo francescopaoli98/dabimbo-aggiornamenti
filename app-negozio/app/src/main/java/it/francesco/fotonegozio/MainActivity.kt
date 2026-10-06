@@ -359,6 +359,7 @@ private fun Schermata(vm: FotoViewModel) {
                     pubblica = { chiediEPubblica(f) },
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                     giaPubblicati = vm.giaPubblicati(f),
+                    zoomAnteprima = vm.zoomAnteprima,
                     togli = { daTogliere = f.numero },
                     comprimi = if (comprimibile) ({ riaperte -= f.numero }) else null,
                 )
@@ -711,10 +712,15 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 }
                 Sezione(
                     "📋", "Lista delle foto",
-                    listOfNotNull("chiudi pubblicate".takeIf { vm.comprimiPubblicate }, "2 alla volta".takeIf { vm.dueAllaVolta }, "torna su".takeIf { vm.tornaSu })
+                    listOfNotNull(
+                        when (vm.zoomAnteprima) { ZoomAnteprima.RESTA -> "zoom resta"; ZoomAnteprima.TORNA -> "zoom torna"; ZoomAnteprima.SPENTO -> "zoom spento" },
+                        "chiudi pubblicate".takeIf { vm.comprimiPubblicate }, "2 alla volta".takeIf { vm.dueAllaVolta }, "torna su".takeIf { vm.tornaSu })
                         .joinToString(" · ").ifEmpty { "tutto spento" }.replaceFirstChar { it.uppercase() },
                     aperta == "lista", { apri("lista") },
                 ) {
+                    Text("Zoom con due dita nell'anteprima", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(bottom = 6.dp))
+                    Scelte(listOf("Resta", "Torna normale", "Spento"), vm.zoomAnteprima.ordinal) { vm.cambiaZoomAnteprima(ZoomAnteprima.entries[it]) }
+                    Spacer(Modifier.height(8.dp))
                     Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola; toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
                     Interruttore("2 foto alla volta", "Più veloce. Se il telefono rallenta, spegnilo.", vm.dueAllaVolta, vm::cambiaDueAllaVolta)
                     Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ per tornare in cima.", vm.tornaSu, vm::cambiaTornaSu)
@@ -836,6 +842,7 @@ private fun Scheda(
     pubblica: () -> Unit,
     salvaDiagnosi: () -> Unit,
     giaPubblicati: List<String> = emptyList(),
+    zoomAnteprima: ZoomAnteprima = ZoomAnteprima.RESTA,
     togli: () -> Unit,
     comprimi: (() -> Unit)? = null,
 ) {
@@ -895,7 +902,7 @@ private fun Scheda(
                 Crossfade(targetState = f.miniatura, label = "foto") { mini ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         when {
-                            mini != null -> AnteprimaZoomabile(mini, f.file, Modifier.fillMaxSize())
+                            mini != null -> AnteprimaZoomabile(mini, f.file, Modifier.fillMaxSize(), zoomAnteprima)
                             f.inCorso -> Luccichio()
                         }
                     }
