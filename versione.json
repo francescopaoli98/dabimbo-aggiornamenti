@@ -1,6 +1,6 @@
 {
-  "versionCode": 68,
-  "versionName": "4.3",
+  "versionCode": 69,
+  "versionName": "4.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Impostazioni più snelle: una riga per gruppo, si apre solo quella che tocchi."
+  "note": "Lista delle foto più snella: si vede di più in uno schermo."
 }
