@@ -243,7 +243,6 @@ private fun Schermata(vm: FotoViewModel) {
                 Image(
                     painterResource(R.drawable.logo), "Da bimbo a bimbo",
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                        .then(if (TemaApp.scuro) Modifier.background(Color(0xFFF4FAFE), RoundedCornerShape(28.dp)).padding(10.dp) else Modifier)
                         .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
                     contentScale = ContentScale.FillWidth,
                 )
