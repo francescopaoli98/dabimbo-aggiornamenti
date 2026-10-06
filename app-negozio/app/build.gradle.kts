@@ -12,8 +12,8 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 50
-        versionName = "2.5"
+        versionCode = 51
+        versionName = "2.6"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk { abiFilters += "arm64-v8a" }
@@ -30,10 +30,12 @@ android {
     }
 
     buildTypes {
-        // Versione da installare: compattata e ottimizzata (R8), molto più fluida della versione di prova
+        // Versione da installare: senza strumenti di prova (più fluida).
+        // NIENTE compattazione R8: dalla 2.2 alla 2.5 rovinava la lettura dei cartellini (ML Kit),
+        // e senza lettura l'app non sa più come girare le foto.
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("negozio")
         }
