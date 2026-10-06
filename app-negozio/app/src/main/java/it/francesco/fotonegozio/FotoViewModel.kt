@@ -199,6 +199,15 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private var ultimoControllo = 0L
+    /** Controllo "di passaggio" quando si torna nell'app: non più di una volta ogni 10 minuti. */
+    fun controllaAggiornamentiOgniTanto() {
+        val adesso = System.currentTimeMillis()
+        if (adesso - ultimoControllo < 10 * 60_000) return
+        ultimoControllo = adesso
+        controllaAggiornamenti()
+    }
+
     /** Scarica la versione nuova e apre "Installa" (la prima volta Android chiede il permesso). */
     fun aggiorna() {
         val n = novita ?: return
@@ -628,7 +637,6 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         if (foto.any { it.inCorso }) elaboraInCoda()
-        controllaAggiornamenti()
         // Ogni cambiamento della lista si salva (poco dopo, per non scrivere a ogni tocco)
         viewModelScope.launch {
             snapshotFlow { foto.toList() }.collectLatest { lista ->

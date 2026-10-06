@@ -135,7 +135,13 @@ class MainActivity : ComponentActivity() {
 
     private var ultimoIndietro = 0L
 
-    override fun onStart() { super.onStart(); AppVisibile.visibile = true; Avvisi.togliPronte(this) }
+    override fun onStart() {
+        super.onStart()
+        AppVisibile.visibile = true
+        Avvisi.togliPronte(this)
+        // Ogni volta che si torna nell'app (al massimo ogni 10 minuti) guardo se c'è una versione nuova
+        viewModel.controllaAggiornamentiOgniTanto()
+    }
     override fun onStop() { AppVisibile.visibile = false; super.onStop() }
 
     // App già aperta e Elisa condivide altre foto dalla Galleria
