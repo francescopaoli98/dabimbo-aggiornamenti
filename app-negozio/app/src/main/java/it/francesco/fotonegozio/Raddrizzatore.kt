@@ -61,7 +61,42 @@ class Raddrizzatore(private val context: Context) {
         val angoli: List<PointF>? = null,   // i 4 angoli della riga del codice in "base", se conosciuti
     )
 
+    /**
+     * Raddrizza la foto: l'etichetta serve a LEGGERE (codice, descrizione, prezzo);
+     * il verso finale lo decide l'OGGETTO quando ha delle scritte chiare (scatole, copertine…),
+     * altrimenti resta quello trovato dall'etichetta.
+     */
     suspend fun raddrizza(uri: Uri): FotoRaddrizzata {
+        val r = raddrizzaDalCartellino(uri)
+        val parole = VersoOggetto.paroleDi(listOf(r.dati?.descrizione) + r.altri.map { it.descrizione })
+        val extra = try { versoOggetto(r.immagine, parole) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { 0 }
+        if (extra == 0) return r
+        return FotoRaddrizzata(
+            ruota(r.immagine, extra), (r.rotazioneApplicata + extra) % 360, r.codiceLetto,
+            r.metodo + " · verso dalle scritte dell'oggetto (+$extra°)", r.dati, r.altri,
+            versoSicuro = true, etichetteViste = r.etichetteViste,
+        )
+    }
+
+    /**
+     * Prova i 4 versi su una copia piccola della foto e conta le scritte dell'oggetto che si leggono dritte.
+     * Restituisce di quanto girare ancora (0 = va bene così, o nessuna scritta chiara).
+     */
+    private suspend fun versoOggetto(foto: Bitmap, paroleCartellino: Set<String>): Int {
+        val k = min(1f, 1400f / max(foto.width, foto.height))
+        val piccola = if (k < 1f) Bitmap.createScaledBitmap(foto, (foto.width * k).toInt(), (foto.height * k).toInt(), true) else foto
+        val voti = mutableMapOf<Int, Float>()
+        for (g in listOf(0, 90, 180, 270)) {
+            val testo = leggi(ruota(piccola, g), "verso oggetto: girata di $g°")
+            voti[g] = testo.textBlocks.flatMap { it.lines }
+                .filter { abs(it.angle) < 20f }   // solo le righe dritte in questo verso
+                .sumOf { VersoOggetto.peso(it.text, it.confidence, paroleCartellino).toDouble() }.toFloat()
+        }
+        diario?.nota("verso oggetto", voti.entries.joinToString { "${it.key}°=${"%.0f".format(it.value)}" })
+        return VersoOggetto.scegli(voti) ?: 0
+    }
+
+    private suspend fun raddrizzaDalCartellino(uri: Uri): FotoRaddrizzata {
         val foto = caricaConExif(uri)
         val zona = trovaCartellino(foto)
             ?: return FotoRaddrizzata(foto, 0, null, "non trovato")
