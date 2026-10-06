@@ -44,6 +44,13 @@ class ScattiTest {
             regola.waitForIdle()
         }
         regola.runOnUiThread { vm.cambiaTema(0) }
+        // I 5 temi di colore, chiari e scuri
+        for (i in NOMI_TAVOLOZZE.indices) for ((modo, nome) in listOf(0 to "chiaro", 1 to "scuro")) {
+            regola.runOnUiThread { vm.cambiaTavolozza(i); vm.cambiaTema(modo) }
+            regola.waitForIdle()
+            salva(regola.activity.window.decorView, "$cartella/tema_${i}_$nome.png")
+        }
+        regola.runOnUiThread { vm.cambiaTavolozza(0); vm.cambiaTema(0) }
         // Riepilogo: un giorno aperto
         regola.runOnUiThread { vm.segnaPubblicata(1) }
         regola.onNodeWithText("Oggi:", substring = true).performClick()

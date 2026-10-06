@@ -141,6 +141,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         private set
     fun cambiaTema(v: Int) { tema = v; TemaApp.modo = v; preferenze.edit().putInt("tema", v).apply() }
 
+    /** Colori: 0 Da bimbo a bimbo, 1 Salvia, 2 Lavanda, 3 Sabbia e mare, 4 Nuvola. */
+    var tavolozza by mutableStateOf(preferenze.getInt("tavolozza", 0))
+        private set
+    fun cambiaTavolozza(v: Int) { tavolozza = v; TemaApp.tavolozza = v; preferenze.edit().putInt("tavolozza", v).apply() }
+
     /** Elabora 2 foto alla volta (più veloce; spegnere se il telefono rallenta). */
     var dueAllaVolta by mutableStateOf(preferenze.getBoolean("due_alla_volta", true))
         private set

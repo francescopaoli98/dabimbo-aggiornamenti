@@ -59,6 +59,7 @@ class AppTest {
         java.io.File(app.filesDir, "lista.json").delete()
         app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         TemaApp.modo = 0
+        TemaApp.tavolozza = 0
         java.io.File(app.filesDir, "pubblicazioni.json").delete()
         // Il FileProvider si ricorda le cartelle del primo test (cache statica): la svuoto
         runCatching {
@@ -591,5 +592,21 @@ class AppTest {
         regola.waitUntil(8_000) { vm.foto[0].pubblicata || vm.messaggio != null }
         assertEquals(90, vm.foto[0].rotazioneFile)
         assertTrue(vm.pronta(1))
+    }
+
+    @Test
+    fun coloriDalleImpostazioni() {
+        val prima = Azzurro
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("🌿 Salvia").performClick()
+        regola.waitForIdle()
+        assertEquals(1, vm.tavolozza)
+        assertEquals(1, TemaApp.tavolozza)
+        assertNotEquals(prima, Azzurro)
+        // Resta salvato
+        assertEquals(1, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.tavolozza)
+        regola.onNodeWithText("🧸 Da bimbo a bimbo").performClick()
+        regola.waitForIdle()
+        assertEquals(prima, Azzurro)
     }
 }

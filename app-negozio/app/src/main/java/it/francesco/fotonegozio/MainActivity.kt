@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) viewModel.carica(fotoDaIntent(intent))
         // Chiaro / scuro: dalle impostazioni, o come il telefono
         TemaApp.modo = viewModel.tema
+        TemaApp.tavolozza = viewModel.tavolozza
         TemaApp.telefonoScuro = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         setContent {
             // Icone di sistema (ora, batteria) chiare sul tema scuro e scure su quello chiaro
@@ -651,6 +652,16 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(0 to "☀ Chiaro", 1 to "🌙 Scuro", 2 to "📱 Come il telefono").forEach { (v, nome) ->
                             FilterChip(selected = vm.tema == v, onClick = { vm.cambiaTema(v) }, label = { Text(nome, maxLines = 1) })
+                        }
+                    }
+                    Text("Colori", fontWeight = FontWeight.Bold, color = BluNotte, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NOMI_TAVOLOZZE.forEachIndexed { i, nome ->
+                            FilterChip(
+                                selected = vm.tavolozza == i, onClick = { vm.cambiaTavolozza(i) },
+                                label = { Text(nome, maxLines = 1) },
+                                leadingIcon = { Box(Modifier.size(14.dp).background(coloreDelTema(i), CircleShape)) },
+                            )
                         }
                     }
                 }
