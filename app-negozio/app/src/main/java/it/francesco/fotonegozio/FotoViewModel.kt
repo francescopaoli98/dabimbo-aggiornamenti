@@ -363,6 +363,13 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var registro by mutableStateOf(Riepilogo.leggi(fileRegistro.takeIf { it.exists() }?.readText().orEmpty()))
         private set
     val giornate: List<Giornata> get() = Riepilogo.giornate(registro)
+
+    /** Codici di questa foto già pubblicati in passato (per non pubblicarli due volte). Vuoto se la foto è già pubblicata ora. */
+    fun giaPubblicati(f: Foto): List<String> {
+        if (f.pubblicata) return emptyList()
+        val noti = registro.mapTo(HashSet()) { it.chiave }
+        return f.articoli.mapNotNull { it.codice }.filter { it in noti }.distinct()
+    }
     val oggiPubblicati: Giornata? get() = giornate.firstOrNull { it.giorno == oggi() }
     private fun oggi() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date())
 

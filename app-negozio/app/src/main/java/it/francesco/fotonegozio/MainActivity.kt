@@ -210,7 +210,7 @@ private fun Schermata(vm: FotoViewModel) {
         else vm.messaggio = "WhatsApp non trovato sul telefono"
     }
     fun chiediEPubblica(f: Foto) {
-        if (f.avvisi.isEmpty()) pubblica(f) else daConfermare = f.numero
+        if (f.avvisi.isEmpty() && vm.giaPubblicati(f).isEmpty()) pubblica(f) else daConfermare = f.numero
     }
     fun scegliFoto() = scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
@@ -329,6 +329,7 @@ private fun Schermata(vm: FotoViewModel) {
                     modificaTesto = { testoInModifica = f.numero },
                     pubblica = { chiediEPubblica(f) },
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
+                    giaPubblicati = vm.giaPubblicati(f),
                     togli = { daTogliere = f.numero },
                     comprimi = if (comprimibile) ({ riaperte -= f.numero }) else null,
                 )
@@ -399,7 +400,10 @@ private fun Schermata(vm: FotoViewModel) {
             AlertDialog(
                 onDismissRequest = { daConfermare = null },
                 title = { Text("Foto ${f.numero}: da controllare") },
-                text = { Text(f.avvisi.joinToString("\n") { "• $it" } + "\n\nVuoi sistemarla prima, o pubblicarla così?") },
+                text = {
+                    val gia = vm.giaPubblicati(f).map { "già pubblicato: cod. $it" }
+                    Text((gia + f.avvisi).joinToString("\n") { "• $it" } + "\n\nVuoi sistemarla prima, o pubblicarla così?")
+                },
                 confirmButton = { TextButton(onClick = { daConfermare = null; pubblica(f) }) { Text("Pubblica lo stesso") } },
                 dismissButton = { TextButton(onClick = { daConfermare = null }) { Text("La sistemo") } },
             )
@@ -664,6 +668,7 @@ private fun Scheda(
     modificaTesto: () -> Unit,
     pubblica: () -> Unit,
     salvaDiagnosi: () -> Unit,
+    giaPubblicati: List<String> = emptyList(),
     togli: () -> Unit,
     comprimi: (() -> Unit)? = null,
 ) {
@@ -747,6 +752,8 @@ private fun Scheda(
                         f.daControllare && !f.pubblicata -> "⚠ Controlla che la foto sia dritta (tocca la foto)"
                         else -> null
                     }
+                    // Prima di tutto: è già stato pubblicato in passato?
+                    if (giaPubblicati.isNotEmpty()) Avviso("⚠ Già pubblicato: cod. " + giaPubblicati.joinToString(", "))
                     avviso?.let { Avviso(it) }
 
                     // Il testo per lo stato (toccalo per correggerlo)

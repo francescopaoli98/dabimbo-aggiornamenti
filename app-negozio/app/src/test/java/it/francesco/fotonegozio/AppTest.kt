@@ -60,6 +60,11 @@ class AppTest {
         app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         TemaApp.modo = 0
         java.io.File(app.filesDir, "pubblicazioni.json").delete()
+        // Il FileProvider si ricorda le cartelle del primo test (cache statica): la svuoto
+        runCatching {
+            val cache = androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
+            (cache.get(null) as MutableMap<*, *>).clear()
+        }
     }
 
     private fun metti(vararg f: Foto) {
@@ -510,5 +515,22 @@ class AppTest {
         regola.onNodeWithText("2 · € 5,50").assertExists()
         // Resta anche riaprendo l'app
         assertEquals(2, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.oggiPubblicati?.articoli)
+    }
+
+    @Test
+    fun avvisoGiaPubblicato() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        // Il giorno dopo (o in un'altra lista) rifotografa lo stesso articolo
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
+        regola.onNodeWithText("⚠ Già pubblicato: cod. 1234567").assertExists()
+        regola.onAllNodesWithText("Già pubblicato", substring = true).assertCountEquals(1)   // la foto 2 no
+        // Pubblicando chiede prima
+        regola.onAllNodesWithText("Pubblica").onFirst().performClick()
+        regola.onNodeWithText("già pubblicato: cod. 1234567", substring = true).assertExists()
+        regola.onNodeWithText("Pubblica lo stesso").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.foto[0].pubblicata)
+        regola.onNodeWithText("⚠ Già pubblicato: cod. 1234567").assertDoesNotExist()
     }
 }
