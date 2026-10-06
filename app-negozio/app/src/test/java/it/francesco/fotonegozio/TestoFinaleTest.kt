@@ -136,4 +136,32 @@ class TestoFinaleTest {
         assertEquals("Felpa senza cappuccio", TestoFinale.espandi("FELPA SENZA CAPP", null, voci))
         assertEquals("Felpa con cappuccio", TestoFinale.espandi("FELPA CAPP", null, voci))
     }
+
+    /** La taglia deve comparire UNA volta sola, nel suo pezzo di testo, comunque sia scritta nella descrizione. */
+    @Test
+    fun taglia_mai_ripetuta() {
+        fun r(desc: String, taglia: String?) = TestoFinale.riga(DatiCartellino(null, desc, null, taglia), emptyList())
+        assertEquals("Felpa - 8 anni", r("FELPA 8A", "8A"))
+        assertEquals("Felpa - 8 anni", r("FELPA 8 A", "8A"))
+        assertEquals("Felpa - 8 anni", r("FELPA 8 ANNI", "8A"))
+        assertEquals("Felpa - 8 anni", r("FELPA 8ANNI", "8A"))
+        assertEquals("Felpa - 7/8 anni", r("FELPA 7/8A", "7/8A"))
+        assertEquals("Felpa - 7/8 anni", r("FELPA 7-8A", "7-8A"))
+        assertEquals("Felpa - 7/8 anni", r("FELPA 7-8 ANNI", "7/8A"))
+        assertEquals("Body - 18 mesi", r("BODY 18M", "18M"))
+        assertEquals("Body - 18 mesi", r("BODY 18 MESI", "18M"))
+        assertEquals("Maglia - 10 anni", r("MAGLIA TG 10A", "10A"))
+        assertEquals("Maglia - 10 anni", r("MAGLIA TG.10A", "10A"))
+        assertEquals("Scarpe - numero 34", r("SCARPE NR 34", "NR 34"))
+        assertEquals("Scarpe - numero 34", r("SCARPE NR34", "NR 34"))
+        assertEquals("Scarpe - numero 34", r("SCARPE N.34", "NR 34"))
+        assertEquals("Scarpe - numero 31", r("SCARPE 31", "31"))
+        assertEquals("Tuta - taglia S", r("TUTA S", "S"))
+        assertEquals("Tuta - taglia XL", r("TUTA XL", "XL"))
+        // Taglia non letta a parte ma scritta nella descrizione: si sposta nel suo posto, non si perde
+        assertEquals("Felpa - 8 anni", r("FELPA 8A", null))
+        assertEquals("Body - 18 mesi", r("BODY 18 MESI", null))
+        // Numeri che NON sono taglie restano (es. un gioco "1 a 10", "Frozen II")
+        assertEquals("Gioco numeri da 1 a 10", r("GIOCO NUMERI DA 1 A 10", null))
+    }
 }

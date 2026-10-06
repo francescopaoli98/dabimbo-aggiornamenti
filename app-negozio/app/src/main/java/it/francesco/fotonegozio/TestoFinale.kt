@@ -27,7 +27,8 @@ object TestoFinale {
 
     /** Una riga di testo per un articolo. */
     fun riga(d: DatiCartellino, voci: List<VoceDizionario>, prezzoGrassetto: Boolean = false): String {
-        val taglia = d.taglia
+        // Taglia non letta a parte ma scritta nella descrizione: la sposto al suo posto (non si perde)
+        val taglia = d.taglia ?: d.descrizione?.let(::tagliaNellaDescrizione)
         val descrizione = d.descrizione?.let { espandi(it, taglia, voci) }
         val parti = listOfNotNull(
             descrizione?.ifBlank { null },
@@ -65,22 +66,15 @@ object TestoFinale {
     /** Espande le sigle, accorda i colori, toglie taglie ripetute e marchi esclusi. */
     fun espandi(descrizione: String, taglia: String?, voci: List<VoceDizionario>): String {
         val perSigla = voci.associateBy { it.sigla.lowercase() }
-        val tagliaPulita = taglia?.lowercase()?.replace(" ", "")
         val parole = descrizione.split(Regex("\\s+")).filter { it.isNotBlank() }.toMutableList()
 
-        // 1. Via le scritte da taglia (la taglia va nel suo pezzo di testo) e i "NR 34" ripetuti
+        // 1. Via le scritte da taglia (la taglia va nel suo pezzo di testo: una volta sola)
+        val tagliaNorm = taglia?.let(::normTaglia)?.ifEmpty { null }
         val tenute = mutableListOf<String>()
         var i = 0
         while (i < parole.size) {
-            val p = parole[i]
-            val pl = p.lowercase()
-            val prossima = parole.getOrNull(i + 1)
-            when {
-                TAGLIA_IN_DESCRIZIONE.matches(p) -> i++
-                pl == "nr" && prossima?.all(Char::isDigit) == true -> i += 2
-                tagliaPulita != null && pl == tagliaPulita -> i++                   // es. scarpe "31 31"
-                else -> { tenute += p; i++ }
-            }
+            val trovata = tagliaQui(parole, i, tagliaNorm)
+            if (trovata != null) i += trovata.first else { tenute += parole[i]; i++ }
         }
 
         // 2. Genere e numero del capo (prima parola, espansa se è una sigla)
@@ -128,9 +122,51 @@ object TestoFinale {
         else -> Forma.MS
     }
 
+    /**
+     * Forma "pulita" di una taglia, per confrontarla: "8 ANNI" → "8a", "7-8A" → "7/8a", "TG.10A" → "10a",
+     * "NR 34" / "N.34" → "n34", "18 MESI" → "18m", "XL" → "xl".
+     */
+    private fun normTaglia(t: String): String = t.lowercase()
+        .replace(" ", "").replace(".", "").replace("-", "/")
+        .removePrefix("tg").removePrefix("taglia")
+        .replace("anni", "a").replace("mesi", "m").replace("nr", "n")
+
+    private val ANNI_MESI = Regex("^\\d{1,2}(/\\d{1,2})?[am]$")
+    private val NUMERO = Regex("^n\\d{1,2}$")
+
+    /**
+     * C'è una taglia che inizia dalla parola [i]? Restituisce quante parole occupa e la sua forma pulita.
+     * Sicure: "8A", "8 ANNI", "7-8A", "18 MESI", "TG 10A", "NR 34", "NR34", "N.34" e la taglia del cartellino.
+     * Dubbie (restano): "8 A" con la A staccata, se non è la taglia del cartellino ("Numeri da 1 a 10").
+     */
+    private fun tagliaQui(parole: List<String>, i: Int, tagliaNorm: String?): Pair<Int, String>? {
+        for (k in 3 downTo 1) {
+            if (i + k > parole.size) continue
+            val pezzo = parole.subList(i, i + k)
+            val n = normTaglia(pezzo.joinToString(""))
+            if (n.isEmpty() || !n.any(Char::isLetterOrDigit)) continue
+            if (tagliaNorm != null && n == tagliaNorm) return k to n
+            val unitaStaccata = k >= 2 && pezzo.last().lowercase().trimEnd('.') in setOf("a", "m")
+            if (ANNI_MESI.matches(n) && !unitaStaccata) return k to n
+            val primo = pezzo[0].lowercase().trimEnd('.')
+            if (NUMERO.matches(n) && (k == 1 && Regex("^nr?\\.?\\d").containsMatchIn(pezzo[0].lowercase()) || k == 2 && primo in setOf("n", "nr"))) return k to n
+        }
+        return null
+    }
+
+    /** La prima taglia "sicura" scritta nella descrizione (es. "FELPA 8A ROSA" → "8A"), o null. */
+    fun tagliaNellaDescrizione(descrizione: String): String? {
+        val parole = descrizione.split(Regex("\\s+")).filter { it.isNotBlank() }
+        for (i in parole.indices) {
+            val (_, n) = tagliaQui(parole, i, null) ?: continue
+            return if (n.startsWith("n")) "NR " + n.drop(1) else n.uppercase()
+        }
+        return null
+    }
+
     /** "8A" → "8 anni", "7/8A" → "7/8 anni", "18M" → "18 mesi", "NR 34" → "numero 34", "31" (scarpe) → "numero 31". */
     fun tagliaPerEsteso(taglia: String?, descrizione: String?): String? {
-        val t = taglia?.trim()?.uppercase() ?: return null
+        val t = taglia?.trim()?.uppercase()?.replace("-", "/") ?: return null
         Regex("^(\\d{1,2}(?:/\\d{1,2})?)\\s?A(NNI)?$").find(t)?.let { return "${it.groupValues[1]} anni" }
         Regex("^(\\d{1,2}(?:/\\d{1,2})?)\\s?M(ESI)?$").find(t)?.let { return "${it.groupValues[1]} mesi" }
         Regex("^(?:NR|N\\.?|TG)\\s?(\\d{1,2})$").find(t)?.let { return "numero ${it.groupValues[1]}" }
