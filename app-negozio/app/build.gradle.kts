@@ -16,7 +16,11 @@ android {
         versionName = "2.6"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
-        ndk { abiFilters += "arm64-v8a" }
+        ndk {
+            abiFilters += "arm64-v8a"
+            // Versione per provare sul PC (emulatore di Android Studio): ./gradlew assembleRelease -Ppc
+            if (project.hasProperty("pc")) abiFilters += "x86_64"
+        }
     }
 
     // Firma: la stessa chiave usata finora, così l'app si aggiorna sopra quella già installata
