@@ -35,6 +35,7 @@ class FotoRaddrizzata(
     val altri: List<DatiCartellino> = emptyList(), // altri cartellini nella stessa foto (es. 9 librottini)
     val versoSicuro: Boolean = false,  // true = il verso è stato deciso leggendo il cartellino dritto
     val etichetteViste: Int = 0,       // cartellini che si vedono nella foto (contati dai prezzi)
+    val versoDaOggetto: Boolean = false, // il verso l'hanno deciso le scritte dell'oggetto: non va più girata
 )
 
 /**
@@ -69,20 +70,24 @@ class Raddrizzatore(private val context: Context) {
     suspend fun raddrizza(uri: Uri): FotoRaddrizzata {
         val r = raddrizzaDalCartellino(uri)
         val parole = VersoOggetto.paroleDi(listOf(r.dati?.descrizione) + r.altri.map { it.descrizione })
-        val extra = try { versoOggetto(r.immagine, parole) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { 0 }
-        if (extra == 0) return r
+        val extra = try { versoOggetto(r.immagine, parole) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { null }
+            ?: return r   // nessuna scritta chiara sull'oggetto: decide l'etichetta
+        if (extra == 0) return FotoRaddrizzata(
+            r.immagine, r.rotazioneApplicata, r.codiceLetto, r.metodo + " · verso confermato dalle scritte dell'oggetto",
+            r.dati, r.altri, versoSicuro = true, etichetteViste = r.etichetteViste, versoDaOggetto = true,
+        )
         return FotoRaddrizzata(
             ruota(r.immagine, extra), (r.rotazioneApplicata + extra) % 360, r.codiceLetto,
             r.metodo + " · verso dalle scritte dell'oggetto (+$extra°)", r.dati, r.altri,
-            versoSicuro = true, etichetteViste = r.etichetteViste,
+            versoSicuro = true, etichetteViste = r.etichetteViste, versoDaOggetto = true,
         )
     }
 
     /**
      * Prova i 4 versi su una copia piccola della foto e conta le scritte dell'oggetto che si leggono dritte.
-     * Restituisce di quanto girare ancora (0 = va bene così, o nessuna scritta chiara).
+     * Restituisce di quanto girare ancora (0 = va già bene), o null se l'oggetto non ha scritte chiare.
      */
-    private suspend fun versoOggetto(foto: Bitmap, paroleCartellino: Set<String>): Int {
+    private suspend fun versoOggetto(foto: Bitmap, paroleCartellino: Set<String>): Int? {
         val k = min(1f, 1400f / max(foto.width, foto.height))
         val piccola = if (k < 1f) Bitmap.createScaledBitmap(foto, (foto.width * k).toInt(), (foto.height * k).toInt(), true) else foto
         val voti = mutableMapOf<Int, Float>()
@@ -93,7 +98,7 @@ class Raddrizzatore(private val context: Context) {
                 .sumOf { VersoOggetto.peso(it.text, it.confidence, paroleCartellino).toDouble() }.toFloat()
         }
         diario?.nota("verso oggetto", voti.entries.joinToString { "${it.key}°=${"%.0f".format(it.value)}" })
-        return VersoOggetto.scegli(voti) ?: 0
+        return VersoOggetto.scegli(voti)
     }
 
     private suspend fun raddrizzaDalCartellino(uri: Uri): FotoRaddrizzata {

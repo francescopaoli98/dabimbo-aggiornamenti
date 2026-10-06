@@ -399,8 +399,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             // Giochi, libri, peluche e scarpe restano come sono stati fotografati.
             var immagine = r.immagine
             var verso = 0
-            // Tutte le foto in verticale (vestiti e oggetti), nel verso che Elisa preferisce
-            if (immagine.width > immagine.height) {
+            // Vestiti in verticale (nel verso che Elisa preferisce), ma solo se le scritte dell'oggetto
+            // non hanno già deciso il verso: un oggetto dritto "come lo vede una persona" non si gira più.
+            val unCapo = (listOfNotNull(r.dati) + r.altri).any { Abbigliamento.eUnCapo(it.descrizione) }
+            if (unCapo && !r.versoDaOggetto && immagine.width > immagine.height) {
                 verso = versoPreferito.verso
                 immagine = Raddrizzatore.ruotaImmagine(immagine, verso)
                 versoPreferito.cambiaVoto(null, verso)   // finché Elisa non la corregge, il verso era giusto
