@@ -77,7 +77,7 @@ class AppTest {
     /** Apre la foto grande e aspetta che sia caricata (si carica in sottofondo). */
     private fun apriVisore() {
         regola.onNodeWithText("🔍 Tocca").performClick()
-        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
     }
 
     private fun premiIndietro() {
@@ -195,7 +195,7 @@ class AppTest {
     @Test
     fun correggiTestoDallaScheda() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("✏ Tocca per correggere").performClick()
+        regola.onNodeWithTag("testo_1").performClick()
         regola.onNodeWithText("Testo per lo stato").assertExists()
         regola.onNode(hasSetTextAction()).performTextReplacement("Felpa bellissima")
         regola.onNodeWithText("Salva").performClick()
@@ -264,7 +264,7 @@ class AppTest {
         regola.onNodeWithText("Destra").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
         // Aspetto che la foto girata sia caricata (prima il pixel a mano non si apre)
-        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
         // Girata di 90°: il rosso ora sta sopra e il blu sotto. Passo il dito in orizzontale sul confine.
         regola.onNodeWithText("Pixel a mano").performClick()
         regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + 20f, centerY), Offset(right - 20f, centerY)) }

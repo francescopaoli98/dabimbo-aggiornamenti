@@ -246,15 +246,21 @@ private fun Schermata(vm: FotoViewModel) {
             Modifier.padding(padding).fillMaxSize(),
             state = lista,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(if (vm.foto.isEmpty()) 20.dp else 12.dp),
         ) {
-            // In alto: ✕ torna al menu principale (solo con delle foto), ⚙ impostazioni (sempre)
+            // In alto: ✕ torna al menu principale (solo con delle foto), ⚙ impostazioni (sempre).
+            // Con delle foto in lista il logo diventa piccolo e sta nella stessa riga: più spazio alle foto.
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (vm.foto.isNotEmpty()) PulsanteTondo("✕", {
                         if (vm.foto.all { it.pubblicata }) vm.svuota() else chiediMenu = true
                     })
-                    Spacer(Modifier.weight(1f))
+                    if (vm.foto.isNotEmpty()) Image(
+                        painterResource(R.drawable.logo), "Da bimbo a bimbo",
+                        Modifier.weight(1f).height(56.dp).padding(horizontal = 10.dp)
+                            .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
+                        contentScale = ContentScale.Fit,
+                    ) else Spacer(Modifier.weight(1f))
                     PulsanteTondo("⚙", { impostazioniAperte = true })
                 }
             }
@@ -262,8 +268,8 @@ private fun Schermata(vm: FotoViewModel) {
             vm.novita?.let { n ->
                 item { AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) }
             }
-            // Logo (tenuto premuto: modalità prove, solo per chi sistema l'app)
-            item {
+            // Logo grande solo all'inizio (tenuto premuto: modalità prove, solo per chi sistema l'app)
+            if (vm.foto.isEmpty()) item {
                 Image(
                     painterResource(R.drawable.logo), "Da bimbo a bimbo",
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp)
@@ -273,19 +279,20 @@ private fun Schermata(vm: FotoViewModel) {
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PulsanteGrande("Scegli foto", "📷", ::scegliFoto, Modifier.weight(1f), altezza = 60.dp, grandezzaTesto = 18)
-                    PulsanteChiaro("Sigle", "📖", { dizionarioAperto = true }, sfondo = Rosa, altezza = 60.dp)
+                    val alto = if (vm.foto.isEmpty()) 60.dp else 48.dp
+                    PulsanteGrande("Scegli foto", "📷", ::scegliFoto, Modifier.weight(1f), altezza = alto, grandezzaTesto = if (vm.foto.isEmpty()) 18 else 16)
+                    PulsanteChiaro("Sigle", "📖", { dizionarioAperto = true }, sfondo = Rosa, altezza = alto, grandezzaTesto = 15)
                 }
             }
             // Riepilogo di oggi (toccandolo: i giorni prima)
             vm.oggiPubblicati?.let { g ->
                 item {
                     Surface(onClick = { riepilogoAperto = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("📊", fontSize = 20.sp)
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("📊", fontSize = 16.sp)
                             Text(
                                 "Oggi: ${g.articoli} ${if (g.articoli == 1) "articolo" else "articoli"} · ${Riepilogo.euro(g.centesimi)}",
-                                fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp, modifier = Modifier.padding(start = 10.dp).weight(1f),
+                                fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f),
                             )
                             Text("›", color = BluNotte, fontSize = 20.sp)
                         }
@@ -487,17 +494,17 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
     val tutte = vm.foto.size
     val fatte = vm.quantePubblicate
     Surface(color = Superficie, shadowElevation = 12.dp, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 8.dp)) {
+            // Una riga sottile: "Pubblicate 3 di 10" con la barretta accanto
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Pubblicate $fatte di $tutte", fontSize = 14.sp, color = BluNotte, modifier = Modifier.weight(1f))
-                if (fatte == tutte) Text("🎉", fontSize = 18.sp)
+                Text("Pubblicate $fatte di $tutte" + if (fatte == tutte) " 🎉" else "", fontSize = 13.sp, color = BluNotte)
+                val avanzamento by animateFloatAsState(if (tutte == 0) 0f else fatte / tutte.toFloat(), label = "pubblicate")
+                LinearProgressIndicator(
+                    progress = { avanzamento },
+                    modifier = Modifier.weight(1f).padding(start = 10.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
+                    color = Verde, trackColor = Cielo,
+                )
             }
-            val avanzamento by animateFloatAsState(if (tutte == 0) 0f else fatte / tutte.toFloat(), label = "pubblicate")
-            LinearProgressIndicator(
-                progress = { avanzamento },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = Verde, trackColor = Cielo,
-            )
             PulsanteGrande(
                 when {
                     prossima != null -> "Pubblica la prossima · Foto ${prossima.numero}"
@@ -506,10 +513,10 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
                 },
                 if (prossima != null) "📤" else if (fatte == tutte) "🎉" else "⏳",
                 pubblica,
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().padding(top = 6.dp),
                 colore = if (fatte == tutte) Verde else Azzurro,
                 attivo = prossima != null,
-                altezza = 60.dp,
+                altezza = 52.dp,
             )
         }
     }
@@ -801,16 +808,17 @@ private fun Benvenuto() {
     }
 }
 
-/** "Sto sistemando le foto… 3 di 31" */
+/** "Preparo le foto… 3 di 31", con le nuvolette che si riempiono. Compatto: una riga e le nuvolette. */
 @Composable
 private fun Avanzamento(fatte: Int, tutte: Int) {
     Surface(color = Cielo, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("Sto sistemando le foto… ${fatte + 1} di $tutte", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp)
-            // Nuvolette che si riempiono di colore man mano che le foto sono pronte
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Preparo le foto… ${fatte + 1} di $tutte", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Text("puoi già pubblicare le pronte", fontSize = 11.sp, color = BluNotte)
+            }
             val avanzamento by animateFloatAsState(fatte / tutte.toFloat(), tween(800), label = "avanzamento")
-            NuvoleAvanzamento(avanzamento, Modifier.padding(top = 10.dp))
-            Text("Puoi già pubblicare quelle pronte.", fontSize = 13.sp, color = BluNotte, modifier = Modifier.padding(top = 6.dp))
+            NuvoleAvanzamento(avanzamento, Modifier.padding(top = 6.dp).padding(horizontal = 24.dp))
         }
     }
 }
@@ -844,10 +852,10 @@ private fun Scheda(
       Column {
         // Fascia colorata in cima: separa bene una foto dall'altra
         Row(
-            Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 14.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Foto ${f.numero}", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte)
+            Text("Foto ${f.numero}", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = BluNotte)
             Spacer(Modifier.weight(1f))
             AnimatedContent(
                 targetState = when {
@@ -868,19 +876,19 @@ private fun Scheda(
             }
             // ▲ per richiudere una foto già pubblicata
             if (comprimi != null) Box(
-                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = comprimi),
+                Modifier.padding(start = 6.dp).size(30.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = comprimi),
                 contentAlignment = Alignment.Center,
             ) { Text("▲", fontSize = 14.sp, color = BluNotte) }
             // ✕ per togliere la foto dalla lista (chiede conferma)
             Box(
-                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = togli),
+                Modifier.padding(start = 6.dp).size(30.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = togli),
                 contentAlignment = Alignment.Center,
             ) { Text("✕", fontSize = 16.sp, color = BluNotte, fontWeight = FontWeight.Bold) }
         }
-        Column(Modifier.padding(14.dp)) {
+        Column(Modifier.padding(10.dp)) {
             // Foto: toccala per ingrandire, girare, pixelare
             Box(
-                Modifier.fillMaxWidth().height(300.dp).clip(MaterialTheme.shapes.medium)
+                Modifier.fillMaxWidth().height(270.dp).clip(MaterialTheme.shapes.medium)
                     .background(FondoTenue).clickable(enabled = f.file != null, onClick = ingrandisci),
                 contentAlignment = Alignment.Center,
             ) {
@@ -921,11 +929,12 @@ private fun Scheda(
                             onClick = modificaTesto,
                             color = FondoTenue,
                             shape = MaterialTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("testo_${f.numero}"),
                         ) {
-                            Column(Modifier.padding(14.dp)) {
-                                Text(testo, fontSize = 17.sp, color = Testo)
-                                Text("✏ Tocca per correggere", fontSize = 13.sp, color = BluNotte, modifier = Modifier.padding(top = 8.dp))
+                            // Il testo, con una piccola ✏ (toccandolo si corregge)
+                            Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                Text(testo, fontSize = 16.sp, color = Testo, modifier = Modifier.weight(1f))
+                                Text("✏", fontSize = 14.sp, color = BluNotte, modifier = Modifier.padding(start = 8.dp))
                             }
                         }
                     }
@@ -940,9 +949,9 @@ private fun Scheda(
                     )
 
                     // Due pulsanti, niente di più
-                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PulsanteChiaro("Articoli (${lista.size})", "📋", articoli, Modifier.weight(1f))
-                        PulsanteGrande(if (f.pubblicata) "Di nuovo" else "Pubblica", if (f.pubblicata) "↺" else "📤", pubblica, Modifier.weight(1f))
+                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PulsanteChiaro("Articoli (${lista.size})", "📋", articoli, Modifier.weight(1f), altezza = 46.dp, grandezzaTesto = 15)
+                        PulsanteGrande(if (f.pubblicata) "Di nuovo" else "Pubblica", if (f.pubblicata) "↺" else "📤", pubblica, Modifier.weight(1f), altezza = 46.dp, grandezzaTesto = 15)
                     }
                 }
             }
@@ -1008,8 +1017,8 @@ private fun SchermataArticoli(f: Foto, modifica: (Int?) -> Unit, chiudi: () -> U
 @Composable
 private fun Etichetta(testo: String, sfondo: Color, colore: Color) {
     Text(
-        testo, color = colore, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-        modifier = Modifier.background(sfondo, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 5.dp),
+        testo, color = colore, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+        modifier = Modifier.background(sfondo, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }
 
@@ -1104,8 +1113,8 @@ private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) ->
 /** Scritta arancione: qui Elisa deve guardare. */
 @Composable
 private fun Avviso(testo: String) = Text(
-    testo, color = Arancione, fontWeight = FontWeight.Bold,
-    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(FondoAvviso, RoundedCornerShape(14.dp)).padding(12.dp),
+    testo, color = Arancione, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).background(FondoAvviso, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 7.dp),
 )
 
 
