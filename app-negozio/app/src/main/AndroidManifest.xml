@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Aggiornamenti dell'app da GitHub (senza Play Store) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Serve per sapere se WhatsApp Business / WhatsApp sono installati (Android 11+) -->
     <queries>
         <package android:name="com.whatsapp.w4b" />

@@ -2,4 +2,6 @@
 <paths>
     <!-- Le foto sistemate dall'app, da passare a WhatsApp -->
     <files-path name="raddrizzate" path="raddrizzate/" />
+    <!-- L'aggiornamento scaricato, da passare all'installazione di Android -->
+    <cache-path name="aggiornamento" path="aggiornamento/" />
 </paths>

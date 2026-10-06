@@ -127,6 +127,41 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     fun cambiaTornaSu(v: Boolean) { tornaSu = v; preferenze.edit().putBoolean("torna_su", v).apply() }
     fun cambiaGrassetto(v: Boolean) { prezzoGrassetto = v; preferenze.edit().putBoolean("prezzo_grassetto", v).apply() }
 
+    // ---- Aggiornamenti ----
+    /** Versione nuova trovata su GitHub (null = nessuna). */
+    var novita by mutableStateOf<Novita?>(null)
+        private set
+    /** Scaricamento in corso: da 0 a 1 (null = fermo). */
+    var scaricamento by mutableStateOf<Float?>(null)
+        private set
+    /** Esito dell'ultimo controllo fatto a mano, per le impostazioni. */
+    var esitoControllo by mutableStateOf<String?>(null)
+        private set
+
+    /** Controlla se c'è una versione nuova ([aMano] = dal pulsante nelle impostazioni: dice anche "nessuna novità"). */
+    fun controllaAggiornamenti(aMano: Boolean = false) {
+        viewModelScope.launch {
+            if (aMano) esitoControllo = "Controllo…"
+            novita = Aggiornamento.controlla(getApplication())
+            if (aMano) esitoControllo = novita?.let { "C'è la versione ${it.versionName}!" } ?: "Hai già l'ultima versione 👍"
+        }
+    }
+
+    /** Scarica la versione nuova e apre "Installa" (la prima volta Android chiede il permesso). */
+    fun aggiorna() {
+        val n = novita ?: return
+        val app = getApplication<Application>()
+        if (!Aggiornamento.puoInstallare(app)) { Aggiornamento.chiediPermesso(app); return }
+        if (scaricamento != null) return
+        viewModelScope.launch {
+            scaricamento = 0f
+            val file = Aggiornamento.scarica(app, n) { p -> viewModelScope.launch { scaricamento = p } }
+            scaricamento = null
+            if (file != null) Aggiornamento.installa(app, file)
+            else android.widget.Toast.makeText(app, "Scaricamento non riuscito: controlla internet e riprova", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     /** Numero della foto a cui si sta pixelando lo sfondo (per la rotellina). */
     var sfondoInCorso by mutableStateOf<Int?>(null)
         private set
@@ -418,6 +453,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         if (foto.any { it.inCorso }) elaboraInCoda()
+        controllaAggiornamenti()
         // Ogni cambiamento della lista si salva (poco dopo, per non scrivere a ogni tocco)
         viewModelScope.launch {
             snapshotFlow { foto.toList() }.collectLatest { lista ->

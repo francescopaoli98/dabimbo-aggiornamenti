@@ -221,6 +221,10 @@ private fun Schermata(vm: FotoViewModel) {
                     PulsanteTondo("⚙", { impostazioniAperte = true })
                 }
             }
+            // Versione nuova dell'app
+            vm.novita?.let { n ->
+                item { AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) }
+            }
             // Logo (tenuto premuto: modalità prove, solo per chi sistema l'app)
             item {
                 Image(
@@ -451,6 +455,28 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
     }
 }
 
+/** "È arrivata la versione 2.8": un tocco e si aggiorna (Android chiede poi "Installa"). */
+@Composable
+private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () -> Unit) {
+    Surface(color = Color.White, shape = MaterialTheme.shapes.large, border = BorderStroke(2.dp, Verde), shadowElevation = 3.dp) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("🎁 È arrivata la versione ${n.versionName}!", fontWeight = FontWeight.ExtraBold, color = BluNotte, fontSize = 17.sp)
+            if (n.note.isNotBlank()) Text(n.note, fontSize = 14.sp, color = Color(0xFF3A4660))
+            if (scaricamento != null) {
+                LinearProgressIndicator(
+                    progress = { scaricamento },
+                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    color = Verde, trackColor = Cielo,
+                )
+                Text("Scarico… ${(scaricamento * 100).toInt()}%", fontSize = 13.sp, color = BluNotte)
+            } else {
+                PulsanteGrande("Aggiorna", "⬇", aggiorna, Modifier.fillMaxWidth(), colore = Verde, altezza = 52.dp)
+                Text("Poi Android chiede \"Installa\": toccalo e l'app si aggiorna. Le foto in lista restano.", fontSize = 12.sp, color = Color(0xFF5A6680))
+            }
+        }
+    }
+}
+
 /** Foto già pubblicata, chiusa in una riga piccola: toccandola si riapre. */
 @Composable
 private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> Unit) {
@@ -500,6 +526,13 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 Riquadro("Lista delle foto") {
                     Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
                     Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ in basso a destra per tornare in cima alla lista.", vm.tornaSu, vm::cambiaTornaSu)
+                }
+                Riquadro("Aggiornamenti") {
+                    val context = LocalContext.current
+                    Text("Versione installata: ${remember { Aggiornamento.nomeVersione(context) }}", fontSize = 15.sp)
+                    PulsanteChiaro("Controlla aggiornamenti", "🔄", { vm.controllaAggiornamenti(aMano = true) }, Modifier.fillMaxWidth().padding(top = 8.dp), altezza = 50.dp)
+                    vm.esitoControllo?.let { Text(it, fontSize = 14.sp, color = BluNotte, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)) }
+                    vm.novita?.let { n -> AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) }
                 }
                 Riquadro("Testo per WhatsApp") {
                     Interruttore("Prezzo in grassetto", "Il prezzo esce come *€ 4,00*: su WhatsApp si vede in grassetto.", vm.prezzoGrassetto, vm::cambiaGrassetto)
