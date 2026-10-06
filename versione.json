@@ -1,6 +1,6 @@
 {
-  "versionCode": 63,
-  "versionName": "3.8",
+  "versionCode": 64,
+  "versionName": "3.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Avviso \"Già pubblicato\" se un articolo è già stato pubblicato in passato."
+  "note": "Riepilogo: tocca un giorno per vedere gli articoli e togliere quelli contati per sbaglio."
 }
