@@ -1,6 +1,6 @@
 {
-  "versionCode": 71,
-  "versionName": "4.6",
+  "versionCode": 72,
+  "versionName": "4.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Lo zoom nell'anteprima resta dopo aver tolto le dita (↺ per tornare normale). Si può cambiare nelle impostazioni."
+  "note": "Lo zoom nell'anteprima resta (↺ per tornare normale); gli aggiornamenti si controllano anche tornando nell'app."
 }
