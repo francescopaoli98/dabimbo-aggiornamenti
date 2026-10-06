@@ -186,6 +186,7 @@ private fun Schermata(vm: FotoViewModel) {
     var daConfermare by remember { mutableStateOf<Int?>(null) }      // foto con avvisi: chiedo prima di pubblicare
     var daTogliere by remember { mutableStateOf<Int?>(null) }        // foto da togliere dalla lista (chiedo conferma)
     var impostazioniAperte by remember { mutableStateOf(false) }
+    var riepilogoAperto by remember { mutableStateOf(false) }
     var chiediMenu by remember { mutableStateOf(false) }               // ✕: tornare al menu principale (chiedo se mancano foto)
     val riaperte = remember { mutableStateListOf<Int>() }              // foto pubblicate riaperte (se le schede si comprimono)
     val lista = rememberLazyListState()
@@ -252,6 +253,21 @@ private fun Schermata(vm: FotoViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PulsanteGrande("Scegli foto", "📷", ::scegliFoto, Modifier.weight(1f), altezza = 60.dp, grandezzaTesto = 18)
                     PulsanteChiaro("Sigle", "📖", { dizionarioAperto = true }, sfondo = Rosa, altezza = 60.dp)
+                }
+            }
+            // Riepilogo di oggi (toccandolo: i giorni prima)
+            vm.oggiPubblicati?.let { g ->
+                item {
+                    Surface(onClick = { riepilogoAperto = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("📊", fontSize = 20.sp)
+                            Text(
+                                "Oggi: ${g.articoli} ${if (g.articoli == 1) "articolo" else "articoli"} · ${Riepilogo.euro(g.centesimi)}",
+                                fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 16.sp, modifier = Modifier.padding(start = 10.dp).weight(1f),
+                            )
+                            Text("›", color = BluNotte, fontSize = 20.sp)
+                        }
+                    }
                 }
             }
             if (vm.foto.isNotEmpty()) item {
@@ -329,6 +345,27 @@ private fun Schermata(vm: FotoViewModel) {
         }
         if (festa) Coriandoli()
       }
+    }
+
+    if (riepilogoAperto) {
+        val nomi = remember { java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.ITALY) }
+        val leggi = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY) }
+        AlertDialog(
+            onDismissRequest = { riepilogoAperto = false },
+            title = { Text("📊 Pubblicati") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    vm.giornate.take(14).forEach { g ->
+                        val giorno = runCatching { nomi.format(leggi.parse(g.giorno)!!) }.getOrDefault(g.giorno).replaceFirstChar { it.uppercase() }
+                        Row(Modifier.fillMaxWidth()) {
+                            Text(giorno, Modifier.weight(1f))
+                            Text("${g.articoli} · ${Riepilogo.euro(g.centesimi)}", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { riepilogoAperto = false }) { Text("Chiudi") } },
+        )
     }
 
     if (impostazioniAperte) {
@@ -547,6 +584,7 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 }
                 Riquadro("Lista delle foto") {
                     Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
+                    Interruttore("2 foto alla volta", "Prepara le foto più in fretta. Se il telefono rallenta, spegnilo.", vm.dueAllaVolta, vm::cambiaDueAllaVolta)
                     Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ in basso a destra per tornare in cima alla lista.", vm.tornaSu, vm::cambiaTornaSu)
                 }
                 Riquadro("Aggiornamenti") {

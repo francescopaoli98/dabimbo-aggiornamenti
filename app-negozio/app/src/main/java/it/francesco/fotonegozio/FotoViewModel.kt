@@ -135,6 +135,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         private set
     fun cambiaTema(v: Int) { tema = v; TemaApp.modo = v; preferenze.edit().putInt("tema", v).apply() }
 
+    /** Elabora 2 foto alla volta (più veloce; spegnere se il telefono rallenta). */
+    var dueAllaVolta by mutableStateOf(preferenze.getBoolean("due_alla_volta", true))
+        private set
+    fun cambiaDueAllaVolta(v: Boolean) { dueAllaVolta = v; preferenze.edit().putBoolean("due_alla_volta", v).apply() }
+
     fun cambiaScalaTesto(v: Float) { scalaTesto = v; preferenze.edit().putFloat("scala_testo", v).apply() }
     fun cambiaComprimi(v: Boolean) { comprimiPubblicate = v; preferenze.edit().putBoolean("comprimi_pubblicate", v).apply() }
     fun cambiaTornaSu(v: Boolean) { tornaSu = v; preferenze.edit().putBoolean("torna_su", v).apply() }
@@ -182,6 +187,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     private val fileLista = File(app.filesDir, "lista.json")
 
     private val raddrizzatore by lazy { Raddrizzatore(app) }   // creato solo quando serve (prima foto)
+    private val secondoRaddrizzatore by lazy { Raddrizzatore(app) }   // per lavorare su 2 foto alla volta
     private val versoPreferito = VersoPreferito(app)
     private val pixelatore by lazy { Pixelatore() }
 
@@ -345,7 +351,20 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         val i = foto.indexOfFirst { it.numero == numero }
         if (i < 0) return
         foto[i] = foto[i].copy(pubblicata = pubblicata)
+        if (pubblicata) {
+            registro = Riepilogo.aggiungi(registro, oggi(), foto[i].articoli)
+            fileRegistro.writeText(Riepilogo.scrivi(registro))
+        }
     }
+
+    // ---- Riepilogo delle pubblicazioni ----
+    private val fileRegistro = File(app.filesDir, "pubblicazioni.json")
+    /** Tutti gli articoli pubblicati, giorno per giorno (resta salvato). */
+    var registro by mutableStateOf(Riepilogo.leggi(fileRegistro.takeIf { it.exists() }?.readText().orEmpty()))
+        private set
+    val giornate: List<Giornata> get() = Riepilogo.giornate(registro)
+    val oggiPubblicati: Giornata? get() = giornate.firstOrNull { it.giorno == oggi() }
+    private fun oggi() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date())
 
     /** Modalità prove (logo tenuto premuto): mostra le informazioni tecniche e la diagnosi. */
     var prove by mutableStateOf(false)
@@ -368,15 +387,26 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Elabora, una alla volta e in ordine, le foto ancora "in lavorazione". */
+    /**
+     * Elabora le foto ancora "in lavorazione", in ordine: 2 alla volta (più veloce),
+     * oppure 1 alla volta se nelle impostazioni è spento "2 foto alla volta".
+     */
     private fun elaboraInCoda() {
         lavoro = viewModelScope.launch {
-            while (true) {
-                val prossima = foto.firstOrNull { it.inCorso } ?: break
-                val fatta = elabora(prossima)
-                // Se nel frattempo Elisa l'ha tolta dalla lista, il risultato si butta
-                val i = foto.indexOfFirst { it.numero == prossima.numero }
-                if (i >= 0) foto[i] = fatta
-                else fatta.fileAuto?.delete()
+            val prese = mutableSetOf<Int>()   // foto già in mano a un "lavoratore"
+            val lavoratori = if (dueAllaVolta) listOf(raddrizzatore, secondoRaddrizzatore) else listOf(raddrizzatore)
+            kotlinx.coroutines.coroutineScope {
+                for (r in lavoratori) launch {
+                    while (true) {
+                        val prossima = foto.firstOrNull { it.inCorso && it.numero !in prese } ?: break
+                        prese += prossima.numero
+                        val fatta = elabora(prossima, r)
+                        // Se nel frattempo Elisa l'ha tolta dalla lista, il risultato si butta
+                        val i = foto.indexOfFirst { it.numero == prossima.numero }
+                        if (i >= 0) foto[i] = fatta
+                        else fatta.fileAuto?.delete()
+                    }
+                }
             }
         }
     }
@@ -388,7 +418,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         listOfNotNull(f.fileAuto, f.file).distinct().forEach { it.delete() }
     }
 
-    private suspend fun elabora(f: Foto): Foto = withContext(Dispatchers.Default) {
+    private suspend fun elabora(f: Foto, raddrizzatore: Raddrizzatore): Foto = withContext(Dispatchers.Default) {
         try {
             val inizio = System.currentTimeMillis()
             val diario = if (diagnosi) Diario() else null

@@ -59,6 +59,7 @@ class AppTest {
         java.io.File(app.filesDir, "lista.json").delete()
         app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         TemaApp.modo = 0
+        java.io.File(app.filesDir, "pubblicazioni.json").delete()
     }
 
     private fun metti(vararg f: Foto) {
@@ -497,5 +498,17 @@ class AppTest {
         // "Togli" dello sfondo: via sfondo e ritocchi
         regola.onAllNodesWithText("Togli").onFirst().performClick()
         regola.waitUntil(5_000) { !vm.foto[0].sfondoPixelato && vm.foto[0].ripristinate.isEmpty() }
+    }
+
+    @Test
+    fun riepilogoDellaGiornata() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321", prezzo = "€ 1,50"))))
+        regola.onNodeWithText("Oggi:", substring = true).assertDoesNotExist()
+        regola.runOnUiThread { vm.segnaPubblicata(1); vm.segnaPubblicata(2); vm.segnaPubblicata(1) }   // la 1 due volte: conta una
+        regola.onNodeWithText("Oggi: 2 articoli · € 5,50").assertExists().performClick()
+        regola.onNodeWithText("📊 Pubblicati").assertExists()
+        regola.onNodeWithText("2 · € 5,50").assertExists()
+        // Resta anche riaprendo l'app
+        assertEquals(2, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.oggiPubblicati?.articoli)
     }
 }
