@@ -1,6 +1,6 @@
 {
-  "versionCode": 59,
-  "versionName": "3.4",
+  "versionCode": 60,
+  "versionName": "3.5",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Il verso della foto lo decidono le scritte dell'oggetto (scatole, copertine); l'etichetta serve per leggere."
+  "note": "Tutte le foto in verticale; Sinistra/Destra e rotazione immediata; pennello \"Originale\" per togliere il pixel dove vuoi; \"no capp\" = senza cappuccio."
 }
