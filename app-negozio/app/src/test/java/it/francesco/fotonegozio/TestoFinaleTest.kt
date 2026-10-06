@@ -128,4 +128,12 @@ class TestoFinaleTest {
         assertEquals(listOf("zebrato"), r["zz"]!!.significati)
         assertEquals(4, r["pic"]!!.significati.size)                // nuova
     }
+
+    @Test
+    fun no_capp_diventa_senza_cappuccio() {
+        val voci = Dizionario.leggi(java.io.File("src/main/assets/dizionario.txt").readText())
+        assertEquals("Felpa senza cappuccio", TestoFinale.espandi("FELPA NO CAPP", null, voci))
+        assertEquals("Felpa senza cappuccio", TestoFinale.espandi("FELPA SENZA CAPP", null, voci))
+        assertEquals("Felpa con cappuccio", TestoFinale.espandi("FELPA CAPP", null, voci))
+    }
 }

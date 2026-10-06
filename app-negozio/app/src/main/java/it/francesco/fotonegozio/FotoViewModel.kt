@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +52,14 @@ data class Foto(
     val latoPixel: Int = 0,                     // lato dei quadretti a mano
     val fileSfondo: File? = null,               // la foto di base con lo sfondo pixelato in automatico (fatta una volta sola)
     val sfondoPixelato: Boolean = false,        // pixel automatico dello sfondo acceso
+    val ripristinate: Set<Long> = emptySet(),   // quadretti dove lo sfondo pixelato torna come l'originale (pennello "Originale")
+    val rotazioneFile: Int = 0,                 // rotazione a mano già "dentro" il file finale (se diversa: si sta ricomponendo)
+    val statoFile: String = "",                 // cosa c'è nel file finale (per non ricomporlo due volte uguale)
 )
+
+/** Cosa deve contenere il file finale: se cambia, la foto va ricomposta. */
+val Foto.statoVoluto: String get() =
+    "${fileAuto?.name}|$rotazioneManuale|$sfondoPixelato|${fileSfondo?.name}|${pixelManuale.hashCode()}|${ripristinate.hashCode()}|$latoPixel"
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
 val Foto.articoli: List<DatiCartellino> get() = listOfNotNull(dati) + altri
@@ -205,7 +213,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Pixel e rotazioni: la foto finale si ricompone ogni volta dagli strati ----
 
     /** Pixel a mano: salva i quadretti (sulla foto di base) e ricompone la foto. */
-    fun salvaPixelManuale(numero: Int, celle: Set<Long>, lato: Int) = modifica(numero) { it.copy(pixelManuale = celle, latoPixel = lato) }
+    fun salvaPixelManuale(numero: Int, celle: Set<Long>, lato: Int, ripristinate: Set<Long>? = null) =
+        modifica(numero) { it.copy(pixelManuale = celle, latoPixel = lato, ripristinate = ripristinate ?: it.ripristinate) }
 
     /** Toglie tutti i pixel fatti a mano (il pixel automatico resta). */
     fun togliPixelManuale(numero: Int) = modifica(numero) { it.copy(pixelManuale = emptySet()) }
@@ -224,7 +233,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Toglie il pixel automatico (quelli a mano restano). */
-    fun togliPixelSfondo(numero: Int) = modifica(numero) { it.copy(sfondoPixelato = false) }
+    fun togliPixelSfondo(numero: Int) = modifica(numero) { it.copy(sfondoPixelato = false, ripristinate = emptySet()) }
 
     /** La foto di base con lo sfondo pixelato, salvata (null se non riesce). */
     private suspend fun calcolaSfondo(f: Foto): File? = withContext(Dispatchers.Default) {
@@ -246,19 +255,33 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Cambia una foto (rotazione, pixel…) e ne ricompone il file finale, un cambiamento alla volta. */
+    /**
+     * Cambia una foto (rotazione, pixel…) e ne ricompone il file finale, un cambiamento alla volta.
+     * Se nel frattempo arrivano altri cambiamenti (es. tre tocchi su "Gira"), la foto si ricompone
+     * una volta sola, con l'ultimo stato.
+     */
     private fun modifica(numero: Int, fine: () -> Unit = {}, cambia: suspend (Foto) -> Foto?) {
         viewModelScope.launch {
             try {
                 bloccoRotazioni.withLock {
                     val f = foto.firstOrNull { it.numero == numero } ?: return@withLock
                     val nuova = cambia(f) ?: return@withLock
+                    aggiorna(numero) { nuova }
+                    if (nuova.statoVoluto == nuova.statoFile) return@withLock   // già fatta
                     val composta = componi(nuova)
                     // Il file finale vecchio non serve più (le basi sì)
                     val vecchio = f.file
                     if (vecchio != null && vecchio != composta.file && vecchio != f.fileAuto && vecchio != f.fileSfondo) vecchio.delete()
-                    val i = foto.indexOfFirst { it.numero == numero }
-                    if (i >= 0) foto[i] = composta
+                    aggiorna(numero) { attuale ->
+                        // Se intanto è cambiata ancora, tengo l'anteprima "veloce" e ricompongo al giro dopo
+                        val uguale = attuale.statoVoluto == composta.statoFile
+                        attuale.copy(
+                            file = composta.file, statoFile = composta.statoFile, rotazioneFile = composta.rotazioneFile,
+                            miniatura = if (uguale) composta.miniatura else attuale.miniatura,
+                        )
+                    }
+                    val ancora = foto.firstOrNull { it.numero == numero }
+                    if (ancora != null && ancora.statoVoluto != ancora.statoFile) modifica(numero) { it }
                 }
             } finally {
                 fine()
@@ -266,23 +289,43 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Foto finale = base (o base con lo sfondo pixelato) + quadretti a mano, girata come vuole Elisa. */
+    private fun aggiorna(numero: Int, cambia: (Foto) -> Foto) {
+        val i = foto.indexOfFirst { it.numero == numero }
+        if (i >= 0) foto[i] = cambia(foto[i])
+    }
+
+    /**
+     * Foto finale = base (o base con lo sfondo pixelato, con i quadretti "Originale" rimessi)
+     * + quadretti a mano, girata come vuole Elisa.
+     */
     private suspend fun componi(f: Foto): Foto = withContext(Dispatchers.Default) {
-        val base = (if (f.sfondoPixelato) f.fileSfondo else null) ?: f.fileAuto ?: return@withContext f
-        var b = BitmapFactory.decodeFile(base.path) ?: return@withContext f
-        if (f.pixelManuale.isEmpty() && f.rotazioneManuale == 0) {
-            return@withContext f.copy(file = base, miniatura = miniatura(b).asImageBitmap())
+        val stato = f.statoVoluto
+        val sfondo = if (f.sfondoPixelato) f.fileSfondo else null
+        val base = sfondo ?: f.fileAuto ?: return@withContext f
+        if (f.pixelManuale.isEmpty() && f.rotazioneManuale == 0 && (sfondo == null || f.ripristinate.isEmpty())) {
+            val b = BitmapFactory.decodeFile(base.path) ?: return@withContext f
+            return@withContext f.copy(file = base, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = 0)
         }
-        if (f.pixelManuale.isNotEmpty()) {
-            val w = b.width; val h = b.height
+        var b = BitmapFactory.decodeFile(base.path, BitmapFactory.Options().apply { inMutable = true }) ?: return@withContext f
+        val w = b.width; val h = b.height
+        val lato = f.latoPixel.takeIf { it > 0 } ?: PixelManuale.lato(w, h)
+        if (f.pixelManuale.isNotEmpty() || (sfondo != null && f.ripristinate.isNotEmpty())) {
             val px = IntArray(w * h).also { b.getPixels(it, 0, w, 0, 0, w, h) }
-            PixelManuale.applica(px, w, h, f.pixelManuale, f.latoPixel.takeIf { it > 0 } ?: PixelManuale.lato(w, h))
+            if (sfondo != null && f.ripristinate.isNotEmpty()) {
+                // Pennello "Originale": in quei quadretti rimetto la foto vera
+                val orig = f.fileAuto?.let { BitmapFactory.decodeFile(it.path) }
+                if (orig != null && orig.width == w && orig.height == h) {
+                    val po = IntArray(w * h).also { orig.getPixels(it, 0, w, 0, 0, w, h) }
+                    PixelManuale.rimetti(px, po, w, h, f.ripristinate, lato)
+                }
+            }
+            if (f.pixelManuale.isNotEmpty()) PixelManuale.applica(px, w, h, f.pixelManuale, lato)
             b = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
         }
         b = Raddrizzatore.ruotaImmagine(b, f.rotazioneManuale)
         // Nome sempre nuovo, così le anteprime si aggiornano
         val file = Raddrizzatore.salva(getApplication(), b, "foto_${f.numero}_v${System.currentTimeMillis() % 100_000_000}")
-        f.copy(file = file, miniatura = miniatura(b).asImageBitmap())
+        f.copy(file = file, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = f.rotazioneManuale)
     }
 
     /** Torna alla schermata iniziale: lista vuota. */
@@ -356,8 +399,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             // Giochi, libri, peluche e scarpe restano come sono stati fotografati.
             var immagine = r.immagine
             var verso = 0
-            val unCapo = (listOfNotNull(r.dati) + r.altri).any { Abbigliamento.eUnCapo(it.descrizione) }
-            if (unCapo && immagine.width > immagine.height) {
+            // Tutte le foto in verticale (vestiti e oggetti), nel verso che Elisa preferisce
+            if (immagine.width > immagine.height) {
                 verso = versoPreferito.verso
                 immagine = Raddrizzatore.ruotaImmagine(immagine, verso)
                 versoPreferito.cambiaVoto(null, verso)   // finché Elisa non la corregge, il verso era giusto
@@ -394,7 +437,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Pulsanti "Gira" (90) e "Capovolgi" (180): Elisa corregge il verso a mano. */
-    fun gira(numero: Int, gradi: Int) = modifica(numero) { f ->
+    /** "↻ Destra" (90), "↺ Sinistra" (270), "Capovolgi" (180): l'anteprima gira subito, la foto vera subito dopo. */
+    fun gira(numero: Int, gradi: Int) {
+        val f = foto.firstOrNull { it.numero == numero } ?: return
+        if (f.fileAuto == null) return
         val nuovaManuale = (f.rotazioneManuale + gradi) % 360
         // L'app impara: il voto passa al verso in cui la foto è finita davvero
         if (f.messaInVerticale) {
@@ -403,8 +449,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 nuovo = (f.versoVerticale + nuovaManuale) % 360,
             )
         }
-        // Elisa l'ha guardata e girata: non serve più l'avviso
-        f.copy(rotazioneManuale = nuovaManuale, daControllare = false)
+        // Subito: la miniatura girata (piccola, istantanea). Elisa l'ha guardata: niente più avviso
+        val mini = f.miniatura?.let { Raddrizzatore.ruotaImmagine(it.asAndroidBitmap(), gradi).asImageBitmap() }
+        aggiorna(numero) { it.copy(rotazioneManuale = nuovaManuale, daControllare = false, miniatura = mini ?: it.miniatura) }
+        // Poi, in sottofondo, la foto vera (più tocchi di fila = una sola ricomposizione)
+        modifica(numero) { it }
     }
 
     /**

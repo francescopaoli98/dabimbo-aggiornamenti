@@ -212,7 +212,7 @@ class AppTest {
     fun giraLaFoto() {
         metti(fotoDiProva(1, listOf(felpa)))
         apriVisore()
-        regola.onNodeWithText("Gira").performClick()
+        regola.onNodeWithText("Destra").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
         regola.onNodeWithText("Capovolgi").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 270 }
@@ -253,7 +253,7 @@ class AppTest {
     fun pixelAManoSuFotoGirata() {
         metti(fotoDiProva(1, listOf(felpa)))
         apriVisore()
-        regola.onNodeWithText("Gira").performClick()
+        regola.onNodeWithText("Destra").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
         // Aspetto che la foto girata sia caricata (prima il pixel a mano non si apre)
         regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
@@ -451,5 +451,51 @@ class AppTest {
         regola.onNodeWithText("☀ Chiaro").performClick()
         regola.waitForIdle()
         assertFalse(TemaApp.scuro)
+    }
+
+    @Test
+    fun sinistraEDestraGiranoSubito() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        apriVisore()
+        regola.onNodeWithText("Sinistra").performClick()
+        // L'anteprima gira subito (la foto vera si ricompone dopo)
+        assertEquals(270, vm.foto[0].rotazioneManuale)
+        assertEquals(400, vm.foto[0].miniatura!!.width)   // era 300×400: girata diventa 400×300
+        regola.waitUntil(5_000) { vm.foto[0].rotazioneFile == 270 }
+        val b = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertEquals(400, b.width)
+        // Girata a sinistra: il rosso (che era a sinistra) ora sta in basso
+        assertTrue(android.graphics.Color.red(b.getPixel(200, 280)) > 200)
+        // Tre tocchi di fila: una sola foto finale, girata giusta
+        regola.onNodeWithText("Destra").performClick()
+        regola.onNodeWithText("Destra").performClick()
+        regola.onNodeWithText("Destra").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 180 && vm.foto[0].rotazioneFile == 180 }
+    }
+
+    @Test
+    fun pennelloOriginaleSulloSfondoPixelato() {
+        val f = fotoDiProva(1, listOf(felpa))
+        // Sfondo "pixelato" finto: tutto grigio
+        val grigio = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888).apply { eraseColor(0xFF808080.toInt()) }
+        val sfondo = Raddrizzatore.salva(regola.activity, grigio, "prova_sfondo")
+        metti(f.copy(fileSfondo = sfondo, sfondoPixelato = true, file = sfondo))
+        apriVisore()
+        regola.onNodeWithText("Rimetti originale").performClick()
+        regola.onNodeWithText("✨ Originale").assertIsSelected()
+        // Passo il pennello sulla parte sinistra (rossa nell'originale)
+        regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + width * 0.2f, centerY - 100f), Offset(left + width * 0.2f, centerY + 100f)) }
+        // Annulla il passo, poi lo rifaccio
+        regola.onNodeWithText("Annulla").performClick()
+        regola.onNodeWithText("Salva").assertIsNotEnabled()
+        regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + width * 0.2f, centerY - 100f), Offset(left + width * 0.2f, centerY + 100f)) }
+        regola.onNodeWithText("Salva").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].ripristinate.isNotEmpty() && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        val b = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertTrue(android.graphics.Color.red(b.getPixel(60, 200)) > 200)      // lì è tornata la foto vera (rossa)
+        assertTrue(android.graphics.Color.red(b.getPixel(250, 50)) in 100..160) // il resto resta "pixelato" (grigio)
+        // "Togli" dello sfondo: via sfondo e ritocchi
+        regola.onAllNodesWithText("Togli").onFirst().performClick()
+        regola.waitUntil(5_000) { !vm.foto[0].sfondoPixelato && vm.foto[0].ripristinate.isEmpty() }
     }
 }

@@ -15,6 +15,9 @@ object TestoFinale {
 
     private val ROMANI = setOf("II", "III", "IV")
 
+    // "NO CAPP", "SENZA CAPP": il "con" della sigla diventa "senza"
+    private val NEGAZIONI = setOf("no", "senza", "s/")
+
     // Parole che finiscono in -a ma sono maschili
     private val MASCHILI_IN_A = setOf("coprispalla", "pigiama", "poncho", "set", "gioco", "puzzle")
 
@@ -97,8 +100,21 @@ object TestoFinale {
             }
         }
 
-        // 4. Niente parole uguali una dopo l'altra, prima lettera maiuscola
-        val senzaDoppioni = espanse.filterIndexed { j, p -> j == 0 || !p.equals(espanse[j - 1], ignoreCase = true) }
+        // 4. "NO CAPP" = senza cappuccio (non "no con cappuccio"): "no" davanti a un "con …" diventa "senza …"
+        val senzaNo = mutableListOf<String>()
+        var j = 0
+        while (j < espanse.size) {
+            val p = espanse[j]
+            val dopo = espanse.getOrNull(j + 1)
+            if (p.lowercase() in NEGAZIONI && dopo != null && dopo.lowercase().startsWith("con ")) {
+                senzaNo += "senza " + dopo.substring(4); j += 2
+            } else {
+                senzaNo += p; j++
+            }
+        }
+
+        // 5. Niente parole uguali una dopo l'altra, prima lettera maiuscola
+        val senzaDoppioni = senzaNo.filterIndexed { k, p -> k == 0 || !p.equals(senzaNo[k - 1], ignoreCase = true) }
         return senzaDoppioni.joinToString(" ").replaceFirstChar { it.uppercase() }
     }
 

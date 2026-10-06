@@ -426,7 +426,7 @@ private fun Schermata(vm: FotoViewModel) {
             gira = { gradi -> vibra.performHapticFeedback(HapticFeedbackType.TextHandleMove); vm.gira(f.numero, gradi) },
             pixelaSfondo = { vm.pixelaSfondo(f.numero) },
             togliSfondo = { vm.togliPixelSfondo(f.numero) },
-            salvaPixelMano = { celle, lato -> vm.salvaPixelManuale(f.numero, celle, lato) },
+            salvaPixel = { celle, lato, rimesse -> vm.salvaPixelManuale(f.numero, celle, lato, rimesse) },
             togliPixelMano = { vm.togliPixelManuale(f.numero) },
             testo = { ingrandita = null; testoInModifica = f.numero },
             chiudi = { ingrandita = null },
@@ -924,7 +924,7 @@ private fun DatiLetti(dati: DatiCartellino) {
 
 /**
  * Foto a schermo intero: si ingrandisce con le dita.
- * In basso: Gira, Capovolgi, Testo e la sezione Pixel (automatico dello sfondo e a mano),
+ * In basso: Sinistra, Destra, Capovolgi, Testo e la sezione Pixel (automatico dello sfondo e a mano),
  * ognuno col suo "↺ Togli" per tornare indietro.
  */
 @Composable
@@ -934,41 +934,47 @@ private fun Visore(
     gira: (Int) -> Unit,
     pixelaSfondo: () -> Unit,
     togliSfondo: () -> Unit,
-    salvaPixelMano: (Set<Long>, Int) -> Unit,
+    salvaPixel: (Set<Long>, Int, Set<Long>) -> Unit,
     togliPixelMano: () -> Unit,
     testo: () -> Unit,
     chiudi: () -> Unit,
 ) {
-    // La foto caricata insieme al suo file: dopo "Gira" per un attimo c'è ancora quella vecchia
-    val caricata by produceState<Pair<File, ImageBitmap>?>(null, f.file) {
+    // La foto caricata, col suo file e la rotazione che ha dentro (dopo "Gira" per un attimo c'è ancora quella vecchia)
+    val caricata by produceState<Triple<File, ImageBitmap, Int>?>(null, f.file) {
         val file = f.file
-        if (file != null) withContext(Dispatchers.IO) { caricaRidotta(file, 2048) }?.let { value = file to it }
+        val rot = f.rotazioneFile
+        if (file != null) withContext(Dispatchers.IO) { caricaRidotta(file, 2048) }?.let { value = Triple(file, it, rot) }
     }
     val immagine = caricata?.second
-    val aggiornata = caricata?.takeIf { it.first == f.file }?.second   // quella giusta per il pixel a mano
+    // Quella giusta per il pixel a mano: file e rotazione aggiornati
+    val aggiornata = caricata?.takeIf { it.first == f.file && it.third == f.rotazioneManuale }?.second
     // Grandezza della foto di base (dove si salvano i quadretti a mano)
     val misureBase = remember(f.fileAuto) { f.fileAuto?.let(::misureFoto) }
-    var pixela by remember { mutableStateOf(false) }
-    Finestra(onDismissRequest = { if (pixela) pixela = false else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    var pennello by remember { mutableStateOf<Pennello?>(null) }   // editor aperto, con questo pennello
+    Finestra(onDismissRequest = { if (pennello != null) pennello = null else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (pixela) "Passa il dito su cosa nascondere" else "Foto ${f.numero} · due dita per ingrandire",
+                    if (pennello != null) "Passa il dito sulla foto" else "Foto ${f.numero} · due dita per ingrandire",
                     color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f),
                 )
-                if (!pixela) PulsanteTondo("✕", chiudi)
+                if (pennello == null) PulsanteTondo("✕", chiudi)
             }
             val img = immagine
-            if (pixela && aggiornata != null && misureBase != null) {
+            val modo = pennello
+            if (modo != null && aggiornata != null && misureBase != null) {
                 EditorPixel(
-                    aggiornata, misureBase.first, misureBase.second, f.rotazioneManuale, f.pixelManuale, Modifier.weight(1f),
-                    salva = { celle, lato -> salvaPixelMano(celle, lato); pixela = false },
-                    esci = { pixela = false },
+                    f, aggiornata, misureBase.first, misureBase.second, modo, Modifier.weight(1f),
+                    salva = { celle, lato, ripristinate -> salvaPixel(celle, lato, ripristinate); pennello = null },
+                    esci = { pennello = null },
                 )
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
-                    if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize(), f.file) }
+                    if (img != null) {
+                        // Rotazione subito a schermo (la foto vera si ricompone in sottofondo)
+                        val delta = ((f.rotazioneManuale - (caricata?.third ?: 0)) % 360 + 360) % 360
+                        key(caricata?.first) { FotoGirata(img, delta) { FotoZoomabile(img, Modifier.fillMaxSize(), caricata?.first) } }
+                    }
                     if (sfondoInCorso) Surface(color = Superficie, shape = RoundedCornerShape(50), shadowElevation = 4.dp) {
                         Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = Azzurro)
@@ -980,7 +986,8 @@ private fun Visore(
                 Surface(color = Superficie, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            PulsanteVisore("↻", "Gira", Modifier.weight(1f)) { gira(90) }
+                            PulsanteVisore("↺", "Sinistra", Modifier.weight(1f)) { gira(270) }
+                            PulsanteVisore("↻", "Destra", Modifier.weight(1f)) { gira(90) }
                             PulsanteVisore("⇅", "Capovolgi", Modifier.weight(1f)) { gira(180) }
                             PulsanteVisore("✏", "Testo", Modifier.weight(1f), azione = testo)
                         }
@@ -990,11 +997,12 @@ private fun Visore(
                                 "✨", "Sfondo automatico", Modifier.weight(1f),
                                 applicato = f.sfondoPixelato, attivo = !sfondoInCorso && aggiornata != null,
                                 applica = pixelaSfondo, togli = togliSfondo,
+                                extra = if (f.sfondoPixelato) ({ pennello = Pennello.ORIGINALE }) else null,
                             )
                             SezionePixel(
                                 "▦", "Pixel a mano", Modifier.weight(1f),
                                 applicato = f.pixelManuale.isNotEmpty(), attivo = !sfondoInCorso && aggiornata != null,
-                                applica = { pixela = true }, togli = togliPixelMano,
+                                applica = { pennello = Pennello.PIXEL }, togli = togliPixelMano,
                                 applicaAncora = true,   // a mano si può sempre aggiungere
                             )
                         }
@@ -1005,9 +1013,35 @@ private fun Visore(
     }
 }
 
+/** Mostra subito la foto girata di [gradi] (con un giro morbido), ridimensionata per stare nel riquadro. */
+@Composable
+private fun FotoGirata(img: ImageBitmap, gradi: Int, contenuto: @Composable () -> Unit) {
+    // Angolo "cumulato", così il giro va sempre dalla parte più corta
+    var cumulato by remember { mutableFloatStateOf(gradi.toFloat()) }
+    var ultimo by remember { mutableIntStateOf(gradi) }
+    if (gradi != ultimo) {
+        cumulato += (((gradi - ultimo) % 360 + 540) % 360 - 180).toFloat()
+        ultimo = gradi
+    }
+    val angolo by animateFloatAsState(cumulato, tween(220), label = "gira")
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val bw = constraints.maxWidth.toFloat(); val bh = constraints.maxHeight.toFloat()
+        val fit = minOf(bw / img.width, bh / img.height)
+        val dw = img.width * fit; val dh = img.height * fit
+        // Girata di un quarto: larghezza e altezza si scambiano
+        val k = if (gradi % 180 != 0) minOf(bw / dh, bh / dw) else 1f
+        val scala by animateFloatAsState(k, tween(220), label = "scala")
+        Box(Modifier.fillMaxSize().graphicsLayer { rotationZ = angolo; scaleX = scala; scaleY = scala }) { contenuto() }
+    }
+}
+
+/** I due pennelli dell'editor. */
+private enum class Pennello { PIXEL, ORIGINALE }
+
 /**
  * Un tipo di pixel nel visore: il pulsante per farlo e, se è già fatto, "↺ Togli" per tornare indietro.
  * [applicaAncora]: il pulsante resta attivo anche dopo (pixel a mano: si aggiungono altri quadretti).
+ * [extra]: pulsante in più (sfondo pixelato: "Rimetti originale" col pennello).
  */
 @Composable
 private fun SezionePixel(
@@ -1015,6 +1049,7 @@ private fun SezionePixel(
     applicato: Boolean, attivo: Boolean,
     applica: () -> Unit, togli: () -> Unit,
     applicaAncora: Boolean = false,
+    extra: (() -> Unit)? = null,
 ) {
     Surface(color = FondoTenue, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, BordoScheda), modifier = modifier) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1026,6 +1061,9 @@ private fun SezionePixel(
                 colore = if (applicato) Verde.copy(alpha = 0.18f) else Cielo,
                 azione = applica,
             )
+            AnimatedVisibility(extra != null) {
+                PulsanteChiaro("Rimetti originale", "🖌", { extra?.invoke() }, Modifier.fillMaxWidth(), colore = Azzurro, altezza = 44.dp, grandezzaTesto = 13, attivo = attivo)
+            }
             AnimatedVisibility(applicato) {
                 PulsanteChiaro("Togli", "↺", togli, Modifier.fillMaxWidth(), colore = Arancione, altezza = 44.dp, grandezzaTesto = 14)
             }
@@ -1055,26 +1093,41 @@ private fun PulsanteVisore(
     }
 }
 
+/** Un passo del pennello: quadretti aggiunti, e quelli "a mano" tolti dal pennello Originale (per poterlo annullare). */
+private class Passo(val pennello: Pennello, val aggiunte: MutableSet<Long> = mutableSetOf(), val tolteMano: MutableSet<Long> = mutableSetOf())
+
 /**
- * Editor del pixel a mano: col dito si "dipingono" quadrettoni sulle parti da nascondere.
- * I quadretti si salvano sulla foto di base ([wBase]×[hBase]); quella mostrata è girata di [rotazione].
+ * Editor coi due pennelli:
+ * - ▦ Pixela: quadrettoni sulle parti da nascondere;
+ * - ✨ Originale: dove lo sfondo automatico ha pixelato troppo, rimette la foto vera.
+ * "Annulla" toglie l'ultimo passo, uno alla volta. I quadretti si salvano sulla foto di base ([wBase]×[hBase]).
  */
 @Composable
 private fun EditorPixel(
-    immagine: ImageBitmap, wBase: Int, hBase: Int, rotazione: Int, iniziali: Set<Long>,
-    modifier: Modifier, salva: (Set<Long>, Int) -> Unit, esci: () -> Unit,
+    f: Foto, immagine: ImageBitmap, wBase: Int, hBase: Int, iniziale: Pennello,
+    modifier: Modifier, salva: (Set<Long>, Int, Set<Long>) -> Unit, esci: () -> Unit,
 ) {
-    val lato = remember(wBase, hBase) { PixelManuale.lato(wBase, hBase) }
-    // Grandezza della foto mostrata (girata) in "pixel della base"
+    val rotazione = f.rotazioneManuale
+    val lato = remember(wBase, hBase) { f.latoPixel.takeIf { it > 0 } ?: PixelManuale.lato(wBase, hBase) }
     val wVista = if (rotazione % 180 == 0) wBase else hBase
     val hVista = if (rotazione % 180 == 0) hBase else wBase
-    // Colori di anteprima: la foto rimpicciolita, circa un pixel per quadretto
-    val piccola = remember(immagine) {
-        android.graphics.Bitmap.createScaledBitmap(immagine.asAndroidBitmap(), maxOf(1, (wVista + lato - 1) / lato), maxOf(1, (hVista + lato - 1) / lato), true)
+    // Sotto: lo sfondo pixelato (se c'è) o la foto vera; il pennello Originale mostra la foto vera
+    val fondo by produceState<ImageBitmap?>(null, f.fileSfondo, f.sfondoPixelato, rotazione) {
+        val file = if (f.sfondoPixelato) f.fileSfondo else f.fileAuto
+        value = file?.let { withContext(Dispatchers.IO) { caricaRuotata(it, rotazione) } }
     }
-    // quadretto → numero del tratto (per "Annulla"); quelli di prima hanno 0 e non si annullano qui
-    val celle = remember { mutableStateMapOf<Long, Int>().apply { iniziali.forEach { put(it, 0) } } }
-    var tratto by remember { mutableIntStateOf(0) }
+    val originale by produceState<ImageBitmap?>(null, f.fileAuto, rotazione) {
+        value = f.fileAuto?.let { withContext(Dispatchers.IO) { caricaRuotata(it, rotazione) } }
+    }
+    // Colori dei quadrettoni: la foto rimpicciolita, circa un pixel per quadretto
+    val piccola = remember(fondo) {
+        val img = fondo ?: immagine
+        android.graphics.Bitmap.createScaledBitmap(img.asAndroidBitmap(), maxOf(1, (wVista + lato - 1) / lato), maxOf(1, (hVista + lato - 1) / lato), true)
+    }
+    val mano = remember { mutableStateListOf<Long>().apply { addAll(f.pixelManuale) } }
+    val rimesse = remember { mutableStateListOf<Long>().apply { addAll(f.ripristinate) } }
+    val passi = remember { mutableStateListOf<Passo>() }
+    var modo by remember { mutableStateOf(iniziale) }
     var grande by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxWidth()) {
@@ -1083,34 +1136,60 @@ private fun EditorPixel(
             val scala = minOf(pxW / wVista, pxH / hVista)
             val ox = (pxW - wVista * scala) / 2; val oy = (pxH - hVista * scala) / 2
             fun dipingi(p: Offset) {
+                val passo = passi.lastOrNull() ?: return
                 val raggio = lato * (if (grande) 2.4f else 1.2f)
                 val (bx, by) = PixelManuale.versoBase((p.x - ox) / scala, (p.y - oy) / scala, rotazione, wBase, hBase)
-                PixelManuale.celleAttorno(bx, by, raggio, lato, wBase, hBase).forEach { if (it !in celle) celle[it] = tratto }
+                for (c in PixelManuale.celleAttorno(bx, by, raggio, lato, wBase, hBase)) {
+                    when (passo.pennello) {
+                        Pennello.PIXEL -> if (c !in mano) { mano += c; passo.aggiunte += c }
+                        Pennello.ORIGINALE -> {
+                            if (f.sfondoPixelato && c !in rimesse) { rimesse += c; passo.aggiunte += c }
+                            if (mano.remove(c)) passo.tolteMano += c   // via anche il pixel a mano lì
+                        }
+                    }
+                }
             }
-            Image(immagine, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Image(fondo ?: immagine, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             Canvas(
                 Modifier.fillMaxSize().testTag("tela")
-                    .pointerInput(grande) {
-                        detectTapGestures(onPress = { tratto++; dipingi(it) })
+                    .pointerInput(grande, modo) {
+                        detectTapGestures(onPress = { passi += Passo(modo); dipingi(it) })
                     }
-                    .pointerInput(grande) {
-                        // il tratto è già contato da onPress
+                    .pointerInput(grande, modo) {
+                        // il passo è già aperto da onPress
                         detectDragGestures(onDragStart = { dipingi(it) }) { cambio, _ -> dipingi(cambio.position) }
                     }
             ) {
-                for (c in celle.keys) {
-                    // Quadretto della base → rettangolo sulla foto mostrata
+                fun rettangolo(c: Long): Pair<Offset, Offset> {
                     val x0 = PixelManuale.colonna(c) * lato.toFloat(); val y0 = PixelManuale.riga(c) * lato.toFloat()
                     val x1 = minOf(wBase.toFloat(), x0 + lato); val y1 = minOf(hBase.toFloat(), y0 + lato)
                     val (ax, ay) = PixelManuale.daBase(x0, y0, rotazione, wBase, hBase)
                     val (bx, by) = PixelManuale.daBase(x1, y1, rotazione, wBase, hBase)
-                    val sx = minOf(ax, bx); val sy = minOf(ay, by); val ex = maxOf(ax, bx); val ey = maxOf(ay, by)
-                    val px = ((sx + ex) / 2 / lato).toInt().coerceIn(0, piccola.width - 1)
-                    val py = ((sy + ey) / 2 / lato).toInt().coerceIn(0, piccola.height - 1)
+                    return Offset(minOf(ax, bx), minOf(ay, by)) to Offset(maxOf(ax, bx), maxOf(ay, by))
+                }
+                // Pennello Originale: la foto vera in quei quadretti
+                originale?.let { o ->
+                    val kx = o.width / wVista.toFloat(); val ky = o.height / hVista.toFloat()
+                    for (c in rimesse) {
+                        val (a, b) = rettangolo(c)
+                        drawImage(
+                            o,
+                            srcOffset = androidx.compose.ui.unit.IntOffset((a.x * kx).toInt(), (a.y * ky).toInt()),
+                            srcSize = androidx.compose.ui.unit.IntSize(maxOf(1, ((b.x - a.x) * kx).toInt()), maxOf(1, ((b.y - a.y) * ky).toInt())),
+                            dstOffset = androidx.compose.ui.unit.IntOffset((ox + a.x * scala).toInt(), (oy + a.y * scala).toInt()),
+                            dstSize = androidx.compose.ui.unit.IntSize(((b.x - a.x) * scala).toInt() + 1, ((b.y - a.y) * scala).toInt() + 1),
+                        )
+                    }
+                }
+                // Pixel a mano: quadrettoni del loro colore medio
+                for (c in mano) {
+                    val (a, b) = rettangolo(c)
+                    val px = ((a.x + b.x) / 2 / lato).toInt().coerceIn(0, piccola.width - 1)
+                    val py = ((a.y + b.y) / 2 / lato).toInt().coerceIn(0, piccola.height - 1)
                     drawRect(
                         Color(piccola.getPixel(px, py)),
-                        Offset(ox + sx * scala, oy + sy * scala),
-                        androidx.compose.ui.geometry.Size((ex - sx) * scala + 1, (ey - sy) * scala + 1),
+                        Offset(ox + a.x * scala, oy + a.y * scala),
+                        androidx.compose.ui.geometry.Size((b.x - a.x) * scala + 1, (b.y - a.y) * scala + 1),
                     )
                 }
             }
@@ -1118,19 +1197,30 @@ private fun EditorPixel(
         Surface(color = Superficie, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = !grande, onClick = { grande = false }, label = { Text("● Pennello piccolo") })
-                    FilterChip(selected = grande, onClick = { grande = true }, label = { Text("⬤ Pennello grande") })
+                    FilterChip(selected = modo == Pennello.PIXEL, onClick = { modo = Pennello.PIXEL }, label = { Text("▦ Pixela") })
+                    FilterChip(selected = modo == Pennello.ORIGINALE, onClick = { modo = Pennello.ORIGINALE }, label = { Text("✨ Originale") })
+                    Spacer(Modifier.weight(1f))
+                    FilterChip(selected = grande, onClick = { grande = !grande }, label = { Text(if (grande) "⬤ Grande" else "● Piccolo") })
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PulsanteChiaro("Esci", "✕", esci, Modifier.weight(1f), altezza = 50.dp, grandezzaTesto = 14)
                     PulsanteChiaro(
                         "Annulla", "↶",
-                        { celle.values.maxOrNull()?.takeIf { it > 0 }?.let { ultimo -> celle.keys.filter { celle[it] == ultimo }.forEach(celle::remove) } },
-                        Modifier.weight(1f), attivo = celle.values.any { it > 0 }, altezza = 50.dp, grandezzaTesto = 14,
+                        {
+                            // Annulla l'ultimo passo, qualunque pennello fosse
+                            passi.removeLastOrNull()?.let { p ->
+                                when (p.pennello) {
+                                    Pennello.PIXEL -> mano.removeAll(p.aggiunte)
+                                    Pennello.ORIGINALE -> { rimesse.removeAll(p.aggiunte); mano.addAll(p.tolteMano) }
+                                }
+                            }
+                        },
+                        Modifier.weight(1f), attivo = passi.isNotEmpty(), altezza = 50.dp, grandezzaTesto = 14,
                     )
                     PulsanteGrande(
-                        "Salva", "✓", { salva(celle.keys.toSet(), lato) }, Modifier.weight(1f),
-                        attivo = celle.values.any { it > 0 }, colore = Verde, altezza = 50.dp, grandezzaTesto = 14,
+                        "Salva", "✓", { salva(mano.toSet(), lato, rimesse.toSet()) }, Modifier.weight(1f),
+                        // Si salva se qualcosa è davvero cambiato rispetto a prima
+                        attivo = mano.toSet() != f.pixelManuale || rimesse.toSet() != f.ripristinate, colore = Verde, altezza = 50.dp, grandezzaTesto = 14,
                     )
                 }
             }
@@ -1304,6 +1394,15 @@ private fun misureFoto(file: File): Pair<Int, Int> {
     val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.path, o)
     return o.outWidth to o.outHeight
+}
+
+/** La foto [file] rimpicciolita (~2000 px) e girata di [gradi]. */
+private fun caricaRuotata(file: File, gradi: Int): ImageBitmap? {
+    val (w, h) = misureFoto(file)
+    var campione = 1
+    while (maxOf(w, h) / (campione * 2) >= 2048) campione *= 2
+    val b = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = campione }) ?: return null
+    return Raddrizzatore.ruotaImmagine(b, gradi).asImageBitmap()
 }
 
 private fun caricaRidotta(file: File, lato: Int): ImageBitmap? {

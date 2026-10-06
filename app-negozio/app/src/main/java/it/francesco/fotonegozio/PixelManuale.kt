@@ -48,6 +48,15 @@ object PixelManuale {
         }
     }
 
+    /** Pennello "Originale": nei quadretti [celle] rimette i pixel di [originale] (stessa grandezza) al posto di [px]. */
+    fun rimetti(px: IntArray, originale: IntArray, larghezza: Int, altezza: Int, celle: Set<Long>, lato: Int) {
+        for (c in celle) {
+            val x0 = colonna(c) * lato; val y0 = riga(c) * lato
+            val x1 = min(larghezza, x0 + lato); val y1 = min(altezza, y0 + lato)
+            for (y in y0 until y1) System.arraycopy(originale, y * larghezza + x0, px, y * larghezza + x0, max(0, x1 - x0))
+        }
+    }
+
     /**
      * La foto mostrata può essere girata a mano di [gradi] (0/90/180/270, in senso orario) rispetto
      * alla foto di base, dove si salvano i quadretti. Queste due funzioni passano da una all'altra.

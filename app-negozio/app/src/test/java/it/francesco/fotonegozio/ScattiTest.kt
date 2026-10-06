@@ -44,6 +44,14 @@ class ScattiTest {
             regola.waitForIdle()
         }
         regola.runOnUiThread { vm.cambiaTema(0) }
+        // Il visore, con lo sfondo "pixelato" acceso (così si vede anche "Rimetti originale")
+        regola.runOnUiThread { vm.foto[0] = vm.foto[0].copy(fileSfondo = file, sfondoPixelato = true) }
+        regola.onAllNodesWithText("🔍 Tocca").onFirst().performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/visore.png")
+        regola.onNodeWithText("Pixel a mano").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/editor.png")
     }
 
     /** Disegna la finestra in un'immagine (Robolectric disegna anche senza schermo vero). */
