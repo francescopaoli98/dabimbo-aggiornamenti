@@ -64,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -967,7 +968,7 @@ private fun Visore(
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
-                    if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize()) }
+                    if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize(), f.file) }
                     if (sfondoInCorso) Surface(color = Superficie, shape = RoundedCornerShape(50), shadowElevation = 4.dp) {
                         Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = Azzurro)
@@ -1139,22 +1140,32 @@ private fun EditorPixel(
 
 /** Immagine che si ingrandisce con due dita (fino a 8 volte) e si sposta col dito. Doppio tocco: zoom avanti/indietro. */
 @Composable
-private fun FotoZoomabile(immagine: ImageBitmap, modifier: Modifier) {
+private fun FotoZoomabile(immagine: ImageBitmap, modifier: Modifier, file: File? = null) {
     var scala by remember { mutableFloatStateOf(1f) }
     var spostamento by remember { mutableStateOf(Offset.Zero) }
-    Box(
+    var riquadro by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+    // Ingrandendo, il pezzo inquadrato arriva nitido dalla foto originale
+    val nitidezza = ricordaNitidezza(file)
+    val vera = misureVere(file) ?: androidx.compose.ui.unit.IntSize(immagine.width, immagine.height)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(scala, spostamento, riquadro) { nitidezza.aggiorna(scala, spostamento, riquadro) }
+    Canvas(
         modifier
             .clipToBounds()
+            .onSizeChanged { riquadro = it }
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { punto ->
-                    if (scala > 1f) {
-                        scala = 1f; spostamento = Offset.Zero
-                    } else {
-                        // Porto il punto toccato al centro, ingrandito 3 volte
-                        val centro = Offset(size.width / 2f, size.height / 2f)
-                        scala = 3f; spostamento = (centro - punto) * 3f
-                    }
-                })
+                detectTapGestures(
+                    onPress = { scope.launch { nitidezza.prepara() } },   // apro la foto originale già al primo tocco
+                    onDoubleTap = { punto ->
+                        if (scala > 1f) {
+                            scala = 1f; spostamento = Offset.Zero
+                        } else {
+                            // Porto il punto toccato al centro, ingrandito 3 volte
+                            val centro = Offset(size.width / 2f, size.height / 2f)
+                            scala = 3f; spostamento = (centro - punto) * 3f
+                        }
+                    },
+                )
             }
             .pointerInput(Unit) {
                 detectTransformGestures { _, sposta, zoom, _ ->
@@ -1163,14 +1174,8 @@ private fun FotoZoomabile(immagine: ImageBitmap, modifier: Modifier) {
                 }
             }
     ) {
-        Image(
-            immagine, null,
-            Modifier.fillMaxSize().graphicsLayer {
-                scaleX = scala; scaleY = scala
-                translationX = spostamento.x; translationY = spostamento.y
-            },
-            contentScale = ContentScale.Fit,
-        )
+        disegnaZoom(immagine, vera, scala, spostamento)
+        if (scala > 1f) nitidezza.pezzo?.let { disegnaZoom(it.immagine, vera, scala, spostamento, it.zona) }
     }
 }
 
@@ -1197,7 +1202,7 @@ private fun ModificaArticolo(
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
             // Sopra: la foto, ingrandibile (due dita / doppio tocco)
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
-                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize()) }
+                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize(), foto) }
                 Text(
                     "Due dita per ingrandire",
                     color = Color.White, fontSize = 12.sp,
@@ -1262,7 +1267,7 @@ private fun ModificaTesto(foto: File?, iniziale: String, manuale: Boolean, salva
     Finestra(onDismissRequest = annulla, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).systemBarsPadding().imePadding()) {
             Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black)) {
-                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize()) }
+                immagine?.let { FotoZoomabile(it, Modifier.fillMaxSize(), foto) }
                 Text(
                     "Due dita per ingrandire",
                     color = Color.White, fontSize = 12.sp,

@@ -19,11 +19,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
@@ -31,12 +35,86 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** Un pezzo della foto originale, caricato a piena risoluzione: [zona] = dove sta nella foto vera. */
-private class Pezzo(val immagine: ImageBitmap, val zona: Rect)
+class Pezzo(val immagine: ImageBitmap, val zona: Rect)
+
+/** Grandezza vera di una foto (si legge solo l'intestazione del file: velocissimo). */
+@Composable
+fun misureVere(file: File?): IntSize? = remember(file) {
+    file?.let { BitmapFactory.Options().apply { inJustDecodeBounds = true; BitmapFactory.decodeFile(it.path, this) } }
+        ?.takeIf { it.outWidth > 0 }?.let { IntSize(it.outWidth, it.outHeight) }
+}
+
+/**
+ * Nitidezza a risoluzione originale mentre si ingrandisce: carica dalla foto VERA solo il pezzo inquadrato.
+ * Veloce perché:
+ * - il "lettore" della foto originale si apre una volta sola e resta pronto ([prepara] lo apre in anticipo);
+ * - si ricarica appena le dita si fermano un attimo (2 centesimi di secondo), tenendo intanto il pezzo di prima.
+ */
+class Nitidezza(private val file: File?, private val misure: IntSize?) {
+    private var lettore: BitmapRegionDecoder? = null
+    private val blocco = Mutex()
+    var pezzo by mutableStateOf<Pezzo?>(null)
+
+    /** Apre la foto originale in sottofondo (da chiamare appena si appoggia un dito). */
+    suspend fun prepara() = blocco.withLock { apri() }
+
+    @Suppress("DEPRECATION")
+    private suspend fun apri(): BitmapRegionDecoder? {
+        lettore?.let { return it }
+        val f = file ?: return null
+        return withContext(Dispatchers.IO) { runCatching { BitmapRegionDecoder.newInstance(f.path, false) }.getOrNull() }
+            .also { lettore = it }
+    }
+
+    /** Carica nitido il pezzo visibile per questo zoom (scala intorno al centro + spostamento). */
+    suspend fun aggiorna(scala: Float, spostamento: Offset, riquadro: IntSize) {
+        val m = misure ?: return
+        if (scala < 1.05f || riquadro == IntSize.Zero) { pezzo = null; return }
+        delay(20)   // le dita si sono fermate un attimo (se si muovono ancora, questo viene annullato)
+        val zona = zonaVisibile(m, riquadro, scala, spostamento) ?: return
+        // Pixel della foto per ogni pixel dello schermo: carico tutti quelli che lo schermo può mostrare
+        val schermoPerFoto = adattamento(m, riquadro) * scala
+        var campione = 1
+        while (campione * 2 * schermoPerFoto <= 1f) campione *= 2
+        val nuovo = blocco.withLock {
+            val l = apri() ?: return
+            withContext(Dispatchers.IO) {
+                runCatching { l.decodeRegion(zona, BitmapFactory.Options().apply { inSampleSize = campione }) }.getOrNull()
+            }
+        } ?: return
+        pezzo = Pezzo(nuovo.asImageBitmap(), zona)
+    }
+
+    fun chiudi() { lettore?.recycle(); lettore = null }
+}
+
+@Composable
+fun ricordaNitidezza(file: File?): Nitidezza {
+    val misure = misureVere(file)
+    val n = remember(file) { Nitidezza(file, misure) }
+    DisposableEffect(n) { onDispose { n.chiudi() } }
+    return n
+}
+
+/** Disegna l'immagine [img] (foto intera, anche rimpicciolita) come la mostra lo zoom: scala [s] intorno al centro + spostamento [p]. */
+fun DrawScope.disegnaZoom(img: ImageBitmap, vera: IntSize, s: Float, p: Offset, zona: Rect? = null) {
+    val box = IntSize(size.width.roundToInt(), size.height.roundToInt())
+    val f = adattamento(vera, box)
+    val ox = (box.width - vera.width * f) / 2; val oy = (box.height - vera.height * f) / 2
+    val c = Offset(box.width / 2f, box.height / 2f)
+    fun aSchermo(x: Float, y: Float) = c + (Offset(ox + x * f, oy + y * f) - c) * s + p
+    val r = zona ?: Rect(0, 0, vera.width, vera.height)
+    val a = aSchermo(r.left.toFloat(), r.top.toFloat()); val b = aSchermo(r.right.toFloat(), r.bottom.toFloat())
+    drawImage(
+        img, dstOffset = IntOffset(a.x.roundToInt(), a.y.roundToInt()),
+        dstSize = IntSize((b.x - a.x).roundToInt(), (b.y - a.y).roundToInt()),
+        filterQuality = FilterQuality.Medium,
+    )
+}
 
 /**
  * Anteprima nella lista: con due dita si ingrandisce (finché le dita sono giù), poi torna com'era.
- * Mentre si ingrandisce, l'app carica dalla foto ORIGINALE solo il pezzo inquadrato,
- * così i dettagli e l'etichetta si leggono nitidi invece che sgranati.
+ * Mentre si ingrandisce, il pezzo inquadrato arriva nitido dalla foto originale.
  * Un dito solo resta alla lista (scorre normalmente); il tocco apre la foto grande.
  */
 @Composable
@@ -45,36 +123,16 @@ fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier =
     var scala by remember { mutableFloatStateOf(1f) }
     var spostamento by remember { mutableStateOf(Offset.Zero) }
     var riquadro by remember { mutableStateOf(IntSize.Zero) }
-    var pezzo by remember(file) { mutableStateOf<Pezzo?>(null) }
-    // Grandezza vera della foto (si legge solo l'intestazione del file: velocissimo)
-    val misure = remember(file) {
-        file?.let { BitmapFactory.Options().apply { inJustDecodeBounds = true; BitmapFactory.decodeFile(it.path, this) } }
-            ?.takeIf { it.outWidth > 0 }?.let { IntSize(it.outWidth, it.outHeight) }
-    }
+    val nitidezza = ricordaNitidezza(file)
+    val misure = misureVere(file)
+    val scope = rememberCoroutineScope()
 
     // Mentre pizzica segue le dita; quando lascia torna dolcemente a posto
     val s by animateFloatAsState(if (attivo) scala else 1f, if (attivo) snap() else spring(), label = "zoom")
     val p by animateOffsetAsState(if (attivo) spostamento else Offset.Zero, if (attivo) snap() else spring(), label = "sposta")
 
-    // Appena le dita si fermano un attimo (0,1 s), carico nitido il pezzo inquadrato
     LaunchedEffect(attivo, scala, spostamento, riquadro) {
-        if (!attivo) { pezzo = null; return@LaunchedEffect }
-        if (file == null || misure == null || scala < 1.3f || riquadro == IntSize.Zero) return@LaunchedEffect
-        delay(100)
-        val zona = zonaVisibile(misure, riquadro, scala, spostamento) ?: return@LaunchedEffect
-        // Pixel della foto per ogni pixel dello schermo: carico solo quelli che servono
-        val schermoPerFoto = adattamento(misure, riquadro) * scala
-        var campione = 1
-        while (campione * 2 * schermoPerFoto <= 1f) campione *= 2
-        pezzo = withContext(Dispatchers.IO) {
-            runCatching {
-                @Suppress("DEPRECATION")
-                val decoder = BitmapRegionDecoder.newInstance(file.path, false)!!
-                try {
-                    decoder.decodeRegion(zona, BitmapFactory.Options().apply { inSampleSize = campione })?.let { Pezzo(it.asImageBitmap(), zona) }
-                } finally { decoder.recycle() }
-            }.getOrNull()
-        } ?: pezzo
+        if (!attivo) nitidezza.pezzo = null else nitidezza.aggiorna(scala, spostamento, riquadro)
     }
 
     Canvas(
@@ -84,6 +142,7 @@ fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier =
                 riquadro = size
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
+                    scope.launch { nitidezza.prepara() }   // apro la foto originale già al primo dito
                     do {
                         val evento = awaitPointerEvent()
                         if (evento.changes.count { it.pressed } >= 2) {
@@ -97,30 +156,9 @@ fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier =
                 }
             }
     ) {
-        val box = IntSize(size.width.roundToInt(), size.height.roundToInt())
         val vera = misure ?: IntSize(miniatura.width, miniatura.height)
-        val f = adattamento(vera, box)
-        // Dove finisce sullo schermo un punto (x, y) della foto vera
-        fun aSchermo(x: Float, y: Float): Offset {
-            val ox = (box.width - vera.width * f) / 2; val oy = (box.height - vera.height * f) / 2
-            val c = Offset(box.width / 2f, box.height / 2f)
-            return c + (Offset(ox + x * f, oy + y * f) - c) * s + p
-        }
-        val inizio = aSchermo(0f, 0f); val fine = aSchermo(vera.width.toFloat(), vera.height.toFloat())
-        drawImage(
-            miniatura, dstOffset = IntOffset(inizio.x.roundToInt(), inizio.y.roundToInt()),
-            dstSize = IntSize((fine.x - inizio.x).roundToInt(), (fine.y - inizio.y).roundToInt()),
-            filterQuality = FilterQuality.Medium,
-        )
-        pezzo?.let { pz ->
-            val a = aSchermo(pz.zona.left.toFloat(), pz.zona.top.toFloat())
-            val b = aSchermo(pz.zona.right.toFloat(), pz.zona.bottom.toFloat())
-            drawImage(
-                pz.immagine, dstOffset = IntOffset(a.x.roundToInt(), a.y.roundToInt()),
-                dstSize = IntSize((b.x - a.x).roundToInt(), (b.y - a.y).roundToInt()),
-                filterQuality = FilterQuality.Medium,
-            )
-        }
+        disegnaZoom(miniatura, vera, s, p)
+        if (attivo) nitidezza.pezzo?.let { disegnaZoom(it.immagine, vera, s, p, it.zona) }
     }
 }
 
