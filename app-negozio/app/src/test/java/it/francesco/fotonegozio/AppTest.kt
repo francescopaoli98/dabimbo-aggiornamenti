@@ -512,9 +512,17 @@ class AppTest {
         regola.runOnUiThread { vm.segnaPubblicata(1); vm.segnaPubblicata(2); vm.segnaPubblicata(1) }   // la 1 due volte: conta una
         regola.onNodeWithText("Oggi: 2 articoli · € 5,50").assertExists().performClick()
         regola.onNodeWithText("📊 Pubblicati").assertExists()
-        regola.onNodeWithText("2 · € 5,50").assertExists()
+        regola.onNodeWithText("2 · € 5,50").assertExists().performClick()
+        // Tolgo l'articolo contato per sbaglio (con conferma)
+        regola.onNodeWithText("cod. 7654321 · € 1,50").assertExists()
+        regola.onNodeWithTag("togli_7654321").performClick()
+        regola.onNodeWithText("Togliere dal conteggio?").assertExists()
+        regola.onNodeWithText("Sì, togli").performClick()
+        regola.waitForIdle()
+        assertEquals(1, vm.oggiPubblicati?.articoli)
+        assertEquals(400, vm.oggiPubblicati?.centesimi)
         // Resta anche riaprendo l'app
-        assertEquals(2, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.oggiPubblicati?.articoli)
+        assertEquals(1, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.oggiPubblicati?.articoli)
     }
 
     @Test

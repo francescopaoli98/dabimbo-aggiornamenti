@@ -349,24 +349,7 @@ private fun Schermata(vm: FotoViewModel) {
     }
 
     if (riepilogoAperto) {
-        val nomi = remember { java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.ITALY) }
-        val leggi = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY) }
-        AlertDialog(
-            onDismissRequest = { riepilogoAperto = false },
-            title = { Text("📊 Pubblicati") },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    vm.giornate.take(14).forEach { g ->
-                        val giorno = runCatching { nomi.format(leggi.parse(g.giorno)!!) }.getOrDefault(g.giorno).replaceFirstChar { it.uppercase() }
-                        Row(Modifier.fillMaxWidth()) {
-                            Text(giorno, Modifier.weight(1f))
-                            Text("${g.articoli} · ${Riepilogo.euro(g.centesimi)}", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { riepilogoAperto = false }) { Text("Chiudi") } },
-        )
+        SchermataRiepilogo(vm) { riepilogoAperto = false }
     }
 
     if (impostazioniAperte) {
@@ -529,6 +512,85 @@ private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () ->
                 Text("Poi Android chiede \"Installa\": toccalo e l'app si aggiorna. Le foto in lista restano.", fontSize = 12.sp, color = TestoTenue)
             }
         }
+    }
+}
+
+/**
+ * Riepilogo delle pubblicazioni: i giorni con i totali; toccando un giorno si vedono i suoi articoli
+ * e si può togliere quello contato per sbaglio.
+ */
+@Composable
+private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
+    val nomi = remember { java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.ITALY) }
+    val leggi = remember { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY) }
+    fun nomeGiorno(g: String) = runCatching { nomi.format(leggi.parse(g)!!) }.getOrDefault(g).replaceFirstChar { it.uppercase() }
+    var giorno by remember { mutableStateOf<String?>(null) }
+    var daTogliere by remember { mutableStateOf<Pubblicato?>(null) }
+
+    Finestra(onDismissRequest = { if (giorno != null) giorno = null else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
+            Row(
+                Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (giorno != null) PulsanteTondo("‹", { giorno = null })
+                Text(
+                    giorno?.let(::nomeGiorno) ?: "📊 Pubblicati",
+                    fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte,
+                    modifier = Modifier.weight(1f).padding(start = if (giorno != null) 12.dp else 0.dp),
+                )
+                PulsanteTondo("✕", chiudi)
+            }
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val g = giorno
+                if (g == null) {
+                    item { Text("Tocca un giorno per vedere gli articoli.", color = TestoTenue, fontSize = 14.sp) }
+                    items(vm.giornate.take(30), key = { it.giorno }) { gg ->
+                        Surface(onClick = { giorno = gg.giorno }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(nomeGiorno(gg.giorno), Modifier.weight(1f), fontSize = 16.sp)
+                                Text("${gg.articoli} · ${Riepilogo.euro(gg.centesimi)}", fontWeight = FontWeight.Bold, color = BluNotte)
+                                Text("  ›", color = BluNotte, fontSize = 18.sp)
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Text(
+                            "Puoi togliere un articolo contato per sbaglio: per esempio uno che hai aperto in WhatsApp " +
+                                "ma poi non hai caricato sullo stato. Tocca ✕ accanto all'articolo.",
+                            color = TestoTenue, fontSize = 14.sp,
+                        )
+                    }
+                    items(vm.articoliDel(g), key = { it.chiave }) { p ->
+                        Surface(color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                            Row(Modifier.fillMaxWidth().padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(p.nome.ifBlank { "Articolo" }, fontSize = 16.sp)
+                                    Text("cod. ${p.chiave} · ${Riepilogo.euro(p.centesimi)}", fontSize = 13.sp, color = TestoTenue)
+                                }
+                                PulsanteTondo("✕", { daTogliere = p }, Modifier.testTag("togli_${p.chiave}"), colore = Arancione)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    daTogliere?.let { p ->
+        AlertDialog(
+            onDismissRequest = { daTogliere = null },
+            title = { Text("Togliere dal conteggio?") },
+            text = { Text("cod. ${p.chiave} · ${Riepilogo.euro(p.centesimi)}\n\nSolo se per sbaglio non l'hai caricato su WhatsApp.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.togliDalRiepilogo(p); daTogliere = null
+                    if (vm.articoliDel(p.giorno).isEmpty()) giorno = null
+                }) { Text("Sì, togli", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = { TextButton(onClick = { daTogliere = null }) { Text("No") } },
+        )
     }
 }
 

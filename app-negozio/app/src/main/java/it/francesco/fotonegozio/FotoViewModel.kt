@@ -352,7 +352,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         if (i < 0) return
         foto[i] = foto[i].copy(pubblicata = pubblicata)
         if (pubblicata) {
-            registro = Riepilogo.aggiungi(registro, oggi(), foto[i].articoli)
+            // Nel riepilogo il nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…)
+            val articoli = foto[i].articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
+            registro = Riepilogo.aggiungi(registro, oggi(), articoli)
             fileRegistro.writeText(Riepilogo.scrivi(registro))
         }
     }
@@ -363,6 +365,15 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var registro by mutableStateOf(Riepilogo.leggi(fileRegistro.takeIf { it.exists() }?.readText().orEmpty()))
         private set
     val giornate: List<Giornata> get() = Riepilogo.giornate(registro)
+
+    /** Gli articoli contati in un giorno. */
+    fun articoliDel(giorno: String): List<Pubblicato> = registro.filter { it.giorno == giorno }
+
+    /** Toglie dal conteggio un articolo contato per sbaglio (es. aperto in WhatsApp ma poi non pubblicato). */
+    fun togliDalRiepilogo(p: Pubblicato) {
+        registro = registro - p
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+    }
 
     /** Codici di questa foto già pubblicati in passato (per non pubblicarli due volte). Vuoto se la foto è già pubblicata ora. */
     fun giaPubblicati(f: Foto): List<String> {

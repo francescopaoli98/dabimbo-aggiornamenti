@@ -44,6 +44,15 @@ class ScattiTest {
             regola.waitForIdle()
         }
         regola.runOnUiThread { vm.cambiaTema(0) }
+        // Riepilogo: un giorno aperto
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("1 · € 4,00").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/riepilogo.png")
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        regola.runOnUiThread { vm.segnaPubblicata(1, false) }
         // Il visore, con lo sfondo "pixelato" acceso (così si vede anche "Rimetti originale")
         regola.runOnUiThread { vm.foto[0] = vm.foto[0].copy(fileSfondo = file, sfondoPixelato = true) }
         regola.onAllNodesWithText("🔍 Tocca").onFirst().performClick()

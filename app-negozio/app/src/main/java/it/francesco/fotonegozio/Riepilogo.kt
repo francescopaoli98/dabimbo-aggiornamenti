@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Un articolo pubblicato: giorno (aaaa-mm-gg), codice (o descrizione se manca) e prezzo in centesimi. */
-data class Pubblicato(val giorno: String, val chiave: String, val centesimi: Int)
+data class Pubblicato(val giorno: String, val chiave: String, val centesimi: Int, val nome: String = "")
 
 /** Totale di un giorno: quanti articoli e quanto valgono. */
 data class Giornata(val giorno: String, val articoli: Int, val centesimi: Int)
@@ -28,7 +28,7 @@ object Riepilogo {
     fun aggiungi(registro: List<Pubblicato>, giorno: String, articoli: List<DatiCartellino>): List<Pubblicato> {
         val nuovi = articoli.mapNotNull { a ->
             val chiave = a.codice ?: a.descrizione ?: return@mapNotNull null
-            Pubblicato(giorno, chiave, centesimi(a.prezzo) ?: 0)
+            Pubblicato(giorno, chiave, centesimi(a.prezzo) ?: 0, a.descrizione.orEmpty())
         }.filter { n -> registro.none { it.giorno == n.giorno && it.chiave == n.chiave } }
             .distinctBy { it.chiave }
         return registro + nuovi
@@ -42,11 +42,11 @@ object Riepilogo {
     fun euro(centesimi: Int) = "€ ${centesimi / 100},${(centesimi % 100).toString().padStart(2, '0')}"
 
     fun scrivi(registro: List<Pubblicato>): String = JSONArray().apply {
-        registro.forEach { put(JSONObject().put("g", it.giorno).put("k", it.chiave).put("c", it.centesimi)) }
+        registro.forEach { put(JSONObject().put("g", it.giorno).put("k", it.chiave).put("c", it.centesimi).put("n", it.nome)) }
     }.toString()
 
     fun leggi(testo: String): List<Pubblicato> = runCatching {
         val a = JSONArray(testo)
-        List(a.length()) { a.getJSONObject(it).let { o -> Pubblicato(o.getString("g"), o.getString("k"), o.optInt("c")) } }
+        List(a.length()) { a.getJSONObject(it).let { o -> Pubblicato(o.getString("g"), o.getString("k"), o.optInt("c"), o.optString("n")) } }
     }.getOrDefault(emptyList())
 }
