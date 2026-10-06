@@ -1,6 +1,6 @@
 {
-  "versionCode": 67,
-  "versionName": "4.2",
+  "versionCode": 68,
+  "versionName": "4.3",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovi temi: Bosco, Tramonto, Mare profondo, Caramella, Elegante, Notte stellata e \"Il mio colore\"."
+  "note": "Impostazioni più snelle: una riga per gruppo, si apre solo quella che tocchi."
 }
