@@ -1,6 +1,6 @@
 {
-  "versionCode": 69,
-  "versionName": "4.4",
+  "versionCode": 70,
+  "versionName": "4.5",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Lista delle foto più snella: si vede di più in uno schermo."
+  "note": "La taglia compare una volta sola nel testo, comunque sia scritta sul cartellino."
 }
