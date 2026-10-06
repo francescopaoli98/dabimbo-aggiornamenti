@@ -19,6 +19,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -59,7 +62,10 @@ data class Foto(
 
 /** Cosa deve contenere il file finale: se cambia, la foto va ricomposta. */
 val Foto.statoVoluto: String get() =
-    "${fileAuto?.name}|$rotazioneManuale|$sfondoPixelato|${fileSfondo?.name}|${pixelManuale.hashCode()}|${ripristinate.hashCode()}|$latoPixel"
+    "${fileAuto?.name}|$rotazioneManuale|$sfondoPixelato|${fileSfondo?.name}|${impronta(pixelManuale)}|${impronta(ripristinate)}|$latoPixel"
+
+/** Impronta di un insieme di quadretti: quanti sono + hash dell'elenco ordinato (due zone diverse non si confondono). */
+private fun impronta(celle: Set<Long>) = "${celle.size}:${celle.sorted().hashCode()}"
 
 /** Tutti gli articoli della foto (il principale + gli altri), nell'ordine in cui vengono mostrati. */
 val Foto.articoli: List<DatiCartellino> get() = listOfNotNull(dati) + altri
@@ -138,6 +144,15 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Elabora 2 foto alla volta (più veloce; spegnere se il telefono rallenta). */
     var dueAllaVolta by mutableStateOf(preferenze.getBoolean("due_alla_volta", true))
         private set
+    /** Avviso sul telefono quando le foto sono pronte (se Elisa è uscita dall'app). */
+    var avvisoPronte by mutableStateOf(preferenze.getBoolean("avviso_pronte", true))
+        private set
+    fun cambiaAvvisoPronte(v: Boolean) { avvisoPronte = v; preferenze.edit().putBoolean("avviso_pronte", v).apply() }
+    /** Il permesso per gli avvisi è già stato chiesto una volta (non si richiede di continuo). */
+    var permessoChiesto: Boolean
+        get() = preferenze.getBoolean("permesso_avvisi_chiesto", false)
+        set(v) { preferenze.edit().putBoolean("permesso_avvisi_chiesto", v).apply() }
+
     fun cambiaDueAllaVolta(v: Boolean) { dueAllaVolta = v; preferenze.edit().putBoolean("due_alla_volta", v).apply() }
 
     fun cambiaScalaTesto(v: Float) { scalaTesto = v; preferenze.edit().putFloat("scala_testo", v).apply() }
@@ -267,6 +282,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
      * una volta sola, con l'ultimo stato.
      */
     private fun modifica(numero: Int, fine: () -> Unit = {}, cambia: suspend (Foto) -> Foto?) {
+        inRicomposizione[numero] = (inRicomposizione[numero] ?: 0) + 1
         viewModelScope.launch {
             try {
                 bloccoRotazioni.withLock {
@@ -274,10 +290,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                     val nuova = cambia(f) ?: return@withLock
                     aggiorna(numero) { nuova }
                     if (nuova.statoVoluto == nuova.statoFile) return@withLock   // già fatta
-                    val composta = componi(nuova)
-                    // Il file finale vecchio non serve più (le basi sì)
-                    val vecchio = f.file
-                    if (vecchio != null && vecchio != composta.file && vecchio != f.fileAuto && vecchio != f.fileSfondo) vecchio.delete()
+                    // Se la foto non si riesce a ricomporre (file rovinato), mi fermo: niente giri a vuoto
+                    val composta = componi(nuova) ?: return@withLock
+                    // Il file finale vecchio NON si cancella qui: WhatsApp potrebbe starlo ancora leggendo
+                    // (la cartella si svuota quando si scelgono foto nuove)
                     aggiorna(numero) { attuale ->
                         // Se intanto è cambiata ancora, tengo l'anteprima "veloce" e ricompongo al giro dopo
                         val uguale = attuale.statoVoluto == composta.statoFile
@@ -290,10 +306,16 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                     if (ancora != null && ancora.statoVoluto != ancora.statoFile) modifica(numero) { it }
                 }
             } finally {
+                val n = (inRicomposizione[numero] ?: 1) - 1
+                if (n <= 0) inRicomposizione.remove(numero) else inRicomposizione[numero] = n
                 fine()
             }
         }
     }
+
+    /** Foto che si stanno ricomponendo (girate, pixelate…): finché non hanno finito non si pubblicano. */
+    private val inRicomposizione = mutableStateMapOf<Int, Int>()
+    fun pronta(numero: Int) = (inRicomposizione[numero] ?: 0) == 0
 
     private fun aggiorna(numero: Int, cambia: (Foto) -> Foto) {
         val i = foto.indexOfFirst { it.numero == numero }
@@ -304,15 +326,17 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
      * Foto finale = base (o base con lo sfondo pixelato, con i quadretti "Originale" rimessi)
      * + quadretti a mano, girata come vuole Elisa.
      */
-    private suspend fun componi(f: Foto): Foto = withContext(Dispatchers.Default) {
+    private suspend fun componi(f: Foto): Foto? = withContext(Dispatchers.Default) { try { componiFoto(f) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null } }
+
+    private fun componiFoto(f: Foto): Foto? {
         val stato = f.statoVoluto
         val sfondo = if (f.sfondoPixelato) f.fileSfondo else null
-        val base = sfondo ?: f.fileAuto ?: return@withContext f
+        val base = sfondo ?: f.fileAuto ?: return null
         if (f.pixelManuale.isEmpty() && f.rotazioneManuale == 0 && (sfondo == null || f.ripristinate.isEmpty())) {
-            val b = BitmapFactory.decodeFile(base.path) ?: return@withContext f
-            return@withContext f.copy(file = base, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = 0)
+            val b = BitmapFactory.decodeFile(base.path) ?: return null
+            return f.copy(file = base, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = 0)
         }
-        var b = BitmapFactory.decodeFile(base.path, BitmapFactory.Options().apply { inMutable = true }) ?: return@withContext f
+        var b = BitmapFactory.decodeFile(base.path, BitmapFactory.Options().apply { inMutable = true }) ?: return null
         val w = b.width; val h = b.height
         val lato = f.latoPixel.takeIf { it > 0 } ?: PixelManuale.lato(w, h)
         if (f.pixelManuale.isNotEmpty() || (sfondo != null && f.ripristinate.isNotEmpty())) {
@@ -331,12 +355,13 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         b = Raddrizzatore.ruotaImmagine(b, f.rotazioneManuale)
         // Nome sempre nuovo, così le anteprime si aggiornano
         val file = Raddrizzatore.salva(getApplication(), b, "foto_${f.numero}_v${System.currentTimeMillis() % 100_000_000}")
-        f.copy(file = file, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = f.rotazioneManuale)
+        return f.copy(file = file, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = f.rotazioneManuale)
     }
 
     /** Torna alla schermata iniziale: lista vuota. */
     fun svuota() {
         lavoro?.cancel()
+        lavoro = null
         foto.clear()
         soloDaControllare = false
         Raddrizzatore.cartella(getApplication()).listFiles()?.forEach { it.delete() }
@@ -354,7 +379,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         if (pubblicata) {
             // Nel riepilogo il nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…)
             val articoli = foto[i].articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
-            registro = Riepilogo.aggiungi(registro, oggi(), articoli)
+            // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
+            val unAnnoFa = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(System.currentTimeMillis() - 365L * 24 * 3600 * 1000))
+            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli)
             fileRegistro.writeText(Riepilogo.scrivi(registro))
         }
     }
@@ -364,7 +391,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Tutti gli articoli pubblicati, giorno per giorno (resta salvato). */
     var registro by mutableStateOf(Riepilogo.leggi(fileRegistro.takeIf { it.exists() }?.readText().orEmpty()))
         private set
-    val giornate: List<Giornata> get() = Riepilogo.giornate(registro)
+    private val giornateCalcolate by derivedStateOf { Riepilogo.giornate(registro) }
+    private val codiciNoti by derivedStateOf { registro.mapTo(HashSet()) { it.chiave } }
+    val giornate: List<Giornata> get() = giornateCalcolate
 
     /** Gli articoli contati in un giorno. */
     fun articoliDel(giorno: String): List<Pubblicato> = registro.filter { it.giorno == giorno }
@@ -378,8 +407,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Codici di questa foto già pubblicati in passato (per non pubblicarli due volte). Vuoto se la foto è già pubblicata ora. */
     fun giaPubblicati(f: Foto): List<String> {
         if (f.pubblicata) return emptyList()
-        val noti = registro.mapTo(HashSet()) { it.chiave }
-        return f.articoli.mapNotNull { it.codice }.filter { it in noti }.distinct()
+        return f.articoli.mapNotNull { it.codice }.filter { it in codiciNoti }.distinct()
     }
     val oggiPubblicati: Giornata? get() = giornate.firstOrNull { it.giorno == oggi() }
     private fun oggi() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date())
@@ -410,9 +438,31 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
      * oppure 1 alla volta se nelle impostazioni è spento "2 foto alla volta".
      */
     private fun elaboraInCoda() {
+        val app = getApplication<Application>()
         lavoro = viewModelScope.launch {
+            // Avviso fisso "Sto preparando le foto…": tiene sveglia l'app anche se Elisa esce
+            val questo = coroutineContext[Job]
+            ServizioLavoro.avvia(app, elaborate, foto.size)
+            Avvisi.togliPronte(app)
+            try {
+                lavoraTutte()
+            } finally {
+                // Se intanto è partita un'altra lista, il servizio serve a lei: non lo fermo
+                if (lavoro === questo || lavoro == null) withContext(NonCancellable) { ServizioLavoro.ferma(app) }
+            }
+            // Finito: se Elisa è fuori dall'app, l'avviso "foto pronte"
+            if (avvisoPronte && !AppVisibile.visibile && foto.isNotEmpty())
+                Avvisi.pronte(app, foto.count { !it.pubblicata }, foto.count { it.daGuardare })
+        }
+    }
+
+    private suspend fun lavoraTutte() {
+        run {
             val prese = mutableSetOf<Int>()   // foto già in mano a un "lavoratore"
-            val lavoratori = if (dueAllaVolta) listOf(raddrizzatore, secondoRaddrizzatore) else listOf(raddrizzatore)
+            // Ogni "lavoratore" si crea il suo lettore solo quando serve, dentro il controllo errori:
+            // se il lettore non parte, la foto finisce con un errore invece di chiudere l'app
+            val lavoratori: List<() -> Raddrizzatore> =
+                if (dueAllaVolta) listOf({ raddrizzatore }, { secondoRaddrizzatore }) else listOf({ raddrizzatore })
             kotlinx.coroutines.coroutineScope {
                 for (r in lavoratori) launch {
                     while (true) {
@@ -423,6 +473,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                         val i = foto.indexOfFirst { it.numero == prossima.numero }
                         if (i >= 0) foto[i] = fatta
                         else fatta.fileAuto?.delete()
+                        Avvisi.aggiornaLavoro(getApplication(), elaborate, foto.size)
                     }
                 }
             }
@@ -436,8 +487,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         listOfNotNull(f.fileAuto, f.file).distinct().forEach { it.delete() }
     }
 
-    private suspend fun elabora(f: Foto, raddrizzatore: Raddrizzatore): Foto = withContext(Dispatchers.Default) {
+    private suspend fun elabora(f: Foto, lettore: () -> Raddrizzatore): Foto = withContext(Dispatchers.Default) {
         try {
+            val raddrizzatore = lettore()
             val inizio = System.currentTimeMillis()
             val diario = if (diagnosi) Diario() else null
             raddrizzatore.diario = diario

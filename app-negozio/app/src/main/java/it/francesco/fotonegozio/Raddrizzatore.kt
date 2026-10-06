@@ -88,7 +88,8 @@ class Raddrizzatore(private val context: Context) {
      * Restituisce di quanto girare ancora (0 = va già bene), o null se l'oggetto non ha scritte chiare.
      */
     private suspend fun versoOggetto(foto: Bitmap, paroleCartellino: Set<String>): Int? {
-        val k = min(1f, 1400f / max(foto.width, foto.height))
+        // Copia piccola: le scritte grandi dell'oggetto si leggono bene anche così, e i 4 passaggi costano poco
+        val k = min(1f, 1000f / max(foto.width, foto.height))
         val piccola = if (k < 1f) Bitmap.createScaledBitmap(foto, (foto.width * k).toInt(), (foto.height * k).toInt(), true) else foto
         val voti = mutableMapOf<Int, Float>()
         for (g in listOf(0, 90, 180, 270)) {
@@ -701,7 +702,7 @@ class Raddrizzatore(private val context: Context) {
         val cx = zona.centerX()
         val cy = zona.centerY()
         val r = Rect(cx - lato / 2, cy - lato / 2, cx + lato / 2, cy + lato / 2)
-        r.intersect(0, 0, b.width, b.height)
+        if (!r.intersect(0, 0, b.width, b.height)) r.set(0, 0, b.width, b.height)   // (non succede, ma per sicurezza)
         val pezzo = Bitmap.createBitmap(b, r.left, r.top, r.width(), r.height())
         val scala = LATO_RITAGLIO.toFloat() / max(pezzo.width, pezzo.height)
         val finale = if (scala > 1f) Bitmap.createScaledBitmap(pezzo, (pezzo.width * scala).toInt(), (pezzo.height * scala).toInt(), true)

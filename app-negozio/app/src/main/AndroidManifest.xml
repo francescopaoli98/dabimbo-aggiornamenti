@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Avvisi: "Sto preparando le foto…" e "Foto pronte da pubblicare" -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <!-- Serve per sapere se WhatsApp Business / WhatsApp sono installati (Android 11+) -->
     <queries>
         <package android:name="com.whatsapp.w4b" />
@@ -47,6 +52,12 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+        <!-- Tiene sveglia l'app mentre prepara le foto (anche se Elisa esce dall'app) -->
+        <service
+            android:name=".ServizioLavoro"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- Permette di passare le foto a WhatsApp in modo sicuro -->
         <provider
             android:name="androidx.core.content.FileProvider"

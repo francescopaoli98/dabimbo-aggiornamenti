@@ -541,4 +541,55 @@ class AppTest {
         assertTrue(vm.foto[0].pubblicata)
         regola.onNodeWithText("⚠ Già pubblicato: cod. 1234567").assertDoesNotExist()
     }
+
+    @Test
+    fun avvisoFotoPronteQuandoSeiFuoriDallApp() {
+        val app = vm.getApplication<android.app.Application>()
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val file = Raddrizzatore.salva(regola.activity, Bitmap.createBitmap(30, 40, Bitmap.Config.ARGB_8888), "prova_avviso")
+        regola.runOnUiThread {
+            AppVisibile.visibile = false   // Elisa è uscita dall'app
+            vm.carica(listOf(Uri.fromFile(file)))
+        }
+        // Mentre lavora parte il servizio con l'avviso fisso
+        val servizio = shadowOf(app).nextStartedService
+        assertEquals(ServizioLavoro::class.java.name, servizio?.component?.className)
+        // Sul PC la lettura non gira: la foto finisce subito (con errore), ma il percorso è lo stesso
+        regola.waitUntil(10_000) { vm.foto.isNotEmpty() && vm.foto.none { it.inCorso } }
+        // (nel simulatore il servizio non parte davvero: l'app aspetta fino a 3 s prima di fermarlo)
+        regola.waitUntil(15_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(200))
+            shadowOf(app.getSystemService(android.app.NotificationManager::class.java)).allNotifications
+                .any { it.extras.getString(android.app.Notification.EXTRA_TITLE)?.contains("pronta da pubblicare") == true }
+        }
+        // Servizio fermato a fine lavoro
+        assertNotNull(shadowOf(app).nextStoppedService)
+    }
+
+    @Test
+    fun nessunAvvisoSeSeiNellApp() {
+        val app = vm.getApplication<android.app.Application>()
+        shadowOf(app).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+        val file = Raddrizzatore.salva(regola.activity, Bitmap.createBitmap(30, 40, Bitmap.Config.ARGB_8888), "prova_avviso2")
+        regola.runOnUiThread { AppVisibile.visibile = true; vm.carica(listOf(Uri.fromFile(file))) }
+        regola.waitUntil(10_000) { vm.foto.isNotEmpty() && vm.foto.none { it.inCorso } }
+        Thread.sleep(300); regola.waitForIdle()
+        val avvisi = shadowOf(app.getSystemService(android.app.NotificationManager::class.java)).allNotifications
+        assertTrue(avvisi.none { it.extras.getString(android.app.Notification.EXTRA_TITLE)?.contains("pronta") == true })
+    }
+
+    @Test
+    fun pubblicaSubitoDopoGiraAspettaLaFotoGirata() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        apriVisore()
+        regola.onNodeWithText("Destra").performClick()
+        regola.onAllNodesWithText("✕").onLast().performClick()   // chiudo il visore
+        // Subito "Pubblica la prossima": l'app aspetta che la foto girata sia pronta, poi la passa a WhatsApp
+        regola.onNodeWithText("Pubblica la prossima · Foto 1").performClick()
+        // (nel simulatore la condivisione del file nuovo non riesce per via delle cartelle dei test:
+        //  conta che il tentativo avvenga solo DOPO che la foto girata è pronta)
+        regola.waitUntil(8_000) { vm.foto[0].pubblicata || vm.messaggio != null }
+        assertEquals(90, vm.foto[0].rotazioneFile)
+        assertTrue(vm.pronta(1))
+    }
 }

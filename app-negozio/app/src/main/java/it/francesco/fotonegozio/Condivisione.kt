@@ -21,7 +21,8 @@ object Condivisione {
         context.getSystemService(ClipboardManager::class.java)
             ?.setPrimaryClip(ClipData.newPlainText("Testo per lo stato", testo))
 
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", foto)
+        val uri = runCatching { FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", foto) }.getOrNull()
+            ?: return false   // file non condivisibile: meglio un messaggio che chiudere l'app
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "image/jpeg"
             putExtra(Intent.EXTRA_STREAM, uri)

@@ -142,10 +142,11 @@ fun AnteprimaZoomabile(miniatura: ImageBitmap, file: File?, modifier: Modifier =
                 riquadro = size
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
-                    scope.launch { nitidezza.prepara() }   // apro la foto originale già al primo dito
                     do {
                         val evento = awaitPointerEvent()
                         if (evento.changes.count { it.pressed } >= 2) {
+                            // Due dita: apro la foto originale (una volta sola; scorrendo la lista con un dito no)
+                            if (!attivo) scope.launch { nitidezza.prepara() }
                             attivo = true
                             scala = (scala * evento.calculateZoom()).coerceIn(1f, 8f)
                             spostamento += evento.calculatePan()

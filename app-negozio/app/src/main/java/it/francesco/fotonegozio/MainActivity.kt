@@ -57,6 +57,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -130,6 +131,9 @@ class MainActivity : ComponentActivity() {
 
     private var ultimoIndietro = 0L
 
+    override fun onStart() { super.onStart(); AppVisibile.visibile = true; Avvisi.togliPronte(this) }
+    override fun onStop() { AppVisibile.visibile = false; super.onStop() }
+
     // App già aperta e Elisa condivide altre foto dalla Galleria
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -178,6 +182,15 @@ private fun Schermata(vm: FotoViewModel) {
     val scegli = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) {
         vm.carica(it)
     }
+    // Permesso per gli avvisi (Android 13+): chiesto una volta sola, quando arrivano le prime foto
+    val permessoAvvisi = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val ctx = LocalContext.current
+    LaunchedEffect(vm.foto.isNotEmpty()) {
+        if (vm.foto.isNotEmpty() && Build.VERSION.SDK_INT >= 33 && !vm.permessoChiesto && !Avvisi.puoAvvisare(ctx)) {
+            vm.permessoChiesto = true
+            permessoAvvisi.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     var ingrandita by remember { mutableStateOf<Int?>(null) }   // numero della foto aperta a schermo intero
     var inModifica by remember { mutableStateOf<Pair<Int, Int?>?>(null) }   // (foto, articolo) - articolo null = nuovo
     var dizionarioAperto by remember { mutableStateOf(false) }
@@ -190,8 +203,8 @@ private fun Schermata(vm: FotoViewModel) {
     var chiediMenu by remember { mutableStateOf(false) }               // ✕: tornare al menu principale (chiedo se mancano foto)
     val riaperte = remember { mutableStateListOf<Int>() }              // foto pubblicate riaperte (se le schede si comprimono)
     val lista = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
     val vibra = LocalHapticFeedback.current
@@ -204,10 +217,15 @@ private fun Schermata(vm: FotoViewModel) {
         else if (mancavano) { mancavano = false; festa = true; kotlinx.coroutines.delay(3400); festa = false }
     }
     fun pubblica(f: Foto) {
-        val file = f.file ?: return
         vibra.performHapticFeedback(HapticFeedbackType.LongPress)
-        if (Condivisione.pubblica(context, file, vm.testo(f))) vm.segnaPubblicata(f.numero)
-        else vm.messaggio = "WhatsApp non trovato sul telefono"
+        scope.launch {
+            // Se la foto si sta ancora sistemando (appena girata o pixelata), aspetto la versione finale
+            if (!vm.pronta(f.numero)) snapshotFlow { vm.pronta(f.numero) }.first { it }
+            val attuale = vm.foto.firstOrNull { it.numero == f.numero } ?: return@launch
+            val file = attuale.file ?: return@launch
+            if (Condivisione.pubblica(context, file, vm.testo(attuale))) vm.segnaPubblicata(attuale.numero)
+            else vm.messaggio = "WhatsApp non trovato sul telefono"
+        }
     }
     fun chiediEPubblica(f: Foto) {
         if (f.avvisi.isEmpty() && vm.giaPubblicati(f).isEmpty()) pubblica(f) else daConfermare = f.numero
@@ -650,6 +668,7 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 }
                 Riquadro("Lista delle foto") {
                     Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
+                    Interruttore("Avvisami quando le foto sono pronte", "Se esci dall'app mentre le prepara, ti arriva un avviso sul telefono.", vm.avvisoPronte, vm::cambiaAvvisoPronte)
                     Interruttore("2 foto alla volta", "Prepara le foto più in fretta. Se il telefono rallenta, spegnilo.", vm.dueAllaVolta, vm::cambiaDueAllaVolta)
                     Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ in basso a destra per tornare in cima alla lista.", vm.tornaSu, vm::cambiaTornaSu)
                 }
@@ -959,7 +978,7 @@ private fun SchermataDizionario(voci: List<VoceDizionario>, salva: (String?, Voc
                         Text(v.sigla.uppercase(), fontWeight = FontWeight.Bold, modifier = Modifier.width(90.dp))
                         Text(
                             if (v.daTogliere) "(tolto dal testo)" else v.significatoTesto,
-                            color = if (v.daTogliere) ARANCIONE else Color.Unspecified,
+                            color = if (v.daTogliere) Arancione else Color.Unspecified,
                         )
                     }
                     HorizontalDivider()
@@ -1011,7 +1030,6 @@ private fun Avviso(testo: String) = Text(
     modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(FondoAvviso, RoundedCornerShape(14.dp)).padding(12.dp),
 )
 
-private val ARANCIONE = Arancione
 
 /** I dati di UN articolo, così come sono letti dal cartellino (le sigle le espande il pezzo 3). */
 @Composable
