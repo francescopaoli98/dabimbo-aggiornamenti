@@ -24,8 +24,11 @@ data class Novita(val versionCode: Long, val versionName: String, val apk: Strin
  */
 object Aggiornamento {
 
-    /** Il file con l'ultima versione (progetto pubblico: solo l'app pronta, niente codice). */
-    const val INDIRIZZO = "https://raw.githubusercontent.com/francescopaoli85-ops/dabimbo-aggiornamenti/main/versione.json"
+    /**
+     * Il file con l'ultima versione, nel progetto pubblico francescopaoli98/dabimbo-aggiornamenti
+     * (solo l'app pronta, niente codice): versione.json + dabimbo.apk sul ramo main.
+     */
+    const val INDIRIZZO = "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/versione.json"
 
     /** Legge il file della versione (Kotlin puro, testabile). */
     fun leggi(testo: String): Novita? = runCatching {
