@@ -1,6 +1,6 @@
 {
-  "versionCode": 64,
-  "versionName": "3.9",
+  "versionCode": 65,
+  "versionName": "4.0",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Riepilogo: tocca un giorno per vedere gli articoli e togliere quelli contati per sbaglio."
+  "note": "Avviso quando le foto sono pronte, e tante correzioni: \"Pubblica\" aspetta la foto girata/pixelata, app più stabile."
 }
