@@ -55,6 +55,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
@@ -637,42 +638,57 @@ private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> U
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-/** Impostazioni: grandezza del testo, schede compresse, pulsante "torna su", prezzo in grassetto. */
+/**
+ * Impostazioni snelle: una riga per gruppo con il riassunto della scelta;
+ * toccandola si apre solo quel gruppo (gli altri restano chiusi).
+ */
 @Composable
 private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
+    var aperta by remember { mutableStateOf<String?>(null) }
+    fun apri(nome: String) { aperta = if (aperta == nome) null else nome }
+    val nomiModo = listOf("Chiaro", "Scuro", "Come il telefono")
+    val nomiTesto = mapOf(0.9f to "Piccolo", 1f to "Medio", 1.2f to "Grande", 1.4f to "Molto grande")
     Finestra(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
             Row(
-                Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 16.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("⚙ Impostazioni", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte, modifier = Modifier.weight(1f))
                 PulsanteTondo("✕", chiudi)
             }
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Riquadro("Aspetto") {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(0 to "☀ Chiaro", 1 to "🌙 Scuro", 2 to "📱 Come il telefono").forEach { (v, nome) ->
-                            FilterChip(selected = vm.tema == v, onClick = { vm.cambiaTema(v) }, label = { Text(nome, maxLines = 1) })
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Sezione("🎨", "Aspetto", "${nomiModo[vm.tema]} · ${NOMI_TAVOLOZZE[vm.tavolozza].substringAfter(' ')}", aperta == "aspetto", { apri("aspetto") }) {
+                    Scelte(nomiModo, vm.tema, vm::cambiaTema)
+                    // Colori: una fila di pallini con il nome sotto
+                    FlowRow(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        NOMI_TAVOLOZZE.indices.forEach { i ->
+                            val scelto = vm.tavolozza == i
+                            Column(
+                                Modifier.width(64.dp).clip(RoundedCornerShape(14.dp)).clickable { vm.cambiaTavolozza(i) }
+                                    .testTag("tema_$i").padding(vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Box(
+                                    Modifier.size(38.dp).clip(CircleShape).background(coloreDelTema(i))
+                                        .then(if (scelto) Modifier.border(3.dp, Testo, CircleShape) else Modifier),
+                                    contentAlignment = Alignment.Center,
+                                ) { Text(if (scelto) "✓" else NOMI_TAVOLOZZE[i].substringBefore(' '), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                                Text(
+                                    NOMI_TAVOLOZZE[i].substringAfter(' '), fontSize = 11.sp, textAlign = TextAlign.Center, maxLines = 2,
+                                    lineHeight = 13.sp, color = if (scelto) BluNotte else TestoTenue, fontWeight = if (scelto) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
                         }
                     }
-                    Text("Colori", fontWeight = FontWeight.Bold, color = BluNotte, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        NOMI_TAVOLOZZE.forEachIndexed { i, nome ->
-                            FilterChip(
-                                selected = vm.tavolozza == i, onClick = { vm.cambiaTavolozza(i) },
-                                label = { Text(nome, maxLines = 1) },
-                                leadingIcon = { Box(Modifier.size(14.dp).background(coloreDelTema(i), CircleShape)) },
-                            )
-                        }
-                    }
-                    // "Il mio colore": 12 colori tra cui scegliere, il tema si costruisce da solo
+                    // "Il mio colore": i 12 colori
                     AnimatedVisibility(vm.tavolozza == IL_MIO_COLORE) {
-                        FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FlowRow(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             COLORI_MIEI.forEach { c ->
                                 val scelto = vm.coloreMio == c
                                 Box(
-                                    Modifier.size(40.dp).clip(CircleShape).background(Color(c))
+                                    Modifier.size(34.dp).clip(CircleShape).background(Color(c))
                                         .then(if (scelto) Modifier.border(3.dp, Testo, CircleShape) else Modifier)
                                         .clickable { vm.cambiaColoreMio(c) }.testTag("colore_$c"),
                                     contentAlignment = Alignment.Center,
@@ -681,55 +697,90 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                         }
                     }
                 }
-                Riquadro("Grandezza del testo") {
-                    val scelte = listOf(0.9f to "Piccolo", 1f to "Medio", 1.2f to "Grande", 1.4f to "Molto grande")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        scelte.forEach { (v, nome) ->
-                            FilterChip(
-                                selected = vm.scalaTesto == v, onClick = { vm.cambiaScalaTesto(v) },
-                                label = { Text(nome, maxLines = 1) },
-                            )
-                        }
-                    }
-                    Text("Esempio: Felpa con cappuccio rosa - 8 anni - € 4,00", color = TestoTenue, modifier = Modifier.padding(top = 6.dp))
+                Sezione("🔠", "Grandezza del testo", nomiTesto[vm.scalaTesto] ?: "Medio", aperta == "testo", { apri("testo") }) {
+                    val valori = listOf(0.9f, 1f, 1.2f, 1.4f)
+                    Scelte(valori.map { nomiTesto.getValue(it) }, valori.indexOf(vm.scalaTesto).coerceAtLeast(0)) { vm.cambiaScalaTesto(valori[it]) }
+                    Text("Felpa con cappuccio rosa - 8 anni - € 4,00", color = TestoTenue, modifier = Modifier.padding(top = 8.dp))
                 }
-                Riquadro("Lista delle foto") {
-                    Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
-                    Interruttore("Avvisami quando le foto sono pronte", "Se esci dall'app mentre le prepara, ti arriva un avviso sul telefono.", vm.avvisoPronte, vm::cambiaAvvisoPronte)
-                    Interruttore("2 foto alla volta", "Prepara le foto più in fretta. Se il telefono rallenta, spegnilo.", vm.dueAllaVolta, vm::cambiaDueAllaVolta)
-                    Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ in basso a destra per tornare in cima alla lista.", vm.tornaSu, vm::cambiaTornaSu)
+                Sezione(
+                    "📋", "Lista delle foto",
+                    listOfNotNull("chiudi pubblicate".takeIf { vm.comprimiPubblicate }, "2 alla volta".takeIf { vm.dueAllaVolta }, "torna su".takeIf { vm.tornaSu })
+                        .joinToString(" · ").ifEmpty { "tutto spento" }.replaceFirstChar { it.uppercase() },
+                    aperta == "lista", { apri("lista") },
+                ) {
+                    Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola; toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
+                    Interruttore("2 foto alla volta", "Più veloce. Se il telefono rallenta, spegnilo.", vm.dueAllaVolta, vm::cambiaDueAllaVolta)
+                    Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ per tornare in cima.", vm.tornaSu, vm::cambiaTornaSu)
                 }
-                Riquadro("Aggiornamenti") {
-                    val context = LocalContext.current
-                    Text("Versione installata: ${remember { Aggiornamento.nomeVersione(context) }}", fontSize = 15.sp)
-                    PulsanteChiaro("Controlla aggiornamenti", "🔄", { vm.controllaAggiornamenti(aMano = true) }, Modifier.fillMaxWidth().padding(top = 8.dp), altezza = 50.dp)
-                    vm.esitoControllo?.let { Text(it, fontSize = 14.sp, color = BluNotte, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)) }
-                    vm.novita?.let { n -> AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) }
-                }
-                Riquadro("Testo per WhatsApp") {
-                    Interruttore("Prezzo in grassetto", "Il prezzo esce come *€ 4,00*: su WhatsApp si vede in grassetto.", vm.prezzoGrassetto, vm::cambiaGrassetto)
+                // Le scelte singole stanno direttamente nella riga: niente da aprire
+                RigaInterruttore("🔔", "Avvisami quando le foto sono pronte", vm.avvisoPronte, vm::cambiaAvvisoPronte)
+                RigaInterruttore("💬", "Prezzo in grassetto su WhatsApp", vm.prezzoGrassetto, vm::cambiaGrassetto)
+                val context = LocalContext.current
+                val versione = remember { Aggiornamento.nomeVersione(context) }
+                Sezione("🔄", "Aggiornamenti", vm.esitoControllo ?: "Versione $versione", aperta == "aggiornamenti", { apri("aggiornamenti") }) {
+                    PulsanteChiaro("Controlla aggiornamenti", "🔄", { vm.controllaAggiornamenti(aMano = true) }, Modifier.fillMaxWidth(), altezza = 48.dp)
+                    vm.novita?.let { n -> Box(Modifier.padding(top = 8.dp)) { AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) } }
                 }
             }
         }
     }
 }
 
+/** Una riga delle impostazioni: icona, titolo, riassunto; toccandola si apre il contenuto. */
 @Composable
-private fun Riquadro(titolo: String, contenuto: @Composable ColumnScope.() -> Unit) {
-    Surface(color = Superficie, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, BordoScheda)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text(titolo, fontWeight = FontWeight.ExtraBold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(bottom = 8.dp))
-            contenuto()
+private fun Sezione(
+    icona: String, titolo: String, riassunto: String, aperta: Boolean, tocca: () -> Unit,
+    contenuto: @Composable ColumnScope.() -> Unit,
+) {
+    val giro by animateFloatAsState(if (aperta) 90f else 0f, label = "freccia")
+    Surface(color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+        Column(Modifier.animateContentSize()) {
+            Row(Modifier.fillMaxWidth().clickable(onClick = tocca).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(icona, fontSize = 20.sp)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(titolo, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BluNotte)
+                    Text(riassunto, fontSize = 13.sp, color = TestoTenue, maxLines = 1)
+                }
+                Text("›", fontSize = 22.sp, color = BluNotte, modifier = Modifier.graphicsLayer { rotationZ = giro })
+            }
+            if (aperta) Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp)) { contenuto() }
+        }
+    }
+}
+
+/** Una riga con l'interruttore direttamente dentro (per le scelte sì/no). */
+@Composable
+private fun RigaInterruttore(icona: String, titolo: String, acceso: Boolean, cambia: (Boolean) -> Unit) {
+    Surface(color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+        Row(Modifier.fillMaxWidth().clickable { cambia(!acceso) }.padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(icona, fontSize = 20.sp)
+            Text(titolo, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = BluNotte, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            Switch(checked = acceso, onCheckedChange = cambia)
+        }
+    }
+}
+
+/** Scelta tra poche voci, tutte in fila (come un interruttore a più posizioni). */
+@Composable
+private fun Scelte(voci: List<String>, scelta: Int, cambia: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(FondoTenue).padding(3.dp)) {
+        voci.forEachIndexed { i, v ->
+            val sel = i == scelta
+            Box(
+                Modifier.weight(1f).clip(RoundedCornerShape(11.dp)).background(if (sel) Azzurro else Color.Transparent)
+                    .clickable { cambia(i) }.padding(vertical = 9.dp, horizontal = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(v, fontSize = 13.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal, color = if (sel) Color.White else Testo, textAlign = TextAlign.Center, maxLines = 2) }
         }
     }
 }
 
 @Composable
 private fun Interruttore(titolo: String, spiegazione: String, acceso: Boolean, cambia: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable { cambia(!acceso) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().clickable { cambia(!acceso) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(titolo, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(spiegazione, fontSize = 13.sp, color = TestoTenue)
+            Text(titolo, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(spiegazione, fontSize = 12.sp, color = TestoTenue)
         }
         Switch(checked = acceso, onCheckedChange = cambia, modifier = Modifier.padding(start = 8.dp))
     }

@@ -344,6 +344,7 @@ class AppTest {
     @Test
     fun impostazioniTestoGrandeRestaSalvato() {
         regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("Grandezza del testo").performClick()
         regola.onNodeWithText("Grande").performClick()
         regola.waitForIdle()
         assertEquals(1.2f, vm.scalaTesto)
@@ -358,7 +359,7 @@ class AppTest {
         metti(fotoDiProva(1, listOf(felpa)))
         assertTrue(vm.testo(vm.foto[0]).endsWith("- € 4,00"))
         regola.onNodeWithText("⚙").performClick()
-        regola.onNodeWithText("Prezzo in grassetto").performClick()
+        regola.onNodeWithText("Prezzo in grassetto su WhatsApp").performClick()
         regola.waitForIdle()
         assertTrue(vm.testo(vm.foto[0]).endsWith("- *€ 4,00*"))
     }
@@ -443,20 +444,21 @@ class AppTest {
         assertFalse(TemaApp.scuro)
         assertEquals(androidx.compose.ui.graphics.Color.White, Superficie)
         regola.onNodeWithText("⚙").performClick()
-        regola.onNodeWithText("🌙 Scuro").performClick()
+        regola.onNodeWithText("Aspetto").performClick()
+        regola.onNodeWithText("Scuro").performClick()
         regola.waitForIdle()
         assertTrue(TemaApp.scuro)
         assertEquals(1, vm.tema)
         assertNotEquals(androidx.compose.ui.graphics.Color.White, Superficie)
         // "Come il telefono": segue il telefono
-        regola.onNodeWithText("📱 Come il telefono").performClick()
+        regola.onNodeWithText("Come il telefono").performClick()
         regola.runOnUiThread { TemaApp.telefonoScuro = false }
         assertFalse(TemaApp.scuro)
         regola.runOnUiThread { TemaApp.telefonoScuro = true }
         assertTrue(TemaApp.scuro)
         // Resta salvato
         assertEquals(2, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.tema)
-        regola.onNodeWithText("☀ Chiaro").performClick()
+        regola.onNodeWithText("Chiaro").performClick()
         regola.waitForIdle()
         assertFalse(TemaApp.scuro)
     }
@@ -599,14 +601,15 @@ class AppTest {
     fun coloriDalleImpostazioni() {
         val prima = Azzurro
         regola.onNodeWithText("⚙").performClick()
-        regola.onNodeWithText("🌿 Salvia").performClick()
+        regola.onNodeWithText("Aspetto").performClick()
+        regola.onNodeWithTag("tema_1").performClick()
         regola.waitForIdle()
         assertEquals(1, vm.tavolozza)
         assertEquals(1, TemaApp.tavolozza)
         assertNotEquals(prima, Azzurro)
         // Resta salvato
         assertEquals(1, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.tavolozza)
-        regola.onNodeWithText("🧸 Da bimbo a bimbo").performClick()
+        regola.onNodeWithTag("tema_0").performClick()
         regola.waitForIdle()
         assertEquals(prima, Azzurro)
     }
@@ -614,7 +617,8 @@ class AppTest {
     @Test
     fun ilMioColore() {
         regola.onNodeWithText("⚙").performClick()
-        regola.onNodeWithText("🎨 Il mio colore").performScrollTo().performClick()
+        regola.onNodeWithText("Aspetto").performClick()
+        regola.onNodeWithTag("tema_$IL_MIO_COLORE").performScrollTo().performClick()
         regola.onNodeWithTag("colore_${0xFFD1495B}").performScrollTo().performClick()
         regola.waitForIdle()
         assertEquals(IL_MIO_COLORE, vm.tavolozza)
@@ -623,5 +627,24 @@ class AppTest {
         assertNotEquals(androidx.compose.ui.graphics.Color(0xFFD1495B), Azzurro)  // in scuro una versione più adatta
         TemaApp.modo = 0
         assertEquals(0xFFD1495B, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.coloreMio)
+    }
+
+    @Test
+    fun impostazioniSnelle() {
+        regola.onNodeWithText("⚙").performClick()
+        // All'inizio tutto chiuso: si vedono solo i riassunti
+        regola.onNodeWithText("Chiaro · Da bimbo a bimbo").assertExists()
+        regola.onNodeWithText("Medio").assertExists()
+        regola.onNodeWithText("Scuro").assertDoesNotExist()
+        // Se ne apre una alla volta
+        regola.onNodeWithText("Aspetto").performClick()
+        regola.onNodeWithText("Scuro").assertExists()
+        regola.onNodeWithText("Grandezza del testo").performClick()
+        regola.onNodeWithText("Scuro").assertDoesNotExist()
+        regola.onNodeWithText("Molto grande").assertExists()
+        // Le scelte sì/no stanno direttamente nella riga
+        regola.onNodeWithText("Avvisami quando le foto sono pronte").performClick()
+        regola.waitForIdle()
+        assertFalse(vm.avvisoPronte)
     }
 }

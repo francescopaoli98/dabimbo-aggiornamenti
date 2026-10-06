@@ -40,6 +40,9 @@ class ScattiTest {
             regola.onNodeWithText("⚙").performClick()
             regola.waitForIdle()
             salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/impostazioni_$nome.png")
+            regola.onNodeWithText("Aspetto").performClick()
+            regola.waitForIdle()
+            salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/impostazioni_aperte_$nome.png")
             regola.onAllNodesWithText("✕").onLast().performClick()
             regola.waitForIdle()
         }
@@ -59,7 +62,8 @@ class ScattiTest {
         // Impostazioni con la scelta del colore aperta
         regola.onNodeWithText("⚙").performClick()
         regola.waitForIdle()
-        regola.onNodeWithText("Colori").performScrollTo()
+        regola.onNodeWithText("Aspetto").performClick()
+        regola.waitForIdle()
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/impostazioni_colori.png")
         regola.onAllNodesWithText("✕").onLast().performClick()
         regola.waitForIdle()
