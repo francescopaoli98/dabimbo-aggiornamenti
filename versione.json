@@ -1,6 +1,6 @@
 {
-  "versionCode": 56,
-  "versionName": "3.1",
+  "versionCode": 57,
+  "versionName": "3.2",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: modalità scura (⚙ Impostazioni → Aspetto)."
+  "note": "Novità: modalità scura (⚙ Impostazioni → Aspetto) e logo senza sfondo."
 }
