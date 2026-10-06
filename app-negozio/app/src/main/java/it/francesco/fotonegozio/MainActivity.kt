@@ -884,7 +884,13 @@ private fun Visore(
     testo: () -> Unit,
     chiudi: () -> Unit,
 ) {
-    val immagine by fotoPerSchermo(f.file)
+    // La foto caricata insieme al suo file: dopo "Gira" per un attimo c'è ancora quella vecchia
+    val caricata by produceState<Pair<File, ImageBitmap>?>(null, f.file) {
+        val file = f.file
+        if (file != null) withContext(Dispatchers.IO) { caricaRidotta(file, 2048) }?.let { value = file to it }
+    }
+    val immagine = caricata?.second
+    val aggiornata = caricata?.takeIf { it.first == f.file }?.second   // quella giusta per il pixel a mano
     // Grandezza della foto di base (dove si salvano i quadretti a mano)
     val misureBase = remember(f.fileAuto) { f.fileAuto?.let(::misureFoto) }
     var pixela by remember { mutableStateOf(false) }
@@ -898,9 +904,9 @@ private fun Visore(
                 if (!pixela) PulsanteTondo("✕", chiudi)
             }
             val img = immagine
-            if (pixela && img != null && misureBase != null) {
+            if (pixela && aggiornata != null && misureBase != null) {
                 EditorPixel(
-                    img, misureBase.first, misureBase.second, f.rotazioneManuale, f.pixelManuale, Modifier.weight(1f),
+                    aggiornata, misureBase.first, misureBase.second, f.rotazioneManuale, f.pixelManuale, Modifier.weight(1f),
                     salva = { celle, lato -> salvaPixelMano(celle, lato); pixela = false },
                     esci = { pixela = false },
                 )
@@ -927,12 +933,12 @@ private fun Visore(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SezionePixel(
                                 "✨", "Sfondo automatico", Modifier.weight(1f),
-                                applicato = f.sfondoPixelato, attivo = !sfondoInCorso && img != null,
+                                applicato = f.sfondoPixelato, attivo = !sfondoInCorso && aggiornata != null,
                                 applica = pixelaSfondo, togli = togliSfondo,
                             )
                             SezionePixel(
                                 "▦", "Pixel a mano", Modifier.weight(1f),
-                                applicato = f.pixelManuale.isNotEmpty(), attivo = !sfondoInCorso && img != null,
+                                applicato = f.pixelManuale.isNotEmpty(), attivo = !sfondoInCorso && aggiornata != null,
                                 applica = { pixela = true }, togli = togliPixelMano,
                                 applicaAncora = true,   // a mano si può sempre aggiungere
                             )

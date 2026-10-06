@@ -65,6 +65,12 @@ class AppTest {
         regola.waitForIdle()
     }
 
+    /** Apre la foto grande e aspetta che sia caricata (si carica in sottofondo). */
+    private fun apriVisore() {
+        regola.onNodeWithText("🔍 Tocca").performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+    }
+
     private fun premiIndietro() {
         regola.runOnUiThread { regola.activity.onBackPressedDispatcher.onBackPressed() }
         regola.waitForIdle()
@@ -192,7 +198,7 @@ class AppTest {
     @Test
     fun visoreApreTestoEChiude() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("🔍 Tocca").performClick()
+        apriVisore()
         regola.onNodeWithText("Capovolgi").assertExists()
         regola.onNodeWithText("Testo").performClick()
         regola.onNodeWithText("Capovolgi").assertDoesNotExist()
@@ -204,7 +210,7 @@ class AppTest {
     @Test
     fun giraLaFoto() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("🔍 Tocca").performClick()
+        apriVisore()
         regola.onNodeWithText("Gira").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
         regola.onNodeWithText("Capovolgi").performClick()
@@ -217,7 +223,7 @@ class AppTest {
     fun pixelaAMano() {
         metti(fotoDiProva(1, listOf(felpa)))
         val prima = vm.foto[0].file
-        regola.onNodeWithText("🔍 Tocca").performClick()
+        apriVisore()
         regola.onNodeWithText("Pixel a mano").performClick()
         regola.onNodeWithText("Salva").assertIsNotEnabled()
         // Passo il dito sul confine rosso/blu
@@ -245,10 +251,11 @@ class AppTest {
     @Test
     fun pixelAManoSuFotoGirata() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("🔍 Tocca").performClick()
+        apriVisore()
         regola.onNodeWithText("Gira").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
-        regola.waitForIdle()
+        // Aspetto che la foto girata sia caricata (prima il pixel a mano non si apre)
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
         // Girata di 90°: il rosso ora sta sopra e il blu sotto. Passo il dito in orizzontale sul confine.
         regola.onNodeWithText("Pixel a mano").performClick()
         regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + 20f, centerY), Offset(right - 20f, centerY)) }
@@ -266,7 +273,7 @@ class AppTest {
     @Test
     fun pixelAutomaticoHaIlSuoPulsante() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("🔍 Tocca").performClick()
+        apriVisore()
         regola.onNodeWithText("Sfondo automatico").assertIsEnabled()
         // Senza pixel fatti, nessun "Togli"
         regola.onNodeWithText("Togli").assertDoesNotExist()
