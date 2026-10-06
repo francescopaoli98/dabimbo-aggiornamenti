@@ -1,6 +1,6 @@
 {
-  "versionCode": 55,
-  "versionName": "3.0",
+  "versionCode": 56,
+  "versionName": "3.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Prova degli aggiornamenti automatici: se vedi questo messaggio, funzionano!"
+  "note": "Novità: modalità scura (⚙ Impostazioni → Aspetto)."
 }
