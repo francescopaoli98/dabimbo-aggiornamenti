@@ -78,8 +78,8 @@ class AppTest {
 
     @Test
     fun avvioMostraIPulsanti() {
-        regola.onNodeWithText("📷  Scegli foto").assertIsDisplayed()
-        regola.onNodeWithText("📖 Sigle").assertIsDisplayed()
+        regola.onNodeWithText("Scegli foto").assertIsDisplayed()
+        regola.onNodeWithText("Sigle").assertIsDisplayed()
         regola.onNodeWithText("Ciao! 👋").assertExists()
     }
 
@@ -94,7 +94,7 @@ class AppTest {
 
     @Test
     fun indietroChiudePrimaLeFinestre() {
-        regola.onNodeWithText("📖 Sigle").performClick()
+        regola.onNodeWithText("Sigle").performClick()
         regola.onNodeWithText("+ Nuova sigla").assertExists()
         regola.onNodeWithText("✕ Chiudi").performClick()
         regola.onNodeWithText("+ Nuova sigla").assertDoesNotExist()
@@ -106,15 +106,15 @@ class AppTest {
         metti(fotoDiProva(1, listOf(felpa)))
         regola.onNodeWithText("Foto 1").assertExists()
         regola.onNodeWithText("Pronta").assertExists()
-        regola.onNodeWithText("📋 Articoli (1)").assertExists()
-        regola.onNodeWithText("📤 Pubblica").assertExists()
+        regola.onNodeWithText("Articoli (1)").assertExists()
+        regola.onNodeWithText("Pubblica").assertExists()
         regola.onNodeWithText("cod. 1234567", substring = true).assertExists()
     }
 
     @Test
     fun modificaArticoloCambiaIlTesto() {
         metti(fotoDiProva(1, listOf(felpa)))
-        regola.onNodeWithText("📋 Articoli (1)").performClick()
+        regola.onNodeWithText("Articoli (1)").performClick()
         regola.onNodeWithText("Articoli · Foto 1").assertExists()
         regola.onNodeWithText("✏ Modifica").performClick()
         regola.onNode(hasSetTextAction() and hasText("4,00")).performTextReplacement("6,5")
@@ -129,15 +129,15 @@ class AppTest {
     fun aggiungiArticoloConRigaVeloce() {
         metti(fotoDiProva(1, emptyList()))
         regola.onNodeWithText("Cartellino non letto", substring = true).assertExists()
-        regola.onNodeWithText("📋 Articoli (0)").performClick()
-        regola.onNodeWithText("+ Aggiungi etichetta").performClick()
+        regola.onNodeWithText("Articoli (0)").performClick()
+        regola.onNodeWithText("Aggiungi etichetta").performClick()
         regola.onAllNodes(hasSetTextAction())[0].performTextInput("1444115 librottino inside out 1,50")
         regola.onNodeWithText("Salva").performClick()
         regola.waitForIdle()
         val a = vm.foto[0].articoli.single()
         assertEquals("1444115", a.codice)
         assertEquals("€ 1,50", a.prezzo)
-        regola.onNodeWithText("📋 Articoli (1)").assertExists()
+        regola.onNodeWithText("Articoli (1)").assertExists()
     }
 
     @Test
@@ -154,7 +154,7 @@ class AppTest {
     @Test
     fun conAvvisiChiedePrimaDiPubblicare() {
         metti(fotoDiProva(1, emptyList()))
-        regola.onNodeWithText("📤 Pubblica").performClick()
+        regola.onNodeWithText("Pubblica").performClick()
         regola.onNodeWithText("Pubblica lo stesso").assertExists()
         regola.onNodeWithText("La sistemo").performClick()
         regola.onNodeWithText("Pubblica lo stesso").assertDoesNotExist()
@@ -164,7 +164,7 @@ class AppTest {
     @Test
     fun pubblicaPassaFotoETestoESegnaPubblicata() {
         metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
-        regola.onNodeWithText("📤  Pubblica la prossima · Foto 1").performClick()
+        regola.onNodeWithText("Pubblica la prossima · Foto 1").performClick()
         regola.waitForIdle()
         val scelta = shadowOf(regola.activity).nextStartedActivity
         assertNotNull(scelta)
@@ -174,7 +174,7 @@ class AppTest {
         assertTrue(dentro.getStringExtra(Intent.EXTRA_TEXT)!!.contains("1234567"))
         assertTrue(vm.foto[0].pubblicata)
         // La barra passa alla foto successiva
-        regola.onNodeWithText("📤  Pubblica la prossima · Foto 2").assertExists()
+        regola.onNodeWithText("Pubblica la prossima · Foto 2").assertExists()
     }
 
     @Test
@@ -209,7 +209,7 @@ class AppTest {
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
         regola.onNodeWithText("Capovolgi").performClick()
         regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 270 }
-        regola.onNodeWithText("✕ Chiudi").performClick()
+        regola.onAllNodesWithText("✕").onLast().performClick()   // la ✕ del visore (sta sopra)
         regola.onNodeWithText("Capovolgi").assertDoesNotExist()
     }
 
@@ -218,16 +218,16 @@ class AppTest {
         metti(fotoDiProva(1, listOf(felpa)))
         val prima = vm.foto[0].file
         regola.onNodeWithText("🔍 Tocca").performClick()
-        regola.onNodeWithText("Pixela").performClick()
-        regola.onNodeWithText("✓ Salva").assertIsNotEnabled()
+        regola.onNodeWithText("Pixel a mano").performClick()
+        regola.onNodeWithText("Salva").assertIsNotEnabled()
         // Passo il dito sul confine rosso/blu
         regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(centerX, top + 50f), Offset(centerX, bottom - 50f)) }
-        regola.onNodeWithText("✓ Salva").assertIsEnabled()
+        regola.onNodeWithText("Salva").assertIsEnabled()
         // Annulla toglie la passata
-        regola.onNodeWithText("↶ Annulla").performClick()
-        regola.onNodeWithText("✓ Salva").assertIsNotEnabled()
+        regola.onNodeWithText("Annulla").performClick()
+        regola.onNodeWithText("Salva").assertIsNotEnabled()
         regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(centerX, top + 50f), Offset(centerX, bottom - 50f)) }
-        regola.onNodeWithText("✓ Salva").performClick()
+        regola.onNodeWithText("Salva").performClick()
         regola.waitUntil(5_000) { vm.foto[0].file != prima }
         // Sul confine ora c'è un colore misto (né rosso puro né blu puro)
         val b = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
@@ -235,12 +235,47 @@ class AppTest {
         assertTrue(android.graphics.Color.red(c) in 40..215 && android.graphics.Color.blue(c) in 40..215)
         // Torna al visore normale
         regola.onNodeWithText("Capovolgi").assertExists()
+        assertTrue(vm.foto[0].pixelManuale.isNotEmpty())
+        // "↺ Togli" del pixel a mano: torna la foto pulita
+        regola.onNodeWithText("Togli").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].pixelManuale.isEmpty() && vm.foto[0].file == vm.foto[0].fileAuto }
+        regola.onNodeWithText("Togli").assertDoesNotExist()
+    }
+
+    @Test
+    fun pixelAManoSuFotoGirata() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.onNodeWithText("🔍 Tocca").performClick()
+        regola.onNodeWithText("Gira").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].rotazioneManuale == 90 }
+        regola.waitForIdle()
+        // Girata di 90°: il rosso ora sta sopra e il blu sotto. Passo il dito in orizzontale sul confine.
+        regola.onNodeWithText("Pixel a mano").performClick()
+        regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + 20f, centerY), Offset(right - 20f, centerY)) }
+        val prima = vm.foto[0].file
+        regola.onNodeWithText("Salva").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].file != prima && vm.foto[0].pixelManuale.isNotEmpty() }
+        val b = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertEquals(400, b.width); assertEquals(300, b.height)   // resta girata
+        val c = b.getPixel(200, 150)
+        assertTrue(android.graphics.Color.red(c) in 40..215 && android.graphics.Color.blue(c) in 40..215)
+        // Lontano dal confine resta nitida
+        assertTrue(android.graphics.Color.red(b.getPixel(200, 20)) > 200)
+    }
+
+    @Test
+    fun pixelAutomaticoHaIlSuoPulsante() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.onNodeWithText("🔍 Tocca").performClick()
+        regola.onNodeWithText("Sfondo automatico").assertIsEnabled()
+        // Senza pixel fatti, nessun "Togli"
+        regola.onNodeWithText("Togli").assertDoesNotExist()
     }
 
     @Test
     @Config(qualifiers = "w411dp-h891dp")   // schermo come il OnePlus
     fun aggiungiSiglaAlDizionario() {
-        regola.onNodeWithText("📖 Sigle").performClick()
+        regola.onNodeWithText("Sigle").performClick()
         regola.onNodeWithText("+ Nuova sigla").performClick()
         regola.onNode(hasSetTextAction() and hasText("Sigla (es. gri)")).performTextReplacement("zzz")
         regola.onNode(hasSetTextAction() and hasText("Significato")).performTextReplacement("zebrato")
@@ -265,12 +300,12 @@ class AppTest {
     @Test
     fun togliFotoDallaLista() {
         metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
-        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onAllNodesWithText("✕")[1].performClick()   // [0] è la ✕ del menu in alto
         regola.onNodeWithText("Stai per rimuovere la Foto 1").assertExists()
         regola.onNodeWithText("Sei sicura?", substring = true).assertExists()
         regola.onNodeWithText("No").performClick()
         assertEquals(2, vm.foto.size)
-        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onAllNodesWithText("✕")[1].performClick()
         regola.onNodeWithText("Sì, rimuovi").performClick()
         regola.waitForIdle()
         assertEquals(listOf(2), vm.foto.map { it.numero })
@@ -291,12 +326,77 @@ class AppTest {
     }
 
     @Test
-    fun scritteGrandiRestanoSalvate() {
-        regola.onNodeWithText("A+").performClick()
+    fun impostazioniTestoGrandeRestaSalvato() {
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("Grande").performClick()
         regola.waitForIdle()
-        assertTrue(vm.scritteGrandi)
+        assertEquals(1.2f, vm.scalaTesto)
         // Riaprendo l'app l'impostazione c'è ancora
-        assertTrue(FotoViewModel(vm.getApplication()).also { it.foto.clear() }.scritteGrandi)
+        assertEquals(1.2f, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.scalaTesto)
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.onNodeWithText("⚙ Impostazioni").assertDoesNotExist()
+    }
+
+    @Test
+    fun prezzoInGrassettoDalleImpostazioni() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        assertTrue(vm.testo(vm.foto[0]).endsWith("- € 4,00"))
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("Prezzo in grassetto").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.testo(vm.foto[0]).endsWith("- *€ 4,00*"))
+    }
+
+    @Test
+    fun fotoPubblicataSiChiudeESiRiapre() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.waitForIdle()
+        // Compressa: niente pulsanti, solo la riga
+        regola.onAllNodesWithText("Articoli (1)").assertCountEquals(1)
+        regola.onNodeWithText("▼").performClick()
+        regola.onAllNodesWithText("Articoli (1)").assertCountEquals(2)
+        regola.onNodeWithText("▲").performClick()
+        regola.onAllNodesWithText("Articoli (1)").assertCountEquals(1)
+        // Spento nelle impostazioni: resta aperta
+        regola.runOnUiThread { vm.cambiaComprimi(false) }
+        regola.onAllNodesWithText("Articoli (1)").assertCountEquals(2)
+    }
+
+    @Test
+    fun crocettaInAltoChiedeSeMancanoFoto() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321"))))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onNodeWithText("Stai per tornare al menu principale").assertExists()
+        regola.onNodeWithText("1 foto non è ancora stata pubblicata", substring = true).assertExists()
+        regola.onNodeWithText("No").performClick()
+        assertEquals(2, vm.foto.size)
+        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.onNodeWithText("Sì, torna al menu").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.foto.isEmpty())
+        regola.onNodeWithText("Ciao! 👋").assertExists()
+    }
+
+    @Test
+    fun crocettaConTuttePubblicateNonChiedeNiente() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.onAllNodesWithText("✕")[0].performClick()
+        regola.waitForIdle()
+        regola.onNodeWithText("Stai per tornare al menu principale").assertDoesNotExist()
+        assertTrue(vm.foto.isEmpty())
+    }
+
+    @Test
+    fun tornaSuSoloSeAcceso() {
+        metti(*Array(8) { fotoDiProva(it + 1, listOf(felpa.copy(codice = "${1000000 + it}"))) })
+        regola.onNode(hasScrollToKeyAction()).performScrollToKey(8)   // scendo fino alla foto 8
+        regola.onNodeWithText("↑").assertDoesNotExist()
+        regola.runOnUiThread { vm.cambiaTornaSu(true) }
+        regola.onNodeWithText("↑").assertExists().performClick()
+        regola.onNodeWithText("Scegli foto").assertIsDisplayed()
     }
 
     @Test

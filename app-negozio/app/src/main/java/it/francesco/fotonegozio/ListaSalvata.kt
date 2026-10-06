@@ -39,6 +39,10 @@ object ListaSalvata {
         put("testoManuale", f.testoManuale)
         put("etichetteViste", f.etichetteViste)
         put("pubblicata", f.pubblicata)
+        put("pixelManuale", JSONArray().apply { f.pixelManuale.forEach { put(it) } })
+        put("latoPixel", f.latoPixel)
+        put("fileSfondo", f.fileSfondo?.path)
+        put("sfondoPixelato", f.sfondoPixelato)
     }
 
     private fun json(d: DatiCartellino) = JSONObject().apply {
@@ -65,6 +69,10 @@ object ListaSalvata {
         testoManuale = o.testo("testoManuale"),
         etichetteViste = o.optInt("etichetteViste"),
         pubblicata = o.optBoolean("pubblicata"),
+        pixelManuale = o.optJSONArray("pixelManuale")?.let { a -> List(a.length()) { a.getLong(it) }.toSet() }.orEmpty(),
+        latoPixel = o.optInt("latoPixel"),
+        fileSfondo = o.testo("fileSfondo")?.let(::File),
+        sfondoPixelato = o.optBoolean("sfondoPixelato"),
     )
 
     private fun dati(o: JSONObject) = DatiCartellino(o.testo("codice"), o.testo("descrizione"), o.testo("prezzo"), o.testo("taglia"))

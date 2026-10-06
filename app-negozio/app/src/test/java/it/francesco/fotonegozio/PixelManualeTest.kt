@@ -32,4 +32,15 @@ class PixelManualeTest {
         val celle = PixelManuale.celleAttorno(0f, 0f, raggio = 30f, lato = 10, larghezza = 100, altezza = 100)
         assertTrue(celle.all { PixelManuale.colonna(it) >= 0 && PixelManuale.riga(it) >= 0 })
     }
+
+    @Test
+    fun andata_e_ritorno_con_la_foto_girata() {
+        for (g in listOf(0, 90, 180, 270)) {
+            val (sx, sy) = PixelManuale.daBase(30f, 70f, g, 400, 300)
+            val (bx, by) = PixelManuale.versoBase(sx, sy, g, 400, 300)
+            assertEquals(30f, bx, 0.001f); assertEquals(70f, by, 0.001f)
+        }
+        // Girata di 90° in senso orario: l'angolo in alto a sinistra finisce in alto a destra
+        assertEquals(300f to 0f, PixelManuale.daBase(0f, 0f, 90, 400, 300))
+    }
 }

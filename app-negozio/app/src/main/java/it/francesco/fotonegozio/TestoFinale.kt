@@ -23,14 +23,14 @@ object TestoFinale {
     private val CALZATURE = listOf("scarp", "stival", "sandal", "ciabatt", "pantofol", "sneaker")
 
     /** Una riga di testo per un articolo. */
-    fun riga(d: DatiCartellino, voci: List<VoceDizionario>): String {
+    fun riga(d: DatiCartellino, voci: List<VoceDizionario>, prezzoGrassetto: Boolean = false): String {
         val taglia = d.taglia
         val descrizione = d.descrizione?.let { espandi(it, taglia, voci) }
         val parti = listOfNotNull(
             descrizione?.ifBlank { null },
             tagliaPerEsteso(taglia, descrizione),
             d.codice?.let { "cod. $it" },
-            d.prezzo,
+            d.prezzo?.let { if (prezzoGrassetto) "*$it*" else it },   // *…* = grassetto su WhatsApp
         )
         return parti.joinToString(" - ")
     }
@@ -40,11 +40,11 @@ object TestoFinale {
      * Collage con lo stesso articolo più volte: una riga sola.
      * Stesso codice = stesso articolo: tengo la riga più completa (es. una etichetta letta male, l'altra bene).
      */
-    fun testo(articoli: List<DatiCartellino>, voci: List<VoceDizionario>): String {
+    fun testo(articoli: List<DatiCartellino>, voci: List<VoceDizionario>, prezzoGrassetto: Boolean = false): String {
         val righe = mutableListOf<String>()
         val posizioneCodice = mutableMapOf<String, Int>()
         for (d in articoli) {
-            val r = riga(d, voci)
+            val r = riga(d, voci, prezzoGrassetto)
             if (r.isBlank()) continue
             val gia = d.codice?.let { posizioneCodice[it] }
             when {

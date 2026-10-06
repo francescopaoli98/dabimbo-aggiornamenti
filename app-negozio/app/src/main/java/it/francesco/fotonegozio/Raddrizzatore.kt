@@ -387,6 +387,34 @@ class Raddrizzatore(private val context: Context) {
         return PointF(xy[0] / scala + area.left, xy[1] / scala + area.top)
     }
 
+    /**
+     * Pixel automatico: dove stanno i cartellini nella foto (codici, prezzi, etichette riconosciute
+     * dalla forma), per tenerli nitidi insieme al loro articolo.
+     */
+    suspend fun zoneCartellini(foto: Bitmap): List<ZonaNitida> {
+        val zone = mutableListOf<ZonaNitida>()
+        val tutta = Rect(0, 0, foto.width, foto.height)
+        runCatching { codiciABarre(foto, tutta, 1f) }.getOrNull()?.forEach { zone += zonaDaCodice(it.angoli) }
+        for (t in listOf(tutta) + tasselli(foto)) {
+            val pezzo = if (t == tutta) foto else Bitmap.createBitmap(foto, t.left, t.top, t.width(), t.height())
+            val testo = runCatching { leggi(pezzo, "pixel: zone") }.getOrNull() ?: continue
+            codiciNelTesto(testo, t, 1f).forEach { zone += zonaDaCodice(it.angoli) }
+            prezziNelTesto(testo, t, 1f).forEach { zone += ZonaNitida(it.centro.x, it.centro.y, SceltaNitidi.raggioDaPrezzo(it.altezza)) }
+        }
+        zone += runCatching {
+            etichetteIn(foto).take(MAX_ETICHETTE).map { r -> ZonaNitida(r.exactCenterX(), r.exactCenterY(), max(r.width(), r.height()) * 0.7f) }
+        }.getOrDefault(emptyList())
+        return zone
+    }
+
+    /** Zona nitida attorno a un cartellino, dai 4 angoli della riga del codice. */
+    private fun zonaDaCodice(angoli: List<PointF>): ZonaNitida {
+        val cx = angoli.sumOf { it.x.toDouble() }.toFloat() / 4
+        val cy = angoli.sumOf { it.y.toDouble() }.toFloat() / 4
+        val larghezza = hypot(angoli[1].x - angoli[0].x, angoli[1].y - angoli[0].y)
+        return ZonaNitida(cx, cy, SceltaNitidi.raggioDaCodice(larghezza))
+    }
+
     /** Riquadro che contiene i 4 angoli. */
     private fun riquadroDi(angoli: List<PointF>) = Rect(
         angoli.minOf { it.x }.toInt(), angoli.minOf { it.y }.toInt(),

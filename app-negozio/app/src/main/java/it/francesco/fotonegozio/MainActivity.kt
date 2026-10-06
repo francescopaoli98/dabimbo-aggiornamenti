@@ -54,6 +54,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -98,7 +100,7 @@ class MainActivity : ComponentActivity() {
         )
         // Foto arrivate dal tasto "Condividi" della Galleria (solo al primo avvio, non dopo una rotazione schermo)
         if (savedInstanceState == null) viewModel.carica(fotoDaIntent(intent))
-        setContent { ConScritte(viewModel.scritteGrandi) { TemaBimbo { Schermata(viewModel) } } }
+        setContent { ConScritte(viewModel.scalaTesto) { TemaBimbo { Schermata(viewModel) } } }
 
         // Tasto Indietro sulla lista delle foto: la prima volta avvisa, la seconda (entro 2 secondi) chiude l'app.
         // Così un tocco per sbaglio non fa perdere le foto. Le finestre aperte (articoli, foto grande…) si chiudono da sole.
@@ -134,25 +136,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Scritte grandi accese o spente (letto anche dalle finestre, che hanno un loro schermo). */
-private val LocalScritteGrandi = compositionLocalOf { false }
+/** Grandezza del testo scelta nelle impostazioni (letta anche dalle finestre, che hanno un loro schermo). */
+private val LocalScalaTesto = compositionLocalOf { 1f }
 
-/** Ingrandisce tutte le scritte del 25% se [grandi] (il resto della grafica resta uguale). */
+/** Ingrandisce o rimpicciolisce tutte le scritte di [scala] (il resto della grafica resta uguale). */
 @Composable
-private fun ConScritte(grandi: Boolean, contenuto: @Composable () -> Unit) {
+private fun ConScritte(scala: Float, contenuto: @Composable () -> Unit) {
     val d = LocalDensity.current
     CompositionLocalProvider(
-        LocalScritteGrandi provides grandi,
-        LocalDensity provides Density(d.density, d.fontScale * if (grandi) 1.25f else 1f),
+        LocalScalaTesto provides scala,
+        LocalDensity provides Density(d.density, d.fontScale * scala),
         content = contenuto,
     )
 }
 
-/** Finestra a tutto schermo che rispetta anche lei le scritte grandi. */
+/** Finestra a tutto schermo che rispetta anche lei la grandezza del testo. */
 @Composable
 private fun Finestra(onDismissRequest: () -> Unit, properties: DialogProperties, contenuto: @Composable () -> Unit) {
-    val grandi = LocalScritteGrandi.current
-    Dialog(onDismissRequest, properties) { ConScritte(grandi, contenuto) }
+    val scala = LocalScalaTesto.current
+    Dialog(onDismissRequest, properties) { ConScritte(scala, contenuto) }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -169,6 +171,11 @@ private fun Schermata(vm: FotoViewModel) {
     var articoliAperti by remember { mutableStateOf<Int?>(null) }    // numero della foto di cui si guardano gli articoli
     var daConfermare by remember { mutableStateOf<Int?>(null) }      // foto con avvisi: chiedo prima di pubblicare
     var daTogliere by remember { mutableStateOf<Int?>(null) }        // foto da togliere dalla lista (chiedo conferma)
+    var impostazioniAperte by remember { mutableStateOf(false) }
+    var chiediMenu by remember { mutableStateOf(false) }               // ✕: tornare al menu principale (chiedo se mancano foto)
+    val riaperte = remember { mutableStateListOf<Int>() }              // foto pubblicate riaperte (se le schede si comprimono)
+    val lista = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     // Foto + testo a WhatsApp Business. L'invio lo preme Elisa dentro WhatsApp.
@@ -200,9 +207,20 @@ private fun Schermata(vm: FotoViewModel) {
         SfondoNuvole()   // ferme: belle e senza consumare
         LazyColumn(
             Modifier.padding(padding).fillMaxSize(),
+            state = lista,
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            // In alto: ✕ torna al menu principale (solo con delle foto), ⚙ impostazioni (sempre)
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (vm.foto.isNotEmpty()) PulsanteTondo("✕", {
+                        if (vm.foto.all { it.pubblicata }) vm.svuota() else chiediMenu = true
+                    })
+                    Spacer(Modifier.weight(1f))
+                    PulsanteTondo("⚙", { impostazioniAperte = true })
+                }
+            }
             // Logo (tenuto premuto: modalità prove, solo per chi sistema l'app)
             item {
                 Image(
@@ -214,25 +232,11 @@ private fun Schermata(vm: FotoViewModel) {
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val (s1, m1) = rimbalzo()
-                    val (s2, m2) = rimbalzo()
-                    Button(
-                        onClick = ::scegliFoto,
-                        modifier = Modifier.weight(1f).heightIn(min = 60.dp).then(m1),
-                        shape = MaterialTheme.shapes.large,
-                        interactionSource = s1,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-                    ) { Text("📷  Scegli foto", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
-                    FilledTonalButton(
-                        onClick = { dizionarioAperto = true },
-                        modifier = Modifier.heightIn(min = 60.dp).then(m2),
-                        interactionSource = s2,
-                        shape = MaterialTheme.shapes.large,
-                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Rosa, contentColor = BluNotte),
-                    ) { Text("📖 Sigle", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                    PulsanteGrande("Scegli foto", "📷", ::scegliFoto, Modifier.weight(1f), altezza = 60.dp, grandezzaTesto = 18)
+                    PulsanteChiaro("Sigle", "📖", { dizionarioAperto = true }, sfondo = Rosa, altezza = 60.dp)
                 }
             }
-            item {
+            if (vm.foto.isNotEmpty()) item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val quante = vm.foto.count { it.daGuardare }
                     if (vm.foto.isNotEmpty()) {
@@ -247,11 +251,6 @@ private fun Schermata(vm: FotoViewModel) {
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Arancione, selectedLabelColor = Color.White),
                         )
                     }
-                    Spacer(Modifier.weight(1f))
-                    FilterChip(
-                        selected = vm.scritteGrandi, onClick = { vm.cambiaScritte(!vm.scritteGrandi) },
-                        label = { Text("A+") },
-                    )
                 }
             }
             if (vm.soloDaControllare && vm.fotoVisibili.isEmpty()) item {
@@ -281,6 +280,11 @@ private fun Schermata(vm: FotoViewModel) {
             }
 
             items(vm.fotoVisibili, key = { it.numero }) { f ->
+                val comprimibile = f.pubblicata && vm.comprimiPubblicate
+                if (comprimibile && f.numero !in riaperte) {
+                    SchedaCompatta(f, Modifier.animateItem()) { riaperte += f.numero }
+                    return@items
+                }
                 Scheda(
                     f,
                     modifier = Modifier.animateItem(),
@@ -292,11 +296,42 @@ private fun Schermata(vm: FotoViewModel) {
                     pubblica = { chiediEPubblica(f) },
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                     togli = { daTogliere = f.numero },
+                    comprimi = if (comprimibile) ({ riaperte -= f.numero }) else null,
                 )
             }
         }
+        // Pulsantino "torna su" (se acceso nelle impostazioni), solo quando si è scesi un po'
+        val sceso by remember { derivedStateOf { lista.firstVisibleItemIndex > 2 } }
+        AnimatedVisibility(
+            vm.tornaSu && sceso,
+            Modifier.align(Alignment.BottomEnd).padding(padding).padding(16.dp),
+            enter = fadeIn() + scaleIn(), exit = fadeOut(),
+        ) {
+            PulsanteTondo("↑", { scope.launch { lista.animateScrollToItem(0) } }, colore = Azzurro)
+        }
         if (festa) Coriandoli()
       }
+    }
+
+    if (impostazioniAperte) {
+        SchermataImpostazioni(vm) { impostazioniAperte = false }
+    }
+
+    // ✕ con foto non ancora pubblicate: chiedo prima
+    if (chiediMenu) {
+        val mancano = vm.foto.count { !it.pubblicata }
+        AlertDialog(
+            onDismissRequest = { chiediMenu = false },
+            title = { Text("Stai per tornare al menu principale") },
+            text = {
+                Text(
+                    (if (mancano == 1) "1 foto non è ancora stata pubblicata e non verrà caricata."
+                    else "$mancano foto non sono ancora state pubblicate e non verranno caricate.") + "\n\nSei sicura?"
+                )
+            },
+            confirmButton = { TextButton(onClick = { chiediMenu = false; vm.svuota() }) { Text("Sì, torna al menu", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) } },
+            dismissButton = { TextButton(onClick = { chiediMenu = false }) { Text("No") } },
+        )
     }
 
     if (dizionarioAperto) {
@@ -369,8 +404,12 @@ private fun Schermata(vm: FotoViewModel) {
     vm.foto.firstOrNull { it.numero == ingrandita }?.let { f ->
         Visore(
             f,
+            sfondoInCorso = vm.sfondoInCorso == f.numero,
             gira = { gradi -> vibra.performHapticFeedback(HapticFeedbackType.TextHandleMove); vm.gira(f.numero, gradi) },
-            salvaPixel = { celle, lato -> vm.salvaPixelata(f.numero, celle, lato) },
+            pixelaSfondo = { vm.pixelaSfondo(f.numero) },
+            togliSfondo = { vm.togliPixelSfondo(f.numero) },
+            salvaPixelMano = { celle, lato -> vm.salvaPixelManuale(f.numero, celle, lato) },
+            togliPixelMano = { vm.togliPixelManuale(f.numero) },
             testo = { ingrandita = null; testoInModifica = f.numero },
             chiudi = { ingrandita = null },
         )
@@ -395,26 +434,99 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(6.dp).clip(RoundedCornerShape(3.dp)),
                 color = Verde, trackColor = Cielo,
             )
-            val (sorgente, morbido) = rimbalzo()
-            Button(
-                onClick = pubblica,
-                enabled = prossima != null,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 62.dp).then(morbido),
-                shape = MaterialTheme.shapes.large,
-                interactionSource = sorgente,
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+            PulsanteGrande(
+                when {
+                    prossima != null -> "Pubblica la prossima · Foto ${prossima.numero}"
+                    fatte == tutte -> "Tutte pubblicate!"
+                    else -> "Un attimo, preparo le foto…"
+                },
+                if (prossima != null) "📤" else if (fatte == tutte) "🎉" else "⏳",
+                pubblica,
+                Modifier.fillMaxWidth(),
+                colore = if (fatte == tutte) Verde else Azzurro,
+                attivo = prossima != null,
+                altezza = 60.dp,
+            )
+        }
+    }
+}
+
+/** Foto già pubblicata, chiusa in una riga piccola: toccandola si riapre. */
+@Composable
+private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> Unit) {
+    Surface(
+        onClick = apri,
+        color = Color.White.copy(alpha = 0.85f),
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, BordoScheda),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFEAF5FC))) {
+                f.miniatura?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            }
+            Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(start = 12.dp).weight(1f))
+            Etichetta("✓ Pubblicata", Color.White, Verde)
+            Text("▼", color = BluNotte, modifier = Modifier.padding(horizontal = 10.dp))
+        }
+    }
+}
+
+/** Impostazioni: grandezza del testo, schede compresse, pulsante "torna su", prezzo in grassetto. */
+@Composable
+private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
+    Finestra(onDismissRequest = chiudi, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
+            Row(
+                Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Rosa, Cielo))).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                AnimatedContent(
-                    targetState = when {
-                        prossima != null -> "📤  Pubblica la prossima · Foto ${prossima.numero}"
-                        fatte == tutte -> "✓  Tutte pubblicate!"
-                        else -> "Un attimo, preparo le foto…"
-                    },
-                    transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) },
-                    label = "pulsante",
-                ) { t -> Text(t, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                Text("⚙ Impostazioni", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte, modifier = Modifier.weight(1f))
+                PulsanteTondo("✕", chiudi)
+            }
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Riquadro("Grandezza del testo") {
+                    val scelte = listOf(0.9f to "Piccolo", 1f to "Medio", 1.2f to "Grande", 1.4f to "Molto grande")
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        scelte.forEach { (v, nome) ->
+                            FilterChip(
+                                selected = vm.scalaTesto == v, onClick = { vm.cambiaScalaTesto(v) },
+                                label = { Text(nome, maxLines = 1) },
+                            )
+                        }
+                    }
+                    Text("Esempio: Felpa con cappuccio rosa - 8 anni - € 4,00", color = Color(0xFF3A4660), modifier = Modifier.padding(top = 6.dp))
+                }
+                Riquadro("Lista delle foto") {
+                    Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
+                    Interruttore("Pulsante \"torna su\"", "Un pulsantino ↑ in basso a destra per tornare in cima alla lista.", vm.tornaSu, vm::cambiaTornaSu)
+                }
+                Riquadro("Testo per WhatsApp") {
+                    Interruttore("Prezzo in grassetto", "Il prezzo esce come *€ 4,00*: su WhatsApp si vede in grassetto.", vm.prezzoGrassetto, vm::cambiaGrassetto)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun Riquadro(titolo: String, contenuto: @Composable ColumnScope.() -> Unit) {
+    Surface(color = Color.White, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, BordoScheda)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(titolo, fontWeight = FontWeight.ExtraBold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(bottom = 8.dp))
+            contenuto()
+        }
+    }
+}
+
+@Composable
+private fun Interruttore(titolo: String, spiegazione: String, acceso: Boolean, cambia: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable { cambia(!acceso) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(titolo, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(spiegazione, fontSize = 13.sp, color = Color(0xFF5A6680))
+        }
+        Switch(checked = acceso, onCheckedChange = cambia, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -460,6 +572,7 @@ private fun Scheda(
     pubblica: () -> Unit,
     salvaDiagnosi: () -> Unit,
     togli: () -> Unit,
+    comprimi: (() -> Unit)? = null,
 ) {
     val lista = f.articoli
     // Le schede pubblicate si "spengono" un po': si vede subito cosa resta da fare
@@ -496,6 +609,11 @@ private fun Scheda(
                     else -> Etichetta("Pronta", Color.White, Verde)
                 }
             }
+            // ▲ per richiudere una foto già pubblicata
+            if (comprimi != null) Box(
+                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)).clickable(onClick = comprimi),
+                contentAlignment = Alignment.Center,
+            ) { Text("▲", fontSize = 14.sp, color = BluNotte) }
             // ✕ per togliere la foto dalla lista (chiede conferma)
             Box(
                 Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)).clickable(onClick = togli),
@@ -564,21 +682,8 @@ private fun Scheda(
 
                     // Due pulsanti, niente di più
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val (s1, m1) = rimbalzo()
-                        val (s2, m2) = rimbalzo()
-                        OutlinedButton(
-                            onClick = articoli,
-                            modifier = Modifier.weight(1f).heightIn(min = 54.dp).then(m1),
-                            shape = MaterialTheme.shapes.medium,
-                            interactionSource = s1,
-                        ) { Text("📋 Articoli (${lista.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
-                        Button(
-                            onClick = pubblica,
-                            modifier = Modifier.weight(1f).heightIn(min = 54.dp).then(m2),
-                            shape = MaterialTheme.shapes.medium,
-                            interactionSource = s2,
-                            colors = ButtonDefaults.buttonColors(containerColor = Azzurro),
-                        ) { Text(if (f.pubblicata) "↺ Di nuovo" else "📤 Pubblica", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                        PulsanteChiaro("Articoli (${lista.size})", "📋", articoli, Modifier.weight(1f))
+                        PulsanteGrande(if (f.pubblicata) "Di nuovo" else "Pubblica", if (f.pubblicata) "↺" else "📤", pubblica, Modifier.weight(1f))
                     }
                 }
             }
@@ -635,11 +740,7 @@ private fun SchermataArticoli(f: Foto, modifica: (Int?) -> Unit, chiudi: () -> U
                     }
                 }
             }
-            Button(
-                onClick = { modifica(null) },
-                modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 58.dp),
-                shape = MaterialTheme.shapes.large,
-            ) { Text("+ Aggiungi etichetta", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            PulsanteGrande("Aggiungi etichetta", "＋", { modifica(null) }, Modifier.fillMaxWidth().padding(16.dp), altezza = 58.dp, grandezzaTesto = 18)
         }
     }
 }
@@ -767,13 +868,25 @@ private fun DatiLetti(dati: DatiCartellino) {
 }
 
 /**
- * Foto a schermo intero: si ingrandisce con le dita. In basso: Gira, Capovolgi, Pixela, Testo.
- * "Pixela" apre l'editor: col dito si coprono a quadrettoni le parti da nascondere.
+ * Foto a schermo intero: si ingrandisce con le dita.
+ * In basso: Gira, Capovolgi, Testo e la sezione Pixel (automatico dello sfondo e a mano),
+ * ognuno col suo "↺ Togli" per tornare indietro.
  */
 @Composable
-private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) -> Unit, testo: () -> Unit, chiudi: () -> Unit) {
+private fun Visore(
+    f: Foto,
+    sfondoInCorso: Boolean,
+    gira: (Int) -> Unit,
+    pixelaSfondo: () -> Unit,
+    togliSfondo: () -> Unit,
+    salvaPixelMano: (Set<Long>, Int) -> Unit,
+    togliPixelMano: () -> Unit,
+    testo: () -> Unit,
+    chiudi: () -> Unit,
+) {
     val immagine by fotoPerSchermo(f.file)
-    val misure = remember(f.file) { f.file?.let(::misureFoto) }   // grandezza vera, per i quadretti della pixelatura
+    // Grandezza della foto di base (dove si salvano i quadretti a mano)
+    val misureBase = remember(f.fileAuto) { f.fileAuto?.let(::misureFoto) }
     var pixela by remember { mutableStateOf(false) }
     Finestra(onDismissRequest = { if (pixela) pixela = false else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
@@ -782,26 +895,48 @@ private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) ->
                     if (pixela) "Passa il dito su cosa nascondere" else "Foto ${f.numero} · due dita per ingrandire",
                     color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f),
                 )
-                if (!pixela) TextButton(onClick = chiudi) { Text("✕ Chiudi", color = Color.White, fontSize = 18.sp) }
+                if (!pixela) PulsanteTondo("✕", chiudi)
             }
             val img = immagine
-            if (pixela && img != null && misure != null) {
+            if (pixela && img != null && misureBase != null) {
                 EditorPixel(
-                    img, misure.first, misure.second, Modifier.weight(1f),
-                    salva = { celle, lato -> salvaPixel(celle, lato); pixela = false },
+                    img, misureBase.first, misureBase.second, f.rotazioneManuale, f.pixelManuale, Modifier.weight(1f),
+                    salva = { celle, lato -> salvaPixelMano(celle, lato); pixela = false },
                     esci = { pixela = false },
                 )
             } else {
-                // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
                     if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize()) }
+                    if (sfondoInCorso) Surface(color = Color.White, shape = RoundedCornerShape(50), shadowElevation = 4.dp) {
+                        Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = Azzurro)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Pixelo lo sfondo…", color = BluNotte, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
-                Surface(color = Color.White, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PulsanteVisore("↻", "Gira", Modifier.weight(1f)) { gira(90) }
-                        PulsanteVisore("⇅", "Capovolgi", Modifier.weight(1f)) { gira(180) }
-                        PulsanteVisore("▦", "Pixela", Modifier.weight(1f)) { pixela = true }
-                        PulsanteVisore("✏", "Testo", Modifier.weight(1f), testo)
+                Surface(color = Color.White, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PulsanteVisore("↻", "Gira", Modifier.weight(1f)) { gira(90) }
+                            PulsanteVisore("⇅", "Capovolgi", Modifier.weight(1f)) { gira(180) }
+                            PulsanteVisore("✏", "Testo", Modifier.weight(1f), azione = testo)
+                        }
+                        // Sezione pixel: due strade, ognuna col suo "torna indietro"
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SezionePixel(
+                                "✨", "Sfondo automatico", Modifier.weight(1f),
+                                applicato = f.sfondoPixelato, attivo = !sfondoInCorso && img != null,
+                                applica = pixelaSfondo, togli = togliSfondo,
+                            )
+                            SezionePixel(
+                                "▦", "Pixel a mano", Modifier.weight(1f),
+                                applicato = f.pixelManuale.isNotEmpty(), attivo = !sfondoInCorso && img != null,
+                                applica = { pixela = true }, togli = togliPixelMano,
+                                applicaAncora = true,   // a mano si può sempre aggiungere
+                            )
+                        }
                     }
                 }
             }
@@ -809,47 +944,87 @@ private fun Visore(f: Foto, gira: (Int) -> Unit, salvaPixel: (Set<Long>, Int) ->
     }
 }
 
-/** Pulsante quadrato del visore: simbolo grande e scritta sotto. */
+/**
+ * Un tipo di pixel nel visore: il pulsante per farlo e, se è già fatto, "↺ Togli" per tornare indietro.
+ * [applicaAncora]: il pulsante resta attivo anche dopo (pixel a mano: si aggiungono altri quadretti).
+ */
 @Composable
-private fun PulsanteVisore(simbolo: String, scritta: String, modifier: Modifier = Modifier, azione: () -> Unit) {
-    val (sorgente, morbido) = rimbalzo()
-    FilledTonalButton(
-        onClick = azione,
-        modifier = modifier.heightIn(min = 72.dp).then(morbido),
-        shape = MaterialTheme.shapes.medium,
-        contentPadding = PaddingValues(4.dp),
-        interactionSource = sorgente,
-        colors = ButtonDefaults.filledTonalButtonColors(containerColor = Cielo, contentColor = BluNotte),
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(simbolo, fontSize = 24.sp)
-            Text(scritta, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+private fun SezionePixel(
+    simbolo: String, scritta: String, modifier: Modifier,
+    applicato: Boolean, attivo: Boolean,
+    applica: () -> Unit, togli: () -> Unit,
+    applicaAncora: Boolean = false,
+) {
+    Surface(color = Color(0xFFF1F8FD), shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, BordoScheda), modifier = modifier) {
+        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            PulsanteVisore(
+                if (applicato && !applicaAncora) "✓" else simbolo,
+                if (applicato && !applicaAncora) "Fatto" else scritta,
+                Modifier.fillMaxWidth(),
+                attivo = attivo && (applicaAncora || !applicato),
+                colore = if (applicato) Verde.copy(alpha = 0.18f) else Cielo,
+                azione = applica,
+            )
+            AnimatedVisibility(applicato) {
+                PulsanteChiaro("Togli", "↺", togli, Modifier.fillMaxWidth(), colore = Arancione, altezza = 44.dp, grandezzaTesto = 14)
+            }
         }
     }
 }
 
-/** Editor della pixelatura a mano: col dito si "dipingono" quadrettoni sulle parti da nascondere. */
+/** Pulsante quadrato del visore: simbolo grande e scritta sotto. */
 @Composable
-private fun EditorPixel(immagine: ImageBitmap, w: Int, h: Int, modifier: Modifier, salva: (Set<Long>, Int) -> Unit, esci: () -> Unit) {
-    // w, h = grandezza vera della foto (quella mostrata può essere rimpicciolita)
-    val lato = remember(immagine) { PixelManuale.lato(w, h) }
-    // Colori di anteprima: la foto rimpicciolita, un pixel per quadretto
-    val piccola = remember(immagine) {
-        android.graphics.Bitmap.createScaledBitmap(immagine.asAndroidBitmap(), (w + lato - 1) / lato, (h + lato - 1) / lato, true)
+private fun PulsanteVisore(
+    simbolo: String, scritta: String, modifier: Modifier = Modifier,
+    attivo: Boolean = true, colore: Color = Cielo, azione: () -> Unit,
+) {
+    val (sorgente, morbido) = rimbalzo()
+    Surface(
+        onClick = azione,
+        enabled = attivo,
+        shape = RoundedCornerShape(20.dp),
+        color = colore,
+        interactionSource = sorgente,
+        modifier = modifier.heightIn(min = 68.dp).then(morbido).alpha(if (attivo) 1f else 0.45f),
+    ) {
+        Column(Modifier.padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(simbolo, fontSize = 22.sp, color = BluNotte)
+            Text(scritta, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = BluNotte, textAlign = TextAlign.Center)
+        }
     }
-    val celle = remember { mutableStateMapOf<Long, Int>() }   // quadretto → numero del tratto (per "Annulla")
+}
+
+/**
+ * Editor del pixel a mano: col dito si "dipingono" quadrettoni sulle parti da nascondere.
+ * I quadretti si salvano sulla foto di base ([wBase]×[hBase]); quella mostrata è girata di [rotazione].
+ */
+@Composable
+private fun EditorPixel(
+    immagine: ImageBitmap, wBase: Int, hBase: Int, rotazione: Int, iniziali: Set<Long>,
+    modifier: Modifier, salva: (Set<Long>, Int) -> Unit, esci: () -> Unit,
+) {
+    val lato = remember(wBase, hBase) { PixelManuale.lato(wBase, hBase) }
+    // Grandezza della foto mostrata (girata) in "pixel della base"
+    val wVista = if (rotazione % 180 == 0) wBase else hBase
+    val hVista = if (rotazione % 180 == 0) hBase else wBase
+    // Colori di anteprima: la foto rimpicciolita, circa un pixel per quadretto
+    val piccola = remember(immagine) {
+        android.graphics.Bitmap.createScaledBitmap(immagine.asAndroidBitmap(), maxOf(1, (wVista + lato - 1) / lato), maxOf(1, (hVista + lato - 1) / lato), true)
+    }
+    // quadretto → numero del tratto (per "Annulla"); quelli di prima hanno 0 e non si annullano qui
+    val celle = remember { mutableStateMapOf<Long, Int>().apply { iniziali.forEach { put(it, 0) } } }
     var tratto by remember { mutableIntStateOf(0) }
     var grande by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
             val pxW = constraints.maxWidth.toFloat(); val pxH = constraints.maxHeight.toFloat()
-            val scala = minOf(pxW / w, pxH / h)
-            val ox = (pxW - w * scala) / 2; val oy = (pxH - h * scala) / 2
+            val scala = minOf(pxW / wVista, pxH / hVista)
+            val ox = (pxW - wVista * scala) / 2; val oy = (pxH - hVista * scala) / 2
             fun dipingi(p: Offset) {
                 val raggio = lato * (if (grande) 2.4f else 1.2f)
-                PixelManuale.celleAttorno((p.x - ox) / scala, (p.y - oy) / scala, raggio, lato, w, h)
-                    .forEach { if (it !in celle) celle[it] = tratto }
+                val (bx, by) = PixelManuale.versoBase((p.x - ox) / scala, (p.y - oy) / scala, rotazione, wBase, hBase)
+                PixelManuale.celleAttorno(bx, by, raggio, lato, wBase, hBase).forEach { if (it !in celle) celle[it] = tratto }
             }
             Image(immagine, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             Canvas(
@@ -862,34 +1037,40 @@ private fun EditorPixel(immagine: ImageBitmap, w: Int, h: Int, modifier: Modifie
                         detectDragGestures(onDragStart = { dipingi(it) }) { cambio, _ -> dipingi(cambio.position) }
                     }
             ) {
-                val l = lato * scala
                 for (c in celle.keys) {
-                    val col = PixelManuale.colonna(c); val rig = PixelManuale.riga(c)
+                    // Quadretto della base → rettangolo sulla foto mostrata
+                    val x0 = PixelManuale.colonna(c) * lato.toFloat(); val y0 = PixelManuale.riga(c) * lato.toFloat()
+                    val x1 = minOf(wBase.toFloat(), x0 + lato); val y1 = minOf(hBase.toFloat(), y0 + lato)
+                    val (ax, ay) = PixelManuale.daBase(x0, y0, rotazione, wBase, hBase)
+                    val (bx, by) = PixelManuale.daBase(x1, y1, rotazione, wBase, hBase)
+                    val sx = minOf(ax, bx); val sy = minOf(ay, by); val ex = maxOf(ax, bx); val ey = maxOf(ay, by)
+                    val px = ((sx + ex) / 2 / lato).toInt().coerceIn(0, piccola.width - 1)
+                    val py = ((sy + ey) / 2 / lato).toInt().coerceIn(0, piccola.height - 1)
                     drawRect(
-                        Color(piccola.getPixel(col.coerceAtMost(piccola.width - 1), rig.coerceAtMost(piccola.height - 1))),
-                        Offset(ox + col * l, oy + rig * l), androidx.compose.ui.geometry.Size(l + 1, l + 1),
+                        Color(piccola.getPixel(px, py)),
+                        Offset(ox + sx * scala, oy + sy * scala),
+                        androidx.compose.ui.geometry.Size((ex - sx) * scala + 1, (ey - sy) * scala + 1),
                     )
                 }
             }
         }
-        Surface(color = Color.White, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
-            Column(Modifier.fillMaxWidth().padding(12.dp)) {
+        Surface(color = Color.White, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = !grande, onClick = { grande = false }, label = { Text("● Pennello piccolo") })
                     FilterChip(selected = grande, onClick = { grande = true }, label = { Text("⬤ Pennello grande") })
                 }
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = esci, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("✕ Esci") }
-                    OutlinedButton(
-                        onClick = { celle.values.maxOrNull()?.let { ultimo -> celle.keys.filter { celle[it] == ultimo }.forEach(celle::remove) } },
-                        enabled = celle.isNotEmpty(),
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                    ) { Text("↶ Annulla") }
-                    Button(
-                        onClick = { salva(celle.keys.toSet(), lato) },
-                        enabled = celle.isNotEmpty(),
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                    ) { Text("✓ Salva", fontWeight = FontWeight.Bold) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PulsanteChiaro("Esci", "✕", esci, Modifier.weight(1f), altezza = 50.dp, grandezzaTesto = 14)
+                    PulsanteChiaro(
+                        "Annulla", "↶",
+                        { celle.values.maxOrNull()?.takeIf { it > 0 }?.let { ultimo -> celle.keys.filter { celle[it] == ultimo }.forEach(celle::remove) } },
+                        Modifier.weight(1f), attivo = celle.values.any { it > 0 }, altezza = 50.dp, grandezzaTesto = 14,
+                    )
+                    PulsanteGrande(
+                        "Salva", "✓", { salva(celle.keys.toSet(), lato) }, Modifier.weight(1f),
+                        attivo = celle.values.any { it > 0 }, colore = Verde, altezza = 50.dp, grandezzaTesto = 14,
+                    )
                 }
             }
         }

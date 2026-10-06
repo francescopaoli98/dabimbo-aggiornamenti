@@ -47,4 +47,23 @@ object PixelManuale {
             for (y in y0 until y1) for (x in x0 until x1) px[y * larghezza + x] = media
         }
     }
+
+    /**
+     * La foto mostrata può essere girata a mano di [gradi] (0/90/180/270, in senso orario) rispetto
+     * alla foto di base, dove si salvano i quadretti. Queste due funzioni passano da una all'altra.
+     * [larghezza] e [altezza] sono quelle della foto di base.
+     */
+    fun versoBase(x: Float, y: Float, gradi: Int, larghezza: Int, altezza: Int): Pair<Float, Float> = when (gradi) {
+        90 -> y to (altezza - x)
+        180 -> (larghezza - x) to (altezza - y)
+        270 -> (larghezza - y) to x
+        else -> x to y
+    }
+
+    fun daBase(x: Float, y: Float, gradi: Int, larghezza: Int, altezza: Int): Pair<Float, Float> = when (gradi) {
+        90 -> (altezza - y) to x
+        180 -> (larghezza - x) to (altezza - y)
+        270 -> y to (larghezza - x)
+        else -> x to y
+    }
 }

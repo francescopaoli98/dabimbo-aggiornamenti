@@ -14,6 +14,11 @@
         android:largeHeap="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- Scarica il modello di separazione oggetti/sfondo (pixel automatico) insieme all'app -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="subject_segment" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
