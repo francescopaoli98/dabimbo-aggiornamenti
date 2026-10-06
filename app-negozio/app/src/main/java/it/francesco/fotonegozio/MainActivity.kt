@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -106,6 +107,7 @@ class MainActivity : ComponentActivity() {
         // Chiaro / scuro: dalle impostazioni, o come il telefono
         TemaApp.modo = viewModel.tema
         TemaApp.tavolozza = viewModel.tavolozza
+        TemaApp.coloreMio = viewModel.coloreMio
         TemaApp.telefonoScuro = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         setContent {
             // Icone di sistema (ora, batteria) chiare sul tema scuro e scure su quello chiaro
@@ -662,6 +664,20 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                                 label = { Text(nome, maxLines = 1) },
                                 leadingIcon = { Box(Modifier.size(14.dp).background(coloreDelTema(i), CircleShape)) },
                             )
+                        }
+                    }
+                    // "Il mio colore": 12 colori tra cui scegliere, il tema si costruisce da solo
+                    AnimatedVisibility(vm.tavolozza == IL_MIO_COLORE) {
+                        FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            COLORI_MIEI.forEach { c ->
+                                val scelto = vm.coloreMio == c
+                                Box(
+                                    Modifier.size(40.dp).clip(CircleShape).background(Color(c))
+                                        .then(if (scelto) Modifier.border(3.dp, Testo, CircleShape) else Modifier)
+                                        .clickable { vm.cambiaColoreMio(c) }.testTag("colore_$c"),
+                                    contentAlignment = Alignment.Center,
+                                ) { if (scelto) Text("✓", color = Color.White, fontWeight = FontWeight.Bold) }
+                            }
                         }
                     }
                 }

@@ -60,6 +60,7 @@ class AppTest {
         app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         TemaApp.modo = 0
         TemaApp.tavolozza = 0
+        TemaApp.coloreMio = 0xFF2E86AB
         java.io.File(app.filesDir, "pubblicazioni.json").delete()
         // Il FileProvider si ricorda le cartelle del primo test (cache statica): la svuoto
         runCatching {
@@ -608,5 +609,19 @@ class AppTest {
         regola.onNodeWithText("🧸 Da bimbo a bimbo").performClick()
         regola.waitForIdle()
         assertEquals(prima, Azzurro)
+    }
+
+    @Test
+    fun ilMioColore() {
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("🎨 Il mio colore").performScrollTo().performClick()
+        regola.onNodeWithTag("colore_${0xFFD1495B}").performScrollTo().performClick()
+        regola.waitForIdle()
+        assertEquals(IL_MIO_COLORE, vm.tavolozza)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFFD1495B), Azzurro)   // il pulsante principale prende il colore scelto
+        TemaApp.modo = 1
+        assertNotEquals(androidx.compose.ui.graphics.Color(0xFFD1495B), Azzurro)  // in scuro una versione più adatta
+        TemaApp.modo = 0
+        assertEquals(0xFFD1495B, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.coloreMio)
     }
 }

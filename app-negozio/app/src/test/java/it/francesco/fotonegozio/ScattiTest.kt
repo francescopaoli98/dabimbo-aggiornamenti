@@ -50,6 +50,19 @@ class ScattiTest {
             regola.waitForIdle()
             salva(regola.activity.window.decorView, "$cartella/tema_${i}_$nome.png")
         }
+        // "Il mio colore" con 4 colori diversi
+        for (c in listOf(0xFFD1495B, 0xFF1B998B, 0xFFBC8A3C, 0xFF8E5BB5)) {
+            regola.runOnUiThread { vm.cambiaColoreMio(c); vm.cambiaTema(0) }
+            regola.waitForIdle()
+            salva(regola.activity.window.decorView, "$cartella/mio_${c.toString(16)}.png")
+        }
+        // Impostazioni con la scelta del colore aperta
+        regola.onNodeWithText("⚙").performClick()
+        regola.waitForIdle()
+        regola.onNodeWithText("Colori").performScrollTo()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/impostazioni_colori.png")
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
         regola.runOnUiThread { vm.cambiaTavolozza(0); vm.cambiaTema(0) }
         // Riepilogo: un giorno aperto
         regola.runOnUiThread { vm.segnaPubblicata(1) }
