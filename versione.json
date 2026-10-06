@@ -1,6 +1,6 @@
 {
-  "versionCode": 60,
-  "versionName": "3.5",
+  "versionCode": 61,
+  "versionName": "3.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Tutte le foto in verticale; Sinistra/Destra e rotazione immediata; pennello \"Originale\" per togliere il pixel dove vuoi; \"no capp\" = senza cappuccio."
+  "note": "Oggetti dritti come li vede una persona: se le scritte dicono il verso, la foto non viene più girata di lato."
 }
