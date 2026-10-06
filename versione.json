@@ -1,6 +1,6 @@
 {
-  "versionCode": 62,
-  "versionName": "3.7",
+  "versionCode": 63,
+  "versionName": "3.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Riepilogo della giornata (articoli pubblicati e valore) e foto preparate 2 alla volta, più in fretta."
+  "note": "Avviso \"Già pubblicato\" se un articolo è già stato pubblicato in passato."
 }
