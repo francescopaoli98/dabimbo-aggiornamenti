@@ -1,6 +1,6 @@
 {
-  "versionCode": 70,
-  "versionName": "4.5",
+  "versionCode": 71,
+  "versionName": "4.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "La taglia compare una volta sola nel testo, comunque sia scritta sul cartellino."
+  "note": "Lo zoom nell'anteprima resta dopo aver tolto le dita (↺ per tornare normale). Si può cambiare nelle impostazioni."
 }
