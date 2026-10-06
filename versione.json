@@ -1,6 +1,6 @@
 {
-  "versionCode": 57,
-  "versionName": "3.2",
+  "versionCode": 58,
+  "versionName": "3.3",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: modalità scura (⚙ Impostazioni → Aspetto) e logo senza sfondo."
+  "note": "Zoom più veloce e nitido, anche nella foto grande."
 }
