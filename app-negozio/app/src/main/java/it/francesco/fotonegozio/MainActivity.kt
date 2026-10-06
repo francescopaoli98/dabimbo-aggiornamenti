@@ -1,6 +1,7 @@
 package it.francesco.fotonegozio
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
@@ -100,7 +101,19 @@ class MainActivity : ComponentActivity() {
         )
         // Foto arrivate dal tasto "Condividi" della Galleria (solo al primo avvio, non dopo una rotazione schermo)
         if (savedInstanceState == null) viewModel.carica(fotoDaIntent(intent))
-        setContent { ConScritte(viewModel.scalaTesto) { TemaBimbo { Schermata(viewModel) } } }
+        // Chiaro / scuro: dalle impostazioni, o come il telefono
+        TemaApp.modo = viewModel.tema
+        TemaApp.telefonoScuro = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        setContent {
+            // Icone di sistema (ora, batteria) chiare sul tema scuro e scure su quello chiaro
+            val scuro = TemaApp.scuro
+            LaunchedEffect(scuro) {
+                val barre = if (scuro) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = barre, navigationBarStyle = barre)
+            }
+            ConScritte(viewModel.scalaTesto) { TemaBimbo { Schermata(viewModel) } }
+        }
 
         // Tasto Indietro sulla lista delle foto: la prima volta avvisa, la seconda (entro 2 secondi) chiude l'app.
         // Così un tocco per sbaglio non fa perdere le foto. Le finestre aperte (articoli, foto grande…) si chiudono da sole.
@@ -230,6 +243,7 @@ private fun Schermata(vm: FotoViewModel) {
                 Image(
                     painterResource(R.drawable.logo), "Da bimbo a bimbo",
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+                        .then(if (TemaApp.scuro) Modifier.background(Color(0xFFF4FAFE), RoundedCornerShape(28.dp)).padding(10.dp) else Modifier)
                         .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
                     contentScale = ContentScale.FillWidth,
                 )
@@ -258,14 +272,14 @@ private fun Schermata(vm: FotoViewModel) {
                 }
             }
             if (vm.soloDaControllare && vm.fotoVisibili.isEmpty()) item {
-                Surface(onClick = { vm.soloDaControllare = false }, color = Color.White, shape = MaterialTheme.shapes.medium) {
+                Surface(onClick = { vm.soloDaControllare = false }, color = Superficie, shape = MaterialTheme.shapes.medium) {
                     Text("Nessuna foto da controllare 👍  Tocca per vederle tutte.", Modifier.fillMaxWidth().padding(16.dp), color = BluNotte, fontWeight = FontWeight.Bold)
                 }
             }
             // Solo in modalità prove
             if (vm.prove) item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Diagnosi (modalità prove)", Modifier.weight(1f), fontSize = 14.sp, color = Color.Gray)
+                    Text("Diagnosi (modalità prove)", Modifier.weight(1f), fontSize = 14.sp, color = TestoTenue)
                     Switch(checked = vm.diagnosi, onCheckedChange = { vm.diagnosi = it })
                 }
             }
@@ -426,7 +440,7 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
     val prossima = vm.prossima
     val tutte = vm.foto.size
     val fatte = vm.quantePubblicate
-    Surface(color = Color.White, shadowElevation = 12.dp, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
+    Surface(color = Superficie, shadowElevation = 12.dp, shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Pubblicate $fatte di $tutte", fontSize = 14.sp, color = BluNotte, modifier = Modifier.weight(1f))
@@ -458,10 +472,10 @@ private fun BarraPubblica(vm: FotoViewModel, pubblica: () -> Unit) {
 /** "È arrivata la versione 2.8": un tocco e si aggiorna (Android chiede poi "Installa"). */
 @Composable
 private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () -> Unit) {
-    Surface(color = Color.White, shape = MaterialTheme.shapes.large, border = BorderStroke(2.dp, Verde), shadowElevation = 3.dp) {
+    Surface(color = Superficie, shape = MaterialTheme.shapes.large, border = BorderStroke(2.dp, Verde), shadowElevation = 3.dp) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("🎁 È arrivata la versione ${n.versionName}!", fontWeight = FontWeight.ExtraBold, color = BluNotte, fontSize = 17.sp)
-            if (n.note.isNotBlank()) Text(n.note, fontSize = 14.sp, color = Color(0xFF3A4660))
+            if (n.note.isNotBlank()) Text(n.note, fontSize = 14.sp, color = TestoTenue)
             if (scaricamento != null) {
                 LinearProgressIndicator(
                     progress = { scaricamento },
@@ -471,7 +485,7 @@ private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () ->
                 Text("Scarico… ${(scaricamento * 100).toInt()}%", fontSize = 13.sp, color = BluNotte)
             } else {
                 PulsanteGrande("Aggiorna", "⬇", aggiorna, Modifier.fillMaxWidth(), colore = Verde, altezza = 52.dp)
-                Text("Poi Android chiede \"Installa\": toccalo e l'app si aggiorna. Le foto in lista restano.", fontSize = 12.sp, color = Color(0xFF5A6680))
+                Text("Poi Android chiede \"Installa\": toccalo e l'app si aggiorna. Le foto in lista restano.", fontSize = 12.sp, color = TestoTenue)
             }
         }
     }
@@ -482,13 +496,13 @@ private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () ->
 private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> Unit) {
     Surface(
         onClick = apri,
-        color = Color.White.copy(alpha = 0.85f),
+        color = Superficie.copy(alpha = 0.85f),
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, BordoScheda),
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFEAF5FC))) {
+            Box(Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(FondoTenue)) {
                 f.miniatura?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
             }
             Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(start = 12.dp).weight(1f))
@@ -498,6 +512,7 @@ private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> U
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 /** Impostazioni: grandezza del testo, schede compresse, pulsante "torna su", prezzo in grassetto. */
 @Composable
 private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
@@ -511,9 +526,16 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 PulsanteTondo("✕", chiudi)
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Riquadro("Aspetto") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(0 to "☀ Chiaro", 1 to "🌙 Scuro", 2 to "📱 Come il telefono").forEach { (v, nome) ->
+                            FilterChip(selected = vm.tema == v, onClick = { vm.cambiaTema(v) }, label = { Text(nome, maxLines = 1) })
+                        }
+                    }
+                }
                 Riquadro("Grandezza del testo") {
                     val scelte = listOf(0.9f to "Piccolo", 1f to "Medio", 1.2f to "Grande", 1.4f to "Molto grande")
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         scelte.forEach { (v, nome) ->
                             FilterChip(
                                 selected = vm.scalaTesto == v, onClick = { vm.cambiaScalaTesto(v) },
@@ -521,7 +543,7 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                             )
                         }
                     }
-                    Text("Esempio: Felpa con cappuccio rosa - 8 anni - € 4,00", color = Color(0xFF3A4660), modifier = Modifier.padding(top = 6.dp))
+                    Text("Esempio: Felpa con cappuccio rosa - 8 anni - € 4,00", color = TestoTenue, modifier = Modifier.padding(top = 6.dp))
                 }
                 Riquadro("Lista delle foto") {
                     Interruttore("Chiudi le foto già pubblicate", "Diventano una riga piccola: meno da scorrere. Toccandole si riaprono.", vm.comprimiPubblicate, vm::cambiaComprimi)
@@ -544,7 +566,7 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
 
 @Composable
 private fun Riquadro(titolo: String, contenuto: @Composable ColumnScope.() -> Unit) {
-    Surface(color = Color.White, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, BordoScheda)) {
+    Surface(color = Superficie, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, BordoScheda)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(titolo, fontWeight = FontWeight.ExtraBold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(bottom = 8.dp))
             contenuto()
@@ -557,7 +579,7 @@ private fun Interruttore(titolo: String, spiegazione: String, acceso: Boolean, c
     Row(Modifier.fillMaxWidth().clickable { cambia(!acceso) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(titolo, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(spiegazione, fontSize = 13.sp, color = Color(0xFF5A6680))
+            Text(spiegazione, fontSize = 13.sp, color = TestoTenue)
         }
         Switch(checked = acceso, onCheckedChange = cambia, modifier = Modifier.padding(start = 8.dp))
     }
@@ -566,13 +588,13 @@ private fun Interruttore(titolo: String, spiegazione: String, acceso: Boolean, c
 /** Schermata vuota: cosa fare per cominciare. */
 @Composable
 private fun Benvenuto() {
-    Surface(color = Color.White, shape = MaterialTheme.shapes.large, shadowElevation = 4.dp, modifier = Modifier.entrata()) {
+    Surface(color = Superficie, shape = MaterialTheme.shapes.large, shadowElevation = 4.dp, modifier = Modifier.entrata()) {
         Column(Modifier.fillMaxWidth().padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Ciao! 👋", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BluNotte)
             Text(
                 "Tocca «Scegli foto» e seleziona le foto da pubblicare.\n\n" +
                     "Oppure dalla Galleria: seleziona le foto, tocca Condividi e scegli «Da bimbo a bimbo».",
-                fontSize = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp), color = Color(0xFF3A4660),
+                fontSize = 17.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 10.dp), color = TestoTenue,
             )
         }
     }
@@ -611,7 +633,7 @@ private fun Scheda(
     // Le schede pubblicate si "spengono" un po': si vede subito cosa resta da fare
     val trasparenza by animateFloatAsState(if (f.pubblicata) 0.72f else 1f, label = "pubblicata")
     Surface(
-        color = Color.White,
+        color = Superficie,
         shape = MaterialTheme.shapes.large,
         shadowElevation = 2.dp,
         border = BorderStroke(1.5.dp, BordoScheda),
@@ -637,19 +659,19 @@ private fun Scheda(
             ) { stato ->
                 when (stato) {
                     0 -> Etichetta("✓ Pubblicata", Color.White, Verde)
-                    1 -> Etichetta("In lavorazione…", Color.White, BluNotte)
+                    1 -> Etichetta("In lavorazione…", Color.White, Azzurro)
                     2 -> Etichetta("⚠ Da controllare", Color.White, Arancione)
                     else -> Etichetta("Pronta", Color.White, Verde)
                 }
             }
             // ▲ per richiudere una foto già pubblicata
             if (comprimi != null) Box(
-                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)).clickable(onClick = comprimi),
+                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = comprimi),
                 contentAlignment = Alignment.Center,
             ) { Text("▲", fontSize = 14.sp, color = BluNotte) }
             // ✕ per togliere la foto dalla lista (chiede conferma)
             Box(
-                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.8f)).clickable(onClick = togli),
+                Modifier.padding(start = 8.dp).size(34.dp).clip(CircleShape).background(Superficie.copy(alpha = 0.8f)).clickable(onClick = togli),
                 contentAlignment = Alignment.Center,
             ) { Text("✕", fontSize = 16.sp, color = BluNotte, fontWeight = FontWeight.Bold) }
         }
@@ -657,7 +679,7 @@ private fun Scheda(
             // Foto: toccala per ingrandire, girare, pixelare
             Box(
                 Modifier.fillMaxWidth().height(300.dp).clip(MaterialTheme.shapes.medium)
-                    .background(Color(0xFFEAF5FC)).clickable(enabled = f.file != null, onClick = ingrandisci),
+                    .background(FondoTenue).clickable(enabled = f.file != null, onClick = ingrandisci),
                 contentAlignment = Alignment.Center,
             ) {
                 Crossfade(targetState = f.miniatura, label = "foto") { mini ->
@@ -671,7 +693,7 @@ private fun Scheda(
                 if (f.file != null) Text(
                     "🔍 Tocca", fontSize = 13.sp, color = BluNotte, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp)
-                        .background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 5.dp),
+                        .background(Superficie.copy(alpha = 0.9f), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
 
@@ -693,12 +715,12 @@ private fun Scheda(
                     if (testo.isNotBlank()) {
                         Surface(
                             onClick = modificaTesto,
-                            color = Color(0xFFEAF5FC),
+                            color = FondoTenue,
                             shape = MaterialTheme.shapes.medium,
                             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         ) {
                             Column(Modifier.padding(14.dp)) {
-                                Text(testo, fontSize = 17.sp, color = Color(0xFF1B1F2A))
+                                Text(testo, fontSize = 17.sp, color = Testo)
                                 Text("✏ Tocca per correggere", fontSize = 13.sp, color = BluNotte, modifier = Modifier.padding(top = 8.dp))
                             }
                         }
@@ -710,7 +732,7 @@ private fun Scheda(
                             (if (f.messaInVerticale) " · messa in verticale" else "") +
                             (if (f.rotazioneManuale != 0) " · girata a mano" else "") +
                             " · ${f.metodo} · ${"%.1f".format(f.secondi)} s",
-                        fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 6.dp),
+                        fontSize = 12.sp, color = TestoTenue, modifier = Modifier.padding(top = 6.dp),
                     )
 
                     // Due pulsanti, niente di più
@@ -755,7 +777,7 @@ private fun SchermataArticoli(f: Foto, modifica: (Int?) -> Unit, chiudi: () -> U
                 }
                 items(lista.size) { i ->
                     val d = lista[i]
-                    Surface(color = Color.White, shape = MaterialTheme.shapes.medium, shadowElevation = 3.dp, border = BorderStroke(1.dp, BordoScheda)) {
+                    Surface(color = Superficie, shape = MaterialTheme.shapes.medium, shadowElevation = 3.dp, border = BorderStroke(1.dp, BordoScheda)) {
                         Column(Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -854,7 +876,7 @@ private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) ->
             Text(
                 "Se cambia con maschile/femminile scrivi le 4 forme:\ngrigio / grigia / grigi / grigie\n" +
                     "Se cambia solo col plurale: verde / verdi",
-                fontSize = 12.sp, color = Color.Gray,
+                fontSize = 12.sp, color = TestoTenue,
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -879,7 +901,7 @@ private fun ModificaSigla(iniziale: VoceDizionario?, salva: (VoceDizionario?) ->
 @Composable
 private fun Avviso(testo: String) = Text(
     testo, color = Arancione, fontWeight = FontWeight.Bold,
-    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(Color(0xFFFFEFE3), RoundedCornerShape(14.dp)).padding(12.dp),
+    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).background(FondoAvviso, RoundedCornerShape(14.dp)).padding(12.dp),
 )
 
 private val ARANCIONE = Arancione
@@ -947,7 +969,7 @@ private fun Visore(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     // key: se la foto cambia (girata, pixelata) lo zoom riparte da capo
                     if (img != null) key(f.file) { FotoZoomabile(img, Modifier.fillMaxSize()) }
-                    if (sfondoInCorso) Surface(color = Color.White, shape = RoundedCornerShape(50), shadowElevation = 4.dp) {
+                    if (sfondoInCorso) Surface(color = Superficie, shape = RoundedCornerShape(50), shadowElevation = 4.dp) {
                         Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 3.dp, color = Azzurro)
                             Spacer(Modifier.width(10.dp))
@@ -955,7 +977,7 @@ private fun Visore(
                         }
                     }
                 }
-                Surface(color = Color.White, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+                Surface(color = Superficie, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             PulsanteVisore("↻", "Gira", Modifier.weight(1f)) { gira(90) }
@@ -994,7 +1016,7 @@ private fun SezionePixel(
     applica: () -> Unit, togli: () -> Unit,
     applicaAncora: Boolean = false,
 ) {
-    Surface(color = Color(0xFFF1F8FD), shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, BordoScheda), modifier = modifier) {
+    Surface(color = FondoTenue, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, BordoScheda), modifier = modifier) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PulsanteVisore(
                 if (applicato && !applicaAncora) "✓" else simbolo,
@@ -1093,7 +1115,7 @@ private fun EditorPixel(
                 }
             }
         }
-        Surface(color = Color.White, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+        Surface(color = Superficie, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
             Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = !grande, onClick = { grande = false }, label = { Text("● Pennello piccolo") })
@@ -1205,7 +1227,7 @@ private fun ModificaArticolo(
                     placeholder = { Text("es. 1444115 librottino inside out 1,50") },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("…oppure riempi o correggi i campi:", fontSize = 13.sp, color = Color.Gray)
+                Text("…oppure riempi o correggi i campi:", fontSize = 13.sp, color = TestoTenue)
                 OutlinedTextField(codice, { codice = it.filter(Char::isDigit).take(7) }, label = { Text("Codice") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(descrizione, { descrizione = it }, label = { Text("Descrizione") }, modifier = Modifier.fillMaxWidth())

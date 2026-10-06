@@ -122,6 +122,11 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var prezzoGrassetto by mutableStateOf(preferenze.getBoolean("prezzo_grassetto", false))
         private set
 
+    /** Tema: 0 chiaro, 1 scuro (modalità notte), 2 come il telefono. */
+    var tema by mutableStateOf(preferenze.getInt("tema", 0))
+        private set
+    fun cambiaTema(v: Int) { tema = v; TemaApp.modo = v; preferenze.edit().putInt("tema", v).apply() }
+
     fun cambiaScalaTesto(v: Float) { scalaTesto = v; preferenze.edit().putFloat("scala_testo", v).apply() }
     fun cambiaComprimi(v: Boolean) { comprimiPubblicate = v; preferenze.edit().putBoolean("comprimi_pubblicate", v).apply() }
     fun cambiaTornaSu(v: Boolean) { tornaSu = v; preferenze.edit().putBoolean("torna_su", v).apply() }

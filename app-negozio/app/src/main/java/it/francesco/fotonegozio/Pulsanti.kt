@@ -71,7 +71,7 @@ fun PulsanteChiaro(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     colore: Color = BluNotte,
-    sfondo: Color = Color.White,
+    sfondo: Color = Superficie,
     attivo: Boolean = true,
     altezza: Dp = 56.dp,
     grandezzaTesto: Int = 16,
@@ -105,7 +105,7 @@ fun PulsanteTondo(simbolo: String, onClick: () -> Unit, modifier: Modifier = Mod
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = Color.White,
+        color = Superficie,
         shadowElevation = 3.dp,
         interactionSource = sorgente,
         modifier = modifier.size(46.dp).then(morbido),

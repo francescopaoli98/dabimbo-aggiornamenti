@@ -58,6 +58,7 @@ class AppTest {
         val app = vm.getApplication<android.app.Application>()
         java.io.File(app.filesDir, "lista.json").delete()
         app.getSharedPreferences("preferenze", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        TemaApp.modo = 0
     }
 
     private fun metti(vararg f: Foto) {
@@ -426,5 +427,29 @@ class AppTest {
         assertEquals("Testo scritto a mano", nuovo.foto[1].testoManuale)
         assertTrue(nuovo.foto[0].file!!.exists())
         nuovo.foto.clear()
+    }
+
+    @Test
+    fun modalitaScuraDalleImpostazioni() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        assertFalse(TemaApp.scuro)
+        assertEquals(androidx.compose.ui.graphics.Color.White, Superficie)
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("🌙 Scuro").performClick()
+        regola.waitForIdle()
+        assertTrue(TemaApp.scuro)
+        assertEquals(1, vm.tema)
+        assertNotEquals(androidx.compose.ui.graphics.Color.White, Superficie)
+        // "Come il telefono": segue il telefono
+        regola.onNodeWithText("📱 Come il telefono").performClick()
+        regola.runOnUiThread { TemaApp.telefonoScuro = false }
+        assertFalse(TemaApp.scuro)
+        regola.runOnUiThread { TemaApp.telefonoScuro = true }
+        assertTrue(TemaApp.scuro)
+        // Resta salvato
+        assertEquals(2, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.tema)
+        regola.onNodeWithText("☀ Chiaro").performClick()
+        regola.waitForIdle()
+        assertFalse(TemaApp.scuro)
     }
 }

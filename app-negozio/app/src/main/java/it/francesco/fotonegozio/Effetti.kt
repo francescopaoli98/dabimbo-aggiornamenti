@@ -34,7 +34,7 @@ fun SfondoNuvole(modifier: Modifier = Modifier) {
             val larghezza = size.width + 8 * r
             val x = ((tempo * velocita + i * 0.37f) % 1f) * larghezza - 4 * r
             val cy = size.height * y
-            val bianco = Color.White.copy(alpha = 0.55f)
+            val bianco = NuvoleSfondo
             // una nuvola = 4 cerchi sovrapposti
             drawCircle(bianco, r, Offset(x, cy))
             drawCircle(bianco, r * 1.3f, Offset(x + r * 1.2f, cy - r * 0.5f))
@@ -80,7 +80,7 @@ fun Luccichio(modifier: Modifier = Modifier) {
         val x = t * size.width
         drawRect(
             Brush.linearGradient(
-                listOf(Cielo.copy(alpha = 0.25f), Color.White.copy(alpha = 0.9f), Cielo.copy(alpha = 0.25f)),
+                listOf(Cielo.copy(alpha = 0.25f), Superficie.copy(alpha = 0.9f), Cielo.copy(alpha = 0.25f)),
                 start = Offset(x - size.width * 0.4f, 0f), end = Offset(x + size.width * 0.4f, size.height),
             )
         )
@@ -119,7 +119,7 @@ private fun Nuvoletta(pieno: Float, colore: Color, modifier: Modifier) {
             drawRoundRect(colore, Offset(w * 0.12f, h * 0.55f + dy), Size(w * 0.76f, h * 0.33f), CornerRadius(h * 0.16f, h * 0.16f))
         }
         nuvola(BluNotte.copy(alpha = 0.18f), dy = h * 0.06f)   // ombra morbida
-        nuvola(Color.White)
+        nuvola(Superficie)
         if (pieno > 0f) clipRect(right = w * (0.1f + 0.8f * pieno)) { nuvola(colore) }
     }
 }
