@@ -1,6 +1,6 @@
 {
-  "versionCode": 72,
-  "versionName": "4.7",
+  "versionCode": 73,
+  "versionName": "4.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Lo zoom nell'anteprima resta (↺ per tornare normale); gli aggiornamenti si controllano anche tornando nell'app."
+  "note": "Ritaglio delle foto (libero o 1:1, 4:5, 3:4, 9:16). Storico con fotina, spunta Prenotato e totali; cancellazione bloccata finché non la sblocchi."
 }
