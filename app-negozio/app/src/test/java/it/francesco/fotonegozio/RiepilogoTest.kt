@@ -50,4 +50,16 @@ class RiepilogoTest {
         val r = Riepilogo.leggi("""[{"g":"2026-10-06","k":"1444496","c":400,"n":"Felpa"}]""")
         assertEquals(listOf(Pubblicato("2026-10-06", "1444496", 400, "Felpa")), r)
     }
+
+    @Test
+    fun la_fotina_arriva_anche_dopo() {
+        // Pubblicato con la versione vecchia (senza fotina), poi ripubblicato lo stesso giorno: prende la fotina, conta sempre 1
+        var r = Riepilogo.aggiungi(emptyList(), "2026-10-06", listOf(felpa))
+        r = Riepilogo.aggiungi(r, "2026-10-06", listOf(felpa), "m_2.jpg")
+        assertEquals(1, r.size)
+        assertEquals("m_2.jpg", r[0].miniatura)
+        // Una fotina già presente non si cambia
+        r = Riepilogo.aggiungi(r, "2026-10-06", listOf(felpa), "m_3.jpg")
+        assertEquals("m_2.jpg", r[0].miniatura)
+    }
 }

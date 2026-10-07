@@ -48,9 +48,12 @@ object Riepilogo {
         val nuovi = articoli.mapNotNull { a ->
             val chiave = a.codice ?: a.descrizione ?: return@mapNotNull null
             Pubblicato(giorno, chiave, centesimi(a.prezzo) ?: 0, a.descrizione.orEmpty(), miniatura)
-        }.filter { n -> registro.none { it.giorno == n.giorno && it.chiave == n.chiave } }
-            .distinctBy { it.chiave }
-        return registro + nuovi
+        }
+        // Già contato oggi ma senza fotina (es. pubblicato con la versione vecchia): ora la prende
+        val conFotina = if (miniatura.isEmpty()) registro else registro.map { r ->
+            if (r.giorno == giorno && r.miniatura.isEmpty() && nuovi.any { it.chiave == r.chiave }) r.copy(miniatura = miniatura) else r
+        }
+        return conFotina + nuovi.filter { n -> registro.none { it.giorno == n.giorno && it.chiave == n.chiave } }.distinctBy { it.chiave }
     }
 
     /** I totali per giorno, dal più recente. */

@@ -566,6 +566,20 @@ class AppTest {
     }
 
     @Test
+    fun fotinaRecuperataDallaLista() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.waitUntil(5_000) { vm.registro.all { java.io.File(vm.cartellaStorico, it.miniatura).exists() } }
+        // Come un articolo pubblicato con la versione vecchia: la fotina non c'è
+        vm.cartellaStorico.listFiles()?.forEach { it.delete() }
+        // Aprendo lo storico la rifà dalla foto ancora in lista
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("1 · € 4,00").performClick()
+        regola.waitUntil(5_000) { vm.registro.all { java.io.File(vm.cartellaStorico, it.miniatura).exists() } }
+        regola.waitUntil(5_000) { regola.onAllNodesWithContentDescription("Foto", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
+    }
+
+    @Test
     fun ritaglio() {
         metti(fotoDiProva(1, listOf(felpa)))
         apriVisore()

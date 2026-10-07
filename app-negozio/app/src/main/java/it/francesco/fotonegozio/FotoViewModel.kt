@@ -417,8 +417,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         if (i < 0) return
         foto[i] = foto[i].copy(pubblicata = pubblicata)
         if (pubblicata) {
-            // Nel riepilogo il nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…)
-            val articoli = foto[i].articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
+            val articoli = articoliPerRegistro(foto[i])
             // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
             val unAnnoFa = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(System.currentTimeMillis() - 365L * 24 * 3600 * 1000))
             val mini = salvaMiniaturaStorico(foto[i])
@@ -448,10 +447,37 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
                 val b = BitmapFactory.decodeFile(sorgente.path, BitmapFactory.Options().apply { inSampleSize = passo }) ?: return@runCatching
                 val scala = 640f / maxOf(b.width, b.height)
                 val piccola = if (scala < 1f) Bitmap.createScaledBitmap(b, (b.width * scala).toInt().coerceAtLeast(1), (b.height * scala).toInt().coerceAtLeast(1), true) else b
-                dest.outputStream().use { piccola.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+                dest.outputStream().use { piccola.compress(Bitmap.CompressFormat.JPEG, 75, it) }
             }
         }
         return nome
+    }
+
+    /** Gli articoli come vanno nel registro: col nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…). */
+    private fun articoliPerRegistro(f: Foto) =
+        f.articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
+
+    /**
+     * Articoli dello storico senza fotina (pubblicati prima della 4.8, o fotina persa):
+     * se la loro foto è ancora in lista, la fotina si rifà da lì.
+     */
+    fun recuperaMiniature() {
+        val senza = registro.filter { it.miniatura.isEmpty() || !File(cartellaStorico, it.miniatura).exists() }
+        if (senza.isEmpty()) return
+        var nuovo = registro
+        for (f in foto) {
+            if (f.inCorso || f.file?.exists() != true) continue
+            val chiavi = articoliPerRegistro(f).mapNotNull { it.codice ?: it.descrizione }.toSet()
+            val qui = senza.filter { it.chiave in chiavi && nuovo.any { n -> n.giorno == it.giorno && n.chiave == it.chiave && n.miniatura == it.miniatura } }
+            if (qui.isEmpty()) continue
+            val nome = salvaMiniaturaStorico(f)
+            if (nome.isEmpty()) continue
+            for (p in qui) nuovo = Riepilogo.cambia(nuovo, p) { it.copy(miniatura = nome) }
+        }
+        if (nuovo != registro) {
+            registro = nuovo
+            fileRegistro.writeText(Riepilogo.scrivi(registro))
+        }
     }
 
     /** Via le fotine che nessun articolo dello storico usa più. */

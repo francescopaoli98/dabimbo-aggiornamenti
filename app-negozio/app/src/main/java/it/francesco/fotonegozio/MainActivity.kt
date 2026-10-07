@@ -578,6 +578,8 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     var daTogliere by remember { mutableStateOf<Pubblicato?>(null) }
     var sbloccata by remember { mutableStateOf(false) }
     var grande by remember { mutableStateOf<File?>(null) }   // fotina ingrandita
+    // Articoli pubblicati senza fotina (es. prima della 4.8): la rifaccio dalle foto ancora in lista
+    LaunchedEffect(Unit) { vm.recuperaMiniature() }
 
     Finestra(onDismissRequest = { if (giorno != null) giorno = null else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
