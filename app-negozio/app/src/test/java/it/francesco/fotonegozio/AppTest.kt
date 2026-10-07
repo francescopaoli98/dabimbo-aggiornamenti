@@ -252,9 +252,9 @@ class AppTest {
         regola.onNodeWithText("Capovolgi").assertExists()
         assertTrue(vm.foto[0].pixelManuale.isNotEmpty())
         // "↺ Togli" del pixel a mano: torna la foto pulita
-        regola.onNodeWithText("Togli").performClick()
+        regola.onNodeWithText("↺ Togli").performClick()
         regola.waitUntil(5_000) { vm.foto[0].pixelManuale.isEmpty() && vm.foto[0].file == vm.foto[0].fileAuto }
-        regola.onNodeWithText("Togli").assertDoesNotExist()
+        regola.onNodeWithText("↺ Togli").assertDoesNotExist()
     }
 
     @Test
@@ -285,7 +285,7 @@ class AppTest {
         apriVisore()
         regola.onNodeWithText("Sfondo automatico").assertIsEnabled()
         // Senza pixel fatti, nessun "Togli"
-        regola.onNodeWithText("Togli").assertDoesNotExist()
+        regola.onNodeWithText("↺ Togli").assertDoesNotExist()
     }
 
     @Test
@@ -491,7 +491,7 @@ class AppTest {
         val sfondo = Raddrizzatore.salva(regola.activity, grigio, "prova_sfondo")
         metti(f.copy(fileSfondo = sfondo, sfondoPixelato = true, file = sfondo))
         apriVisore()
-        regola.onNodeWithText("Rimetti originale").performClick()
+        regola.onNodeWithText("🖌 Originale").performClick()
         regola.onNodeWithText("✨ Originale").assertIsSelected()
         // Passo il pennello sulla parte sinistra (rossa nell'originale)
         regola.onNodeWithTag("tela").performTouchInput { swipe(Offset(left + width * 0.2f, centerY - 100f), Offset(left + width * 0.2f, centerY + 100f)) }
@@ -505,7 +505,7 @@ class AppTest {
         assertTrue(android.graphics.Color.red(b.getPixel(60, 200)) > 200)      // lì è tornata la foto vera (rossa)
         assertTrue(android.graphics.Color.red(b.getPixel(250, 50)) in 100..160) // il resto resta "pixelato" (grigio)
         // "Togli" dello sfondo: via sfondo e ritocchi
-        regola.onAllNodesWithText("Togli").onFirst().performClick()
+        regola.onAllNodesWithText("↺ Togli").onFirst().performClick()
         regola.waitUntil(5_000) { !vm.foto[0].sfondoPixelato && vm.foto[0].ripristinate.isEmpty() }
     }
 
@@ -517,8 +517,11 @@ class AppTest {
         regola.onNodeWithText("Oggi: 2 articoli · € 5,50").assertExists().performClick()
         regola.onNodeWithText("📊 Pubblicati").assertExists()
         regola.onNodeWithText("2 · € 5,50").assertExists().performClick()
-        // Tolgo l'articolo contato per sbaglio (con conferma)
+        // Tolgo l'articolo contato per sbaglio (con conferma): prima la ✕ è bloccata
         regola.onNodeWithText("cod. 7654321 · € 1,50").assertExists()
+        regola.onNodeWithTag("togli_7654321").assertDoesNotExist()
+        regola.onNodeWithText("🔒 Sblocca cancellazione").performClick()
+        regola.onNodeWithText("🔓 Cancellazione sbloccata").assertExists()
         regola.onNodeWithTag("togli_7654321").performClick()
         regola.onNodeWithText("Togliere dal conteggio?").assertExists()
         regola.onNodeWithText("Sì, togli").performClick()
@@ -527,6 +530,83 @@ class AppTest {
         assertEquals(400, vm.oggiPubblicati?.centesimi)
         // Resta anche riaprendo l'app
         assertEquals(1, FotoViewModel(vm.getApplication()).also { it.foto.clear() }.oggiPubblicati?.articoli)
+    }
+
+    @Test
+    fun storicoPrenotatiEFotina() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321", prezzo = "€ 1,50"))))
+        regola.runOnUiThread { vm.segnaPubblicata(1); vm.segnaPubblicata(2) }
+        // La fotina dello storico si scrive in sottofondo
+        regola.waitUntil(5_000) { vm.registro.all { java.io.File(vm.cartellaStorico, it.miniatura).exists() } }
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("2 · € 5,50").performClick()
+        // Venduto spento di partenza
+        regola.onNodeWithTag("vendi_1234567").assertDoesNotExist()
+        regola.onNodeWithTag("prenota_1234567").performClick()
+        regola.onNodeWithText("✓ Prenotato").assertExists()
+        regola.onNodeWithText("📌 Prenotati: 1 · € 4,00").assertExists()
+        assertEquals(true, vm.registro.first { it.chiave == "1234567" }.prenotato)
+        // Annulla prenotazione
+        regola.onNodeWithText("Annulla prenotazione").performClick()
+        regola.onNodeWithText("📌 Prenotati: 0 · € 0,00").assertExists()
+        regola.onNodeWithTag("prenota_7654321").performClick()
+        // La fotina si ingrandisce
+        regola.waitUntil(5_000) { regola.onAllNodesWithContentDescription("Foto", useUnmergedTree = true).fetchSemanticsNodes().size == 2 }
+        regola.onNodeWithTag("fotina_1234567").performClick()
+        regola.onNodeWithTag("fotina_grande").assertExists()
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        // Resta anche riaprendo l'app (e vale per i giorni passati: è nel registro)
+        val nuovo = FotoViewModel(vm.getApplication()).also { it.foto.clear() }
+        assertEquals(1, nuovo.oggiPubblicati?.prenotati)
+        assertEquals(150, nuovo.oggiPubblicati?.centesimiPrenotati)
+        // Con la spunta "Venduto" accesa nelle impostazioni
+        regola.runOnUiThread { vm.cambiaMostraVenduto(true) }
+        regola.onNodeWithTag("vendi_1234567").performClick()
+        regola.onNodeWithText("💶 Venduti: 1 · € 4,00").assertExists()
+    }
+
+    @Test
+    fun ritaglio() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        apriVisore()
+        regola.onNodeWithText("Ritaglia").performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithTag("ritaglio_tela").assertExists() }.isSuccess }
+        regola.onNodeWithText("Salva").assertIsNotEnabled()
+        // Formato quadrato: 300×300 al centro della foto 300×400
+        regola.onNodeWithText("1:1").performClick()
+        regola.onNodeWithText("Salva").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].ritaglio != null && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        val b = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertEquals(b.width, b.height)
+        assertEquals(300, b.width)
+        // Girandola il ritaglio resta lo stesso pezzo di foto
+        regola.onNodeWithText("Destra").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].rotazioneFile == 90 && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        assertEquals(300, android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path).height)
+        // Libero: trascino l'angolo in basso a destra verso il centro
+        regola.onNodeWithText("Ritaglia").performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithTag("ritaglio_tela").assertExists() }.isSuccess }
+        regola.onNodeWithText("Tutta").performClick()
+        regola.onNodeWithText("Salva").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].ritaglio == null && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        val intera = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertEquals(400, intera.width)   // girata: 400×300
+        regola.onNodeWithText("Ritaglia").performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithTag("ritaglio_tela").assertExists() }.isSuccess }
+        regola.onNodeWithTag("ritaglio_tela").performTouchInput {
+            // L'immagine sta al centro: parto dall'angolo in basso a destra della foto
+            val k = minOf(width / 400f, height / 300f)
+            val angolo = Offset(centerX + 200f * k - 4f, centerY + 150f * k - 4f)
+            swipe(angolo, Offset(centerX, centerY))
+        }
+        regola.onNodeWithText("Salva").performClick()
+        regola.waitUntil(5_000) { vm.foto[0].ritaglio != null && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        val piccola = android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path)
+        assertTrue(piccola.width in 150..260 && piccola.height in 100..200)
+        // ↺ Togli: torna tutta
+        regola.onAllNodesWithText("↺ Togli").onFirst().performClick()
+        regola.waitUntil(5_000) { vm.foto[0].ritaglio == null && vm.foto[0].statoFile == vm.foto[0].statoVoluto }
+        assertEquals(400, android.graphics.BitmapFactory.decodeFile(vm.foto[0].file!!.path).width)
     }
 
     @Test

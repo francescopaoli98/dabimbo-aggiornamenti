@@ -46,6 +46,7 @@ object ListaSalvata {
         put("ripristinate", JSONArray().apply { f.ripristinate.forEach { put(it) } })
         put("rotazioneFile", f.rotazioneFile)
         put("statoFile", f.statoFile)
+        f.ritaglio?.let { put("ritaglio", Ritaglio.scrivi(it)) }
     }
 
     private fun json(d: DatiCartellino) = JSONObject().apply {
@@ -79,6 +80,7 @@ object ListaSalvata {
         ripristinate = o.optJSONArray("ripristinate")?.let { a -> List(a.length()) { a.getLong(it) }.toSet() }.orEmpty(),
         rotazioneFile = o.optInt("rotazioneFile", o.optInt("rotazioneManuale")),
         statoFile = o.optString("statoFile"),
+        ritaglio = Ritaglio.leggi(o.testo("ritaglio")),
     )
 
     private fun dati(o: JSONObject) = DatiCartellino(o.testo("codice"), o.testo("descrizione"), o.testo("prezzo"), o.testo("taglia"))

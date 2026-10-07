@@ -70,14 +70,17 @@ class ScattiTest {
         regola.runOnUiThread { vm.cambiaTavolozza(0); vm.cambiaTema(0) }
         // Riepilogo: un giorno aperto
         regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.waitUntil(5_000) { vm.registro.all { java.io.File(vm.cartellaStorico, it.miniatura).exists() } }
+        regola.runOnUiThread { vm.segnaPrenotato(vm.registro.first(), true) }
         regola.onNodeWithText("Oggi:", substring = true).performClick()
         regola.onNodeWithText("1 · € 4,00").performClick()
+        regola.waitUntil(5_000) { regola.onAllNodesWithContentDescription("Foto", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         regola.waitForIdle()
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/riepilogo.png")
         regola.onAllNodesWithText("✕").onLast().performClick()
         regola.waitForIdle()
         regola.runOnUiThread { vm.segnaPubblicata(1, false) }
-        // Il visore, con lo sfondo "pixelato" acceso (così si vede anche "Rimetti originale")
+        // Il visore, con lo sfondo "pixelato" acceso (così si vede anche "Originale")
         regola.runOnUiThread { vm.foto[0] = vm.foto[0].copy(fileSfondo = file, sfondoPixelato = true) }
         regola.onAllNodesWithText("🔍 Tocca").onFirst().performClick()
         regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
@@ -85,6 +88,12 @@ class ScattiTest {
         regola.onNodeWithText("Pixel a mano").performClick()
         regola.waitForIdle()
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/editor.png")
+        regola.onNodeWithText("Esci").performClick()
+        regola.onNodeWithText("Ritaglia").performClick()
+        regola.waitUntil(5_000) { runCatching { regola.onNodeWithTag("ritaglio_tela").assertExists() }.isSuccess }
+        regola.onNodeWithText("4:5").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/ritaglio.png")
     }
 
     /** Disegna la finestra in un'immagine (Robolectric disegna anche senza schermo vero). */

@@ -81,6 +81,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -290,8 +291,18 @@ private fun Schermata(vm: FotoViewModel) {
                     PulsanteChiaro("Sigle", "📖", { dizionarioAperto = true }, sfondo = Rosa, altezza = alto, grandezzaTesto = 15)
                 }
             }
-            // Riepilogo di oggi (toccandolo: i giorni prima)
-            vm.oggiPubblicati?.let { g ->
+            // Riepilogo di oggi (toccandolo: i giorni prima). Se oggi niente, si apre lo storico lo stesso.
+            val g = vm.oggiPubblicati
+            if (g == null && vm.registro.isNotEmpty()) item {
+                Surface(onClick = { riepilogoAperto = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("📊", fontSize = 16.sp)
+                        Text("Storico pubblicati", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                        Text("›", color = BluNotte, fontSize = 20.sp)
+                    }
+                }
+            }
+            if (g != null) {
                 item {
                     Surface(onClick = { riepilogoAperto = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -300,6 +311,7 @@ private fun Schermata(vm: FotoViewModel) {
                                 "Oggi: ${g.articoli} ${if (g.articoli == 1) "articolo" else "articoli"} · ${Riepilogo.euro(g.centesimi)}",
                                 fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f),
                             )
+                            if (g.prenotati > 0) Text("📌 ${g.prenotati}", color = Verde, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(end = 6.dp))
                             Text("›", color = BluNotte, fontSize = 20.sp)
                         }
                     }
@@ -488,6 +500,7 @@ private fun Schermata(vm: FotoViewModel) {
             togliSfondo = { vm.togliPixelSfondo(f.numero) },
             salvaPixel = { celle, lato, rimesse -> vm.salvaPixelManuale(f.numero, celle, lato, rimesse) },
             togliPixelMano = { vm.togliPixelManuale(f.numero) },
+            salvaRitaglio = { q -> vm.salvaRitaglio(f.numero, q) },
             testo = { ingrandita = null; testoInModifica = f.numero },
             chiudi = { ingrandita = null },
         )
@@ -552,8 +565,9 @@ private fun AvvisoAggiornamento(n: Novita, scaricamento: Float?, aggiorna: () ->
 }
 
 /**
- * Riepilogo delle pubblicazioni: i giorni con i totali; toccando un giorno si vedono i suoi articoli
- * e si può togliere quello contato per sbaglio.
+ * Storico delle pubblicazioni: i giorni con i totali; toccando un giorno si vedono i suoi articoli,
+ * con la fotina (si ingrandisce), la spunta "Prenotato" (e "Venduto" se accesa nelle impostazioni).
+ * Il ✕ per togliere un articolo contato per sbaglio c'è solo con "Sblocca cancellazione".
  */
 @Composable
 private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
@@ -562,6 +576,8 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     fun nomeGiorno(g: String) = runCatching { nomi.format(leggi.parse(g)!!) }.getOrDefault(g).replaceFirstChar { it.uppercase() }
     var giorno by remember { mutableStateOf<String?>(null) }
     var daTogliere by remember { mutableStateOf<Pubblicato?>(null) }
+    var sbloccata by remember { mutableStateOf(false) }
+    var grande by remember { mutableStateOf<File?>(null) }   // fotina ingrandita
 
     Finestra(onDismissRequest = { if (giorno != null) giorno = null else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Column(Modifier.fillMaxSize().background(SfondoLista).systemBarsPadding()) {
@@ -580,36 +596,65 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val g = giorno
                 if (g == null) {
-                    item { Text("Tocca un giorno per vedere gli articoli.", color = TestoTenue, fontSize = 14.sp) }
-                    items(vm.giornate.take(30), key = { it.giorno }) { gg ->
+                    item { Text("Tocca un giorno per vedere gli articoli e segnare i prenotati.", color = TestoTenue, fontSize = 14.sp) }
+                    items(vm.giornate.take(60), key = { it.giorno }) { gg ->
                         Surface(onClick = { giorno = gg.giorno }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
                             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(nomeGiorno(gg.giorno), Modifier.weight(1f), fontSize = 16.sp)
+                                Column(Modifier.weight(1f)) {
+                                    Text(nomeGiorno(gg.giorno), fontSize = 16.sp)
+                                    if (gg.prenotati > 0) Text("📌 ${gg.prenotati} prenotati · ${Riepilogo.euro(gg.centesimiPrenotati)}", fontSize = 13.sp, color = Verde, fontWeight = FontWeight.Bold)
+                                    if (vm.mostraVenduto && gg.venduti > 0) Text("💶 ${gg.venduti} venduti · ${Riepilogo.euro(gg.centesimiVenduti)}", fontSize = 13.sp, color = Azzurro, fontWeight = FontWeight.Bold)
+                                }
                                 Text("${gg.articoli} · ${Riepilogo.euro(gg.centesimi)}", fontWeight = FontWeight.Bold, color = BluNotte)
                                 Text("  ›", color = BluNotte, fontSize = 18.sp)
                             }
                         }
                     }
                 } else {
+                    val tot = vm.giornate.firstOrNull { it.giorno == g }
                     item {
-                        Text(
-                            "Puoi togliere un articolo contato per sbaglio: per esempio uno che hai aperto in WhatsApp " +
-                                "ma poi non hai caricato sullo stato. Tocca ✕ accanto all'articolo.",
-                            color = TestoTenue, fontSize = 14.sp,
-                        )
-                    }
-                    items(vm.articoliDel(g), key = { it.chiave }) { p ->
+                        // Totali del giorno e, in alto, il lucchetto della cancellazione
                         Surface(color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
-                            Row(Modifier.fillMaxWidth().padding(start = 14.dp, top = 8.dp, bottom = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(p.nome.ifBlank { "Articolo" }, fontSize = 16.sp)
-                                    Text("cod. ${p.chiave} · ${Riepilogo.euro(p.centesimi)}", fontSize = 13.sp, color = TestoTenue)
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                tot?.let {
+                                    Text("${it.articoli} ${if (it.articoli == 1) "pubblicato" else "pubblicati"} · ${Riepilogo.euro(it.centesimi)}", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 15.sp)
+                                    Text("📌 Prenotati: ${it.prenotati} · ${Riepilogo.euro(it.centesimiPrenotati)}", color = Verde, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    if (vm.mostraVenduto) Text("💶 Venduti: ${it.venduti} · ${Riepilogo.euro(it.centesimiVenduti)}", color = Azzurro, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 }
-                                PulsanteTondo("✕", { daTogliere = p }, Modifier.testTag("togli_${p.chiave}"), colore = Arancione)
+                                Row(
+                                    Modifier.fillMaxWidth().padding(top = 4.dp).clip(RoundedCornerShape(10.dp)).clickable { sbloccata = !sbloccata },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        if (sbloccata) "🔓 Cancellazione sbloccata" else "🔒 Sblocca cancellazione",
+                                        fontSize = 14.sp, color = if (sbloccata) Arancione else TestoTenue, modifier = Modifier.weight(1f),
+                                    )
+                                    Switch(checked = sbloccata, onCheckedChange = { sbloccata = it }, modifier = Modifier.testTag("sblocca"))
+                                }
                             }
                         }
                     }
+                    items(vm.articoliDel(g), key = { it.chiave }) { p ->
+                        RigaStorico(
+                            p, File(vm.cartellaStorico, p.miniatura).takeIf { p.miniatura.isNotEmpty() },
+                            mostraVenduto = vm.mostraVenduto, cancellabile = sbloccata,
+                            ingrandisci = { grande = it },
+                            prenota = { vm.segnaPrenotato(p, it) },
+                            vendi = { vm.segnaVenduto(p, it) },
+                            togli = { daTogliere = p },
+                        )
+                    }
                 }
+            }
+        }
+    }
+
+    grande?.let { file ->
+        val img by fotoPerSchermo(file)
+        Finestra(onDismissRequest = { grande = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding().testTag("fotina_grande")) {
+                img?.let { FotoZoomabile(it, Modifier.fillMaxSize(), file) }
+                PulsanteTondo("✕", { grande = null }, Modifier.align(Alignment.TopEnd).padding(12.dp))
             }
         }
     }
@@ -627,6 +672,60 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { daTogliere = null }) { Text("No") } },
         )
+    }
+}
+
+/** Un articolo dello storico: fotina, nome, codice e prezzo, spunte Prenotato (e Venduto). */
+@Composable
+private fun RigaStorico(
+    p: Pubblicato, fotina: File?, mostraVenduto: Boolean, cancellabile: Boolean,
+    ingrandisci: (File) -> Unit, prenota: (Boolean) -> Unit, vendi: (Boolean) -> Unit, togli: () -> Unit,
+) {
+    // La fotina si legge in sottofondo (appena pubblicata potrebbe essere ancora in scrittura: riprovo un attimo)
+    val img by produceState<ImageBitmap?>(null, fotina) {
+        val f = fotina ?: return@produceState
+        repeat(10) {
+            if (f.exists()) { value = withContext(Dispatchers.IO) { caricaRidotta(f, 256) }; if (value != null) return@produceState }
+            kotlinx.coroutines.delay(300)
+        }
+    }
+    Surface(
+        color = Superficie, shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(if (p.prenotato) 2.dp else 1.dp, if (p.prenotato) Verde else BordoScheda),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)).background(FondoTenue)
+                    .then(if (fotina != null && img != null) Modifier.clickable { ingrandisci(fotina) } else Modifier)
+                    .testTag("fotina_${p.chiave}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                val i = img
+                if (i != null) Image(i, "Foto", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else Text("🖼", fontSize = 22.sp)
+            }
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(p.nome.ifBlank { "Articolo" }, fontSize = 16.sp, maxLines = 2)
+                Text("cod. ${p.chiave} · ${Riepilogo.euro(p.centesimi)}", fontSize = 13.sp, color = TestoTenue)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (p.prenotato) {
+                        FilterChip(
+                            selected = true, onClick = {}, label = { Text("✓ Prenotato", fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Verde.copy(alpha = 0.22f)),
+                        )
+                        TextButton(onClick = { prenota(false) }) { Text("Annulla prenotazione", color = Arancione, fontSize = 13.sp) }
+                    } else {
+                        FilterChip(selected = false, onClick = { prenota(true) }, label = { Text("📌 Prenotato") }, modifier = Modifier.testTag("prenota_${p.chiave}"))
+                    }
+                    if (mostraVenduto) FilterChip(
+                        selected = p.venduto, onClick = { vendi(!p.venduto) },
+                        label = { Text(if (p.venduto) "✓ Venduto" else "💶 Venduto") },
+                        modifier = Modifier.testTag("vendi_${p.chiave}"),
+                    )
+                }
+            }
+            if (cancellabile) PulsanteTondo("✕", togli, Modifier.testTag("togli_${p.chiave}"), colore = Arancione)
+        }
     }
 }
 
@@ -734,6 +833,7 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 // Le scelte singole stanno direttamente nella riga: niente da aprire
                 RigaInterruttore("🔔", "Avvisami quando le foto sono pronte", vm.avvisoPronte, vm::cambiaAvvisoPronte)
                 RigaInterruttore("💬", "Prezzo in grassetto su WhatsApp", vm.prezzoGrassetto, vm::cambiaGrassetto)
+                RigaInterruttore("💶", "Spunta \"Venduto\" nello storico", vm.mostraVenduto, vm::cambiaMostraVenduto)
                 val context = LocalContext.current
                 val versione = remember { Aggiornamento.nomeVersione(context) }
                 Sezione("🔄", "Aggiornamenti", vm.esitoControllo ?: "Versione $versione", aperta == "aggiornamenti", { apri("aggiornamenti") }) {
@@ -1161,6 +1261,7 @@ private fun Visore(
     togliSfondo: () -> Unit,
     salvaPixel: (Set<Long>, Int, Set<Long>) -> Unit,
     togliPixelMano: () -> Unit,
+    salvaRitaglio: (Riquadro?) -> Unit,
     testo: () -> Unit,
     chiudi: () -> Unit,
 ) {
@@ -1176,18 +1277,32 @@ private fun Visore(
     // Grandezza della foto di base (dove si salvano i quadretti a mano)
     val misureBase = remember(f.fileAuto) { f.fileAuto?.let(::misureFoto) }
     var pennello by remember { mutableStateOf<Pennello?>(null) }   // editor aperto, con questo pennello
-    Finestra(onDismissRequest = { if (pennello != null) pennello = null else chiudi() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    var ritaglia by remember { mutableStateOf(false) }              // editor del ritaglio aperto
+    Finestra(
+        onDismissRequest = { if (pennello != null) pennello = null else if (ritaglia) ritaglia = false else chiudi() },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Column(Modifier.fillMaxSize().background(Color.Black).systemBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    if (pennello != null) "Passa il dito sulla foto" else "Foto ${f.numero} · due dita per ingrandire",
+                    when {
+                        pennello != null -> "Passa il dito sulla foto"
+                        ritaglia -> "Trascina gli angoli o sposta il riquadro"
+                        else -> "Foto ${f.numero} · due dita per ingrandire"
+                    },
                     color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f),
                 )
-                if (pennello == null) PulsanteTondo("✕", chiudi)
+                if (pennello == null && !ritaglia) PulsanteTondo("✕", chiudi)
             }
             val img = immagine
             val modo = pennello
-            if (modo != null && aggiornata != null && misureBase != null) {
+            if (ritaglia && misureBase != null) {
+                EditorRitaglio(
+                    f, Modifier.weight(1f),
+                    salva = { q -> salvaRitaglio(q); ritaglia = false },
+                    esci = { ritaglia = false },
+                )
+            } else if (modo != null && aggiornata != null && misureBase != null) {
                 EditorPixel(
                     f, aggiornata, misureBase.first, misureBase.second, modo, Modifier.weight(1f),
                     salva = { celle, lato, ripristinate -> salvaPixel(celle, lato, ripristinate); pennello = null },
@@ -1216,8 +1331,8 @@ private fun Visore(
                             PulsanteVisore("⇅", "Capovolgi", Modifier.weight(1f)) { gira(180) }
                             PulsanteVisore("✏", "Testo", Modifier.weight(1f), azione = testo)
                         }
-                        // Sezione pixel: due strade, ognuna col suo "torna indietro"
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Pixel (due strade) e ritaglio, ognuno col suo "torna indietro"
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             SezionePixel(
                                 "✨", "Sfondo automatico", Modifier.weight(1f),
                                 applicato = f.sfondoPixelato, attivo = !sfondoInCorso && aggiornata != null,
@@ -1229,6 +1344,12 @@ private fun Visore(
                                 applicato = f.pixelManuale.isNotEmpty(), attivo = !sfondoInCorso && aggiornata != null,
                                 applica = { pennello = Pennello.PIXEL }, togli = togliPixelMano,
                                 applicaAncora = true,   // a mano si può sempre aggiungere
+                            )
+                            SezionePixel(
+                                "✂", "Ritaglia", Modifier.weight(1f),
+                                applicato = f.ritaglio != null, attivo = !sfondoInCorso && aggiornata != null,
+                                applica = { ritaglia = true }, togli = { salvaRitaglio(null) },
+                                applicaAncora = true,   // il ritaglio si può sempre cambiare
                             )
                         }
                     }
@@ -1277,7 +1398,7 @@ private fun SezionePixel(
     extra: (() -> Unit)? = null,
 ) {
     Surface(color = FondoTenue, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, BordoScheda), modifier = modifier) {
-        Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PulsanteVisore(
                 if (applicato && !applicaAncora) "✓" else simbolo,
                 if (applicato && !applicaAncora) "Fatto" else scritta,
@@ -1287,10 +1408,10 @@ private fun SezionePixel(
                 azione = applica,
             )
             AnimatedVisibility(extra != null) {
-                PulsanteChiaro("Rimetti originale", "🖌", { extra?.invoke() }, Modifier.fillMaxWidth(), colore = Azzurro, altezza = 44.dp, grandezzaTesto = 13, attivo = attivo)
+                PulsanteChiaro("🖌 Originale", "", { extra?.invoke() }, Modifier.fillMaxWidth(), colore = Azzurro, altezza = 44.dp, grandezzaTesto = 13, attivo = attivo)
             }
             AnimatedVisibility(applicato) {
-                PulsanteChiaro("Togli", "↺", togli, Modifier.fillMaxWidth(), colore = Arancione, altezza = 44.dp, grandezzaTesto = 14)
+                PulsanteChiaro("↺ Togli", "", togli, Modifier.fillMaxWidth(), colore = Arancione, altezza = 44.dp, grandezzaTesto = 14)
             }
         }
     }
@@ -1446,6 +1567,101 @@ private fun EditorPixel(
                         "Salva", "✓", { salva(mano.toSet(), lato, rimesse.toSet()) }, Modifier.weight(1f),
                         // Si salva se qualcosa è davvero cambiato rispetto a prima
                         attivo = mano.toSet() != f.pixelManuale || rimesse.toSet() != f.ripristinate, colore = Verde, altezza = 50.dp, grandezzaTesto = 14,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Editor del ritaglio: un riquadro sopra la foto (fuori è scurito).
+ * Si trascinano gli angoli per allargarlo/stringerlo, o il centro per spostarlo.
+ * Formati pronti (1:1, 4:5, 3:4, 9:16) o libero. Si salva sulla foto di base, in proporzione.
+ */
+@Composable
+private fun EditorRitaglio(f: Foto, modifier: Modifier, salva: (Riquadro?) -> Unit, esci: () -> Unit) {
+    val rotazione = f.rotazioneManuale
+    // Sotto: la foto intera (senza ritaglio), girata come la vede Elisa
+    val img by produceState<ImageBitmap?>(null, f.fileSfondo, f.sfondoPixelato, rotazione) {
+        val file = if (f.sfondoPixelato) f.fileSfondo else f.fileAuto
+        value = file?.let { withContext(Dispatchers.IO) { caricaRuotata(it, rotazione) } }
+    }
+    val immagine = img
+    Column(modifier.fillMaxWidth()) {
+        if (immagine == null) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Azzurro) }
+            return@Column
+        }
+        val iw = immagine.width.toFloat(); val ih = immagine.height.toFloat()
+        // Il riquadro, in pixel della foto mostrata
+        val iniziale = remember(immagine) {
+            f.ritaglio?.let { Ritaglio.daBase(it, rotazione) }?.let { Riquadro(it.l * iw, it.t * ih, it.r * iw, it.b * ih) } ?: Riquadro(0f, 0f, iw, ih)
+        }
+        var q by remember(immagine) { mutableStateOf(iniziale) }
+        var formato by remember { mutableIntStateOf(0) }
+        val rapporto = Ritaglio.FORMATI[formato].rapporto
+        val bordo = Color.White
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val pxW = constraints.maxWidth.toFloat(); val pxH = constraints.maxHeight.toFloat()
+            val scala = minOf(pxW / iw, pxH / ih)
+            val ox = (pxW - iw * scala) / 2; val oy = (pxH - ih * scala) / 2
+            val tolleranza = with(LocalDensity.current) { 36.dp.toPx() }
+            Image(immagine, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Canvas(
+                Modifier.fillMaxSize().testTag("ritaglio_tela")
+                    .pointerInput(scala, rapporto) {
+                        var presa: Maniglia? = null
+                        detectDragGestures(
+                            onDragStart = { p -> presa = Ritaglio.maniglia(q, (p.x - ox) / scala, (p.y - oy) / scala, tolleranza / scala) },
+                            onDragEnd = { presa = null },
+                        ) { cambio, d ->
+                            val m = presa ?: return@detectDragGestures
+                            cambio.consume()
+                            q = Ritaglio.trascina(q, m, d.x / scala, d.y / scala, iw, ih, rapporto, minOf(iw, ih) * 0.08f)
+                        }
+                    }
+            ) {
+                val a = Offset(ox + q.l * scala, oy + q.t * scala)
+                val b = Offset(ox + q.r * scala, oy + q.b * scala)
+                val scuro = Color(0x99000000)
+                // Fuori dal riquadro: scurito
+                drawRect(scuro, Offset(0f, 0f), androidx.compose.ui.geometry.Size(size.width, a.y))
+                drawRect(scuro, Offset(0f, b.y), androidx.compose.ui.geometry.Size(size.width, size.height - b.y))
+                drawRect(scuro, Offset(0f, a.y), androidx.compose.ui.geometry.Size(a.x, b.y - a.y))
+                drawRect(scuro, Offset(b.x, a.y), androidx.compose.ui.geometry.Size(size.width - b.x, b.y - a.y))
+                // Bordo e linee dei terzi
+                drawRect(bordo, a, androidx.compose.ui.geometry.Size(b.x - a.x, b.y - a.y), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()))
+                for (k in 1..2) {
+                    val x = a.x + (b.x - a.x) * k / 3; val y = a.y + (b.y - a.y) * k / 3
+                    drawLine(bordo.copy(alpha = 0.5f), Offset(x, a.y), Offset(x, b.y), 1.dp.toPx())
+                    drawLine(bordo.copy(alpha = 0.5f), Offset(a.x, y), Offset(b.x, y), 1.dp.toPx())
+                }
+                // Le 4 maniglie agli angoli
+                for (p in listOf(a, Offset(b.x, a.y), Offset(a.x, b.y), b)) drawCircle(bordo, 9.dp.toPx(), p)
+            }
+        }
+        Surface(color = Superficie, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Ritaglio.FORMATI.forEachIndexed { i, fm ->
+                        FilterChip(
+                            selected = formato == i,
+                            onClick = { formato = i; if (fm.rapporto != null) q = Ritaglio.formato(fm.rapporto, iw, ih) },
+                            label = { Text(fm.nome) },
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PulsanteChiaro("Esci", "✕", esci, Modifier.weight(1f), altezza = 50.dp, grandezzaTesto = 14)
+                    PulsanteChiaro(
+                        "Tutta", "⛶", { formato = 0; q = Riquadro(0f, 0f, iw, ih) },
+                        Modifier.weight(1f), attivo = q != Riquadro(0f, 0f, iw, ih), altezza = 50.dp, grandezzaTesto = 14,
+                    )
+                    PulsanteGrande(
+                        "Salva", "✓",
+                        { salva(Ritaglio.versoBase(Riquadro(q.l / iw, q.t / ih, q.r / iw, q.b / ih), rotazione)) },
+                        Modifier.weight(1f), attivo = q != iniziale, colore = Verde, altezza = 50.dp, grandezzaTesto = 14,
                     )
                 }
             }

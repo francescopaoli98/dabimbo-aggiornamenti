@@ -58,11 +58,12 @@ data class Foto(
     val ripristinate: Set<Long> = emptySet(),   // quadretti dove lo sfondo pixelato torna come l'originale (pennello "Originale")
     val rotazioneFile: Int = 0,                 // rotazione a mano già "dentro" il file finale (se diversa: si sta ricomponendo)
     val statoFile: String = "",                 // cosa c'è nel file finale (per non ricomporlo due volte uguale)
+    val ritaglio: Riquadro? = null,             // ritaglio sulla foto di base, in proporzione 0..1 (null = tutta)
 )
 
 /** Cosa deve contenere il file finale: se cambia, la foto va ricomposta. */
 val Foto.statoVoluto: String get() =
-    "${fileAuto?.name}|$rotazioneManuale|$sfondoPixelato|${fileSfondo?.name}|${impronta(pixelManuale)}|${impronta(ripristinate)}|$latoPixel"
+    "${fileAuto?.name}|$rotazioneManuale|$sfondoPixelato|${fileSfondo?.name}|${impronta(pixelManuale)}|${impronta(ripristinate)}|$latoPixel|${ritaglio?.let(Ritaglio::scrivi)}"
 
 /** Impronta di un insieme di quadretti: quanti sono + hash dell'elenco ordinato (due zone diverse non si confondono). */
 private fun impronta(celle: Set<Long>) = "${celle.size}:${celle.sorted().hashCode()}"
@@ -178,6 +179,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     fun cambiaComprimi(v: Boolean) { comprimiPubblicate = v; preferenze.edit().putBoolean("comprimi_pubblicate", v).apply() }
     fun cambiaTornaSu(v: Boolean) { tornaSu = v; preferenze.edit().putBoolean("torna_su", v).apply() }
     fun cambiaGrassetto(v: Boolean) { prezzoGrassetto = v; preferenze.edit().putBoolean("prezzo_grassetto", v).apply() }
+    /** Nello storico anche la spunta "Venduto" con l'incassato (per ora a mano; in futuro dal programma del negozio). */
+    var mostraVenduto by mutableStateOf(preferenze.getBoolean("mostra_venduto", false))
+        private set
+    fun cambiaMostraVenduto(v: Boolean) { mostraVenduto = v; preferenze.edit().putBoolean("mostra_venduto", v).apply() }
 
     // ---- Aggiornamenti ----
     /** Versione nuova trovata su GitHub (null = nessuna). */
@@ -264,6 +269,9 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Pixel a mano: salva i quadretti (sulla foto di base) e ricompone la foto. */
     fun salvaPixelManuale(numero: Int, celle: Set<Long>, lato: Int, ripristinate: Set<Long>? = null) =
         modifica(numero) { it.copy(pixelManuale = celle, latoPixel = lato, ripristinate = ripristinate ?: it.ripristinate) }
+
+    /** Ritaglio (sulla foto di base, in proporzione); null o tutta la foto = niente ritaglio. */
+    fun salvaRitaglio(numero: Int, q: Riquadro?) = modifica(numero) { it.copy(ritaglio = q?.takeUnless(Ritaglio::tutta)) }
 
     /** Toglie tutti i pixel fatti a mano (il pixel automatico resta). */
     fun togliPixelManuale(numero: Int) = modifica(numero) { it.copy(pixelManuale = emptySet()) }
@@ -360,7 +368,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         val stato = f.statoVoluto
         val sfondo = if (f.sfondoPixelato) f.fileSfondo else null
         val base = sfondo ?: f.fileAuto ?: return null
-        if (f.pixelManuale.isEmpty() && f.rotazioneManuale == 0 && (sfondo == null || f.ripristinate.isEmpty())) {
+        if (f.pixelManuale.isEmpty() && f.rotazioneManuale == 0 && f.ritaglio == null && (sfondo == null || f.ripristinate.isEmpty())) {
             val b = BitmapFactory.decodeFile(base.path) ?: return null
             return f.copy(file = base, miniatura = miniatura(b).asImageBitmap(), statoFile = stato, rotazioneFile = 0)
         }
@@ -379,6 +387,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (f.pixelManuale.isNotEmpty()) PixelManuale.applica(px, w, h, f.pixelManuale, lato)
             b = Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
+        }
+        f.ritaglio?.let { q ->
+            val (l, t, lw, lh) = Ritaglio.pixel(q, w, h).toList()
+            b = Bitmap.createBitmap(b, l, t, lw, lh)
         }
         b = Raddrizzatore.ruotaImmagine(b, f.rotazioneManuale)
         // Nome sempre nuovo, così le anteprime si aggiornano
@@ -409,8 +421,46 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             val articoli = foto[i].articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
             // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
             val unAnnoFa = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(System.currentTimeMillis() - 365L * 24 * 3600 * 1000))
-            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli)
+            val mini = salvaMiniaturaStorico(foto[i])
+            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli, mini)
             fileRegistro.writeText(Riepilogo.scrivi(registro))
+            pulisciStorico()
+        }
+    }
+
+    /** Cartella con le fotine dello storico (restano anche quando la lista si svuota). */
+    val cartellaStorico: File get() = File(getApplication<Application>().filesDir, "storico").apply { mkdirs() }
+
+    /**
+     * Fotina piccola (lato 640) della foto pubblicata, per riconoscere l'articolo nello storico.
+     * Il nome lo decido subito; il file lo scrivo in sottofondo (la foto grande va letta).
+     */
+    private fun salvaMiniaturaStorico(f: Foto): String {
+        val sorgente = f.file ?: return ""
+        val nome = "m_${System.currentTimeMillis()}_${f.numero}.jpg"
+        val dest = File(cartellaStorico, nome)
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(sorgente.path, o)
+                var passo = 1
+                while (maxOf(o.outWidth, o.outHeight) / (passo * 2) >= 640) passo *= 2
+                val b = BitmapFactory.decodeFile(sorgente.path, BitmapFactory.Options().apply { inSampleSize = passo }) ?: return@runCatching
+                val scala = 640f / maxOf(b.width, b.height)
+                val piccola = if (scala < 1f) Bitmap.createScaledBitmap(b, (b.width * scala).toInt().coerceAtLeast(1), (b.height * scala).toInt().coerceAtLeast(1), true) else b
+                dest.outputStream().use { piccola.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            }
+        }
+        return nome
+    }
+
+    /** Via le fotine che nessun articolo dello storico usa più. */
+    private fun pulisciStorico() {
+        val usate = registro.mapTo(HashSet()) { it.miniatura }
+        viewModelScope.launch(Dispatchers.IO) {
+            // Solo quelle vecchie di almeno un minuto: una appena decisa potrebbe non essere ancora scritta
+            val limite = System.currentTimeMillis() - 60_000
+            cartellaStorico.listFiles()?.filter { it.name !in usate && it.lastModified() < limite }?.forEach { it.delete() }
         }
     }
 
@@ -428,7 +478,20 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Toglie dal conteggio un articolo contato per sbaglio (es. aperto in WhatsApp ma poi non pubblicato). */
     fun togliDalRiepilogo(p: Pubblicato) {
-        registro = registro - p
+        registro = registro.filterNot { it.giorno == p.giorno && it.chiave == p.chiave }
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+        pulisciStorico()
+    }
+
+    /** Spunta "Prenotato" (Elisa la mette quando qualcuno lo prenota su WhatsApp). */
+    fun segnaPrenotato(p: Pubblicato, si: Boolean) {
+        registro = Riepilogo.cambia(registro, p) { it.copy(prenotato = si) }
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+    }
+
+    /** Spunta "Venduto" (solo se accesa nelle impostazioni). */
+    fun segnaVenduto(p: Pubblicato, si: Boolean) {
+        registro = Riepilogo.cambia(registro, p) { it.copy(venduto = si) }
         fileRegistro.writeText(Riepilogo.scrivi(registro))
     }
 

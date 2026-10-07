@@ -91,8 +91,11 @@ fun PulsanteChiaro(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            Cerchietto(icona, colore.copy(alpha = 0.10f))
-            Spacer(Modifier.width(8.dp))
+            // Icona vuota = solo la scritta (pulsanti stretti)
+            if (icona.isNotEmpty()) {
+                Cerchietto(icona, colore.copy(alpha = 0.10f))
+                Spacer(Modifier.width(8.dp))
+            }
             Text(testo, color = colore, fontWeight = FontWeight.Bold, fontSize = grandezzaTesto.sp, textAlign = TextAlign.Center)
         }
     }
