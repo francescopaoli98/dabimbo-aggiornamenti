@@ -1,6 +1,6 @@
 {
-  "versionCode": 73,
-  "versionName": "4.8",
+  "versionCode": 74,
+  "versionName": "4.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Ritaglio delle foto (libero o 1:1, 4:5, 3:4, 9:16). Storico con fotina, spunta Prenotato e totali; cancellazione bloccata finché non la sblocchi."
+  "note": "Nello storico le fotine compaiono anche per gli articoli pubblicati prima (se la foto è ancora in lista)."
 }
