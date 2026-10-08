@@ -1,6 +1,6 @@
 {
-  "versionCode": 78,
-  "versionName": "5.3",
+  "versionCode": 79,
+  "versionName": "5.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Carosello: l'ultima riga ora dice \"Scrivi nei commenti o in DM il numero che ti interessa\" (si cambia in ⚙ → Instagram)."
+  "note": "Segni \"caricato su\": 🟢 WhatsApp, 📱 Storia IG, ▦ Post IG. Si mettono da soli, toccandoli li togli o li rimetti. Li vedi nella lista, nello storico (coi totali) e nella scelta Instagram."
 }
