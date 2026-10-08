@@ -1,6 +1,6 @@
 {
-  "versionCode": 74,
-  "versionName": "4.9",
+  "versionCode": 75,
+  "versionName": "5.0",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nello storico le fotine compaiono anche per gli articoli pubblicati prima (se la foto è ancora in lista)."
+  "note": "Instagram: storie con prezzo e codice sotto la foto, carosello numerato nell'ordine che scegli (anche dai giorni passati), testo e hashtag già copiati."
 }
