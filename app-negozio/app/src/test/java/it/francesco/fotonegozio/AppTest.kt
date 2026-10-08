@@ -679,6 +679,17 @@ class AppTest {
     }
 
     @Test
+    fun ultimaRigaInstagramDalleImpostazioni() {
+        regola.onNodeWithText("⚙").performClick()
+        regola.onNodeWithText("Instagram").performClick()
+        regola.onNodeWithTag("fine_ig").performTextReplacement("Scrivi nei commenti il numero 👇")
+        assertEquals("Scrivi nei commenti il numero 👇", vm.fineIG)
+        assertTrue(vm.didascaliaIG(emptyList()).endsWith("Scrivi nei commenti il numero 👇\n\n" + TestoInstagram.HASHTAG))
+        regola.onNodeWithText("Rimetti quelli di partenza").performClick()
+        assertEquals(TestoInstagram.FINE, vm.fineIG)
+    }
+
+    @Test
     fun guide() {
         regola.onNodeWithTag("apri_guide").performClick()
         for (g in Guide.TUTTE) regola.onNodeWithTag("guida_${g.id}").assertExists()

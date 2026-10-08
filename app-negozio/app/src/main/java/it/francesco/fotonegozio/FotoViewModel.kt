@@ -202,6 +202,10 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var inizioIG by mutableStateOf(preferenze.getString("inizio_ig", null) ?: TestoInstagram.INIZIO)
         private set
     fun cambiaInizioIG(v: String) { inizioIG = v; preferenze.edit().putString("inizio_ig", v).apply() }
+    /** Ultima riga della didascalia ("Scrivi nei commenti o in DM il numero…"). */
+    var fineIG by mutableStateOf(preferenze.getString("fine_ig", null) ?: TestoInstagram.FINE)
+        private set
+    fun cambiaFineIG(v: String) { fineIG = v; preferenze.edit().putString("fine_ig", v).apply() }
 
     /** Le foto della lista di adesso, pronte per Instagram. */
     fun elementiListaIG(): List<ElementoIG> = foto.filter { !it.inCorso && it.errore == null && it.file?.exists() == true }.map { f ->
@@ -234,7 +238,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         ImmaginiInstagram.salva(context, immagini, "carosello")
     }
 
-    fun didascaliaIG(scelte: List<ElementoIG>) = TestoInstagram.didascalia(scelte.map { it.righe }, inizioIG, hashtagIG, codiciPrenotati)
+    fun didascaliaIG(scelte: List<ElementoIG>) = TestoInstagram.didascalia(scelte.map { it.righe }, inizioIG, hashtagIG, codiciPrenotati, fineIG)
 
     // Caroselli mandati a Instagram: li ricordo (60 giorni), così se un articolo viene prenotato si rifà il testo
     private val fileCaroselli = File(app.filesDir, "caroselli.json")
@@ -252,7 +256,7 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         caroselli.filter { c -> c.foto.any { righe -> righe.any { it.codice == codice } } }.reversed()
 
     /** Il testo del carosello rifatto coi prenotati di adesso ("2. PRENOTATO – Scarpe…"). */
-    fun didascaliaAggiornata(c: CaroselloIG) = TestoInstagram.didascalia(c.foto, inizioIG, hashtagIG, codiciPrenotati)
+    fun didascaliaAggiornata(c: CaroselloIG) = TestoInstagram.didascalia(c.foto, inizioIG, hashtagIG, codiciPrenotati, fineIG)
 
     /** La storia "PRENOTATO" di un articolo dello storico (dalla copia buona, o dalla fotina se non c'è più). */
     suspend fun preparaPrenotato(context: android.content.Context, p: Pubblicato): File? = withContext(Dispatchers.Default) {

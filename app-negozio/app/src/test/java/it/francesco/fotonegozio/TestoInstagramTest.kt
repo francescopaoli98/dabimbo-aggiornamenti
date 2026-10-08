@@ -55,4 +55,13 @@ class TestoInstagramTest {
         assertTrue(t.startsWith("1. Scarpe Diadora - numero 33"))
         assertTrue(t.contains("2. PRENOTATO – Felpa rosa - 8 anni - cod. 1444496 - € 4,00 + Librottino - € 1,50"))
     }
+
+    @Test
+    fun ultima_riga_modificabile() {
+        assertTrue(TestoInstagram.FINE.contains("commenti"))
+        val t = TestoInstagram.didascalia(listOf(listOf(libro)), "", "", fine = "Scrivi nei commenti 👇")
+        assertEquals("1. Librottino - € 1,50\n\nScrivi nei commenti 👇", t)
+        // Vuota: niente riga
+        assertEquals("1. Librottino - € 1,50\n", TestoInstagram.didascalia(listOf(listOf(libro)), "", "", fine = ""))
+    }
 }

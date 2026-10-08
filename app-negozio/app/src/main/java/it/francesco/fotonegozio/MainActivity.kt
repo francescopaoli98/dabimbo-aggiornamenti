@@ -947,9 +947,11 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 Sezione("📸", "Instagram", vm.hashtagIG.ifBlank { "Nessun hashtag" }, aperta == "instagram", { apri("instagram") }) {
                     Text("Prima riga del carosello", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     OutlinedTextField(vm.inizioIG, vm::cambiaInizioIG, Modifier.fillMaxWidth(), singleLine = true)
+                    Text("Ultima riga (dove scrivervi)", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                    OutlinedTextField(vm.fineIG, vm::cambiaFineIG, Modifier.fillMaxWidth().testTag("fine_ig"))
                     Text("Hashtag (in fondo al testo)", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
                     OutlinedTextField(vm.hashtagIG, vm::cambiaHashtagIG, Modifier.fillMaxWidth().testTag("hashtag_ig"))
-                    TextButton(onClick = { vm.cambiaHashtagIG(TestoInstagram.HASHTAG); vm.cambiaInizioIG(TestoInstagram.INIZIO) }) { Text("Rimetti quelli di partenza") }
+                    TextButton(onClick = { vm.cambiaHashtagIG(TestoInstagram.HASHTAG); vm.cambiaInizioIG(TestoInstagram.INIZIO); vm.cambiaFineIG(TestoInstagram.FINE) }) { Text("Rimetti quelli di partenza") }
                     Text("Le foto pubblicate restano in buona qualità per $GIORNI_HD giorni, per poterle mettere su Instagram anche dopo.", fontSize = 12.sp, color = TestoTenue)
                 }
                 Sezione("🔄", "Aggiornamenti", vm.esitoControllo ?: "Versione $versione", aperta == "aggiornamenti", { apri("aggiornamenti") }) {

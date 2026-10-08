@@ -35,7 +35,7 @@ object TestoInstagram {
 
     const val HASHTAG = "#dabimboabimbo #dabimboabimboprato #prato #usatobambini #negoziousatobambini"
     const val INIZIO = "Nuovi arrivi 🧸"
-    const val FINE = "Scrivici in DM il numero che ti interessa 💬"
+    const val FINE = "Scrivi nei commenti o in DM il numero che ti interessa 💬"
 
     /** Un articolo della lista (descrizione espansa col dizionario, taglia per esteso, come su WhatsApp). */
     fun daDati(d: DatiCartellino, voci: List<VoceDizionario>): RigaIG {
@@ -65,13 +65,14 @@ object TestoInstagram {
     fun didascalia(
         foto: List<List<RigaIG>>, inizio: String = INIZIO, hashtag: String = HASHTAG,
         prenotati: Set<String> = emptySet(),   // codici prenotati: nella riga compare "PRENOTATO –"
+        fine: String = FINE,                    // ultima riga ("Scrivi nei commenti…"), vuota = niente
     ): String = buildString {
         if (inizio.isNotBlank()) append(inizio.trim()).append("\n\n")
         foto.forEachIndexed { i, righe ->
             val testo = righe.joinToString(" + ") { r -> (if (r.codice != null && r.codice in prenotati) "PRENOTATO – " else "") + riga(r) }
             append(i + 1).append(". ").append(testo.ifEmpty { "—" }).append('\n')
         }
-        append('\n').append(FINE)
+        if (fine.isNotBlank()) append('\n').append(fine.trim())
         if (hashtag.isNotBlank()) append("\n\n").append(hashtag.trim())
     }
 }
