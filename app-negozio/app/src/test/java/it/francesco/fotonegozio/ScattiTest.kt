@@ -110,6 +110,18 @@ class ScattiTest {
         regola.onNodeWithText("Esci").performClick()
         regola.onAllNodesWithText("✕").onLast().performClick()
         regola.waitForIdle()
+        // Guide: l'elenco e una pagina
+        regola.onNodeWithTag("apri_guide").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/guide.png")
+        regola.onNodeWithTag("guida_storie").performClick()
+        regola.onNodeWithText("Avanti ›").performClick()
+        regola.onNodeWithText("Avanti ›").performClick()
+        regola.waitForIdle(); Thread.sleep(500); regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/guida_pagina.png")
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        regola.runOnUiThread { Guide.TUTTE.forEach { vm.segnaGuidaVista(it.id) } }
         // Instagram: due foto scelte, poi l'anteprima delle storie e del carosello
         regola.onNodeWithText("Instagram: storie e carosello").performClick()
         regola.onNodeWithTag("ig_L1").performClick()

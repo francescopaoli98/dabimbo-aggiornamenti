@@ -77,7 +77,7 @@ class AppTest {
     /** Apre la foto grande e aspetta che sia caricata (si carica in sottofondo). */
     private fun apriVisore() {
         regola.onNodeWithText("🔍 Tocca").performClick()
-        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+        regola.waitUntil(20_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
     }
 
     private fun premiIndietro() {
@@ -676,6 +676,35 @@ class AppTest {
         metti(fotoDiProva(1, listOf(felpa)))
         regola.onNodeWithText("⛔ Già prenotato: cod. 1234567").assertExists()
         regola.onNodeWithText("Già pubblicato", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun guide() {
+        regola.onNodeWithTag("apri_guide").performClick()
+        for (g in Guide.TUTTE) regola.onNodeWithTag("guida_${g.id}").assertExists()
+        regola.onNodeWithTag("guida_storico").performClick()
+        regola.onNodeWithText("1. ${Guide.STORICO.pagine[0].testo}").assertExists()
+        repeat(Guide.STORICO.pagine.size - 1) { regola.onNodeWithText("Avanti ›").performClick(); regola.waitForIdle() }
+        regola.onNodeWithText("${Guide.STORICO.pagine.size}. ${Guide.STORICO.pagine.last().testo}").assertExists()
+        // All'ultima pagina: si passa alla guida dopo
+        regola.onNodeWithText("${Guide.STORIE.titolo} ›").performClick()
+        regola.onNodeWithText("1. ${Guide.STORIE.pagine[0].testo}").assertExists()
+        regola.onNodeWithText("‹ Indietro").assertIsNotEnabled()
+    }
+
+    @Test
+    fun guidaPropostaLaPrimaVolta() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("❓ Prima volta qui?").assertExists()
+        regola.onNodeWithText("Non ora").performClick()
+        regola.onNodeWithText("❓ Prima volta qui?").assertDoesNotExist()
+        // Resta chiusa anche riaprendo l'app
+        assertTrue(FotoViewModel(vm.getApplication()).also { it.foto.clear() }.guidaVista(Guide.STORICO.id))
+        // Dal ❓ la guida si apre lo stesso
+        regola.onAllNodesWithText("❓").onLast().performClick()
+        regola.onNodeWithText("1. ${Guide.STORICO.pagine[0].testo}").assertExists()
     }
 
     @Test

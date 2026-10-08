@@ -56,8 +56,11 @@ fun PulsanteGrande(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            Cerchietto(icona, Color.White.copy(alpha = 0.25f))
-            Spacer(Modifier.width(10.dp))
+            // Icona vuota = solo la scritta
+            if (icona.isNotEmpty()) {
+                Cerchietto(icona, Color.White.copy(alpha = 0.25f))
+                Spacer(Modifier.width(10.dp))
+            }
             Text(testo, color = Color.White, fontWeight = FontWeight.Bold, fontSize = grandezzaTesto.sp, textAlign = TextAlign.Center)
         }
     }

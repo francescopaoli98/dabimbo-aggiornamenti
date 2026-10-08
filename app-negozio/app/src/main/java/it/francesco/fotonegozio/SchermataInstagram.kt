@@ -65,6 +65,7 @@ fun SchermataInstagram(vm: FotoViewModel, chiudi: () -> Unit) {
     val scelte = remember { mutableStateListOf<ElementoIG>() }
     var preparo by remember { mutableStateOf(false) }
     var anteprima by remember { mutableStateOf<Pair<TipoIG, List<File>>?>(null) }
+    var guida by remember { mutableStateOf(false) }
 
     fun prepara(tipo: TipoIG) {
         if (preparo) return
@@ -86,8 +87,11 @@ fun SchermataInstagram(vm: FotoViewModel, chiudi: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("📸 Instagram", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte, modifier = Modifier.weight(1f))
+                PulsanteTondo("❓", { guida = true })
+                Spacer(Modifier.width(8.dp))
                 PulsanteTondo("✕", chiudi)
             }
+            ProponiGuida(Guide.STORIE, vm.guidaVista(Guide.STORIE.id), { vm.segnaGuidaVista(Guide.STORIE.id) }) { guida = true }
             // Da dove: lista di adesso o un giorno passato
             LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (lista.isNotEmpty()) item {
@@ -144,6 +148,8 @@ fun SchermataInstagram(vm: FotoViewModel, chiudi: () -> Unit) {
             }
         }
     }
+
+    if (guida) SchermataGuide(Guide.STORIE) { guida = false }
 
     anteprima?.let { (tipo, file) ->
         AnteprimaIG(

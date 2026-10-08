@@ -55,6 +55,8 @@ class GuideTest {
             Foto(i + 1, Uri.fromFile(file), inCorso = false, miniatura = mini.asImageBitmap(), fileAuto = file, file = file, dati = d, daControllare = i == 0)
         }
 
+        // La striscia "Prima volta qui?" non deve comparire nelle schermate
+        regola.runOnUiThread { Guide.TUTTE.forEach { vm.segnaGuidaVista(it.id) } }
         // ---------- 1. WhatsApp ----------
         regola.waitForIdle()
         scatto("wa_1", regola.onNodeWithText("Scegli foto"))
@@ -150,7 +152,7 @@ class GuideTest {
     }
 
     private fun hasTestTagPrefix(p: String) = SemanticsMatcher("tag $p…") { n ->
-        n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.startsWith(p) == true
+        androidx.compose.ui.semantics.SemanticsProperties.TestTag in n.config && n.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag].startsWith(p)
     }
 
     private fun aspetta(ms: Long = 400) {
@@ -166,14 +168,27 @@ class GuideTest {
      */
     private fun scatto(nome: String, vararg bersagli: SemanticsNodeInteraction, dialogo: Boolean = false) {
         regola.waitForIdle()
-        val v = if (dialogo) ShadowDialog.getLatestDialog().window!!.decorView else regola.activity.window.decorView
-        val b = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888)
-        regola.runOnUiThread { v.draw(Canvas(b)) }
+        // Lo schermo intero: l'app sotto, poi le finestre aperte una sopra l'altra (quelle piccole al centro, col velo scuro)
+        val sotto = regola.activity.window.decorView
+        val b = Bitmap.createBitmap(sotto.width, sotto.height, Bitmap.Config.ARGB_8888)
+        var dx = 0f; var dy = 0f
+        regola.runOnUiThread {
+            val tela = Canvas(b)
+            sotto.draw(tela)
+            for (d in ShadowDialog.getShownDialogs().filter { it.isShowing }) {
+                val v = d.window!!.decorView
+                if (v.width <= 0) continue
+                dx = (b.width - v.width) / 2f; dy = (b.height - v.height) / 2f
+                if (v.width < b.width || v.height < b.height) tela.drawColor(Color.argb(120, 0, 0, 0))
+                tela.save(); tela.translate(dx, dy); v.draw(tela); tela.restore()
+            }
+        }
+        if (!dialogo) { dx = 0f; dy = 0f }
         val c = Canvas(b)
         val margine = 14f
         val zone = bersagli.map { s ->
             val r = s.fetchSemanticsNode().boundsInWindow
-            RectF(r.left - margine, r.top - margine, r.right + margine, r.bottom + margine)
+            RectF(r.left + dx - margine, r.top + dy - margine, r.right + dx + margine, r.bottom + dy + margine)
         }
         // Scuro tutto tranne le zone
         val buchi = Path().apply {

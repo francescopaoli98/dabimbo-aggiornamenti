@@ -187,6 +187,12 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         private set
     fun cambiaMostraVenduto(v: Boolean) { mostraVenduto = v; preferenze.edit().putBoolean("mostra_venduto", v).apply() }
 
+    // ---- Guide ----
+    /** Guide già viste (o proposta chiusa): la striscia "Prima volta qui?" non compare più. */
+    private val guideViste = mutableStateMapOf<String, Boolean>()
+    fun guidaVista(id: String) = guideViste.getOrPut(id) { preferenze.getBoolean("guida_vista_$id", false) }
+    fun segnaGuidaVista(id: String) { guideViste[id] = true; preferenze.edit().putBoolean("guida_vista_$id", true).apply() }
+
     // ---- Instagram ----
     /** Hashtag in fondo alla didascalia del carosello (modificabili nelle impostazioni). */
     var hashtagIG by mutableStateOf(preferenze.getString("hashtag_ig", null) ?: TestoInstagram.HASHTAG)

@@ -212,6 +212,7 @@ private fun Schermata(vm: FotoViewModel) {
     var impostazioniAperte by remember { mutableStateOf(false) }
     var riepilogoAperto by remember { mutableStateOf(false) }
     var instagramAperto by remember { mutableStateOf(false) }
+    var guideAperte by remember { mutableStateOf(false) }
     var chiediMenu by remember { mutableStateOf(false) }               // ✕: tornare al menu principale (chiedo se mancano foto)
     val riaperte = remember { mutableStateListOf<Int>() }              // foto pubblicate riaperte (se le schede si comprimono)
     val lista = rememberLazyListState()
@@ -269,6 +270,8 @@ private fun Schermata(vm: FotoViewModel) {
                             .combinedClickable(onClick = {}, onLongClick = { vm.prove = !vm.prove }),
                         contentScale = ContentScale.Fit,
                     ) else Spacer(Modifier.weight(1f))
+                    PulsanteTondo("❓", { guideAperte = true }, Modifier.testTag("apri_guide"))
+                    Spacer(Modifier.width(8.dp))
                     PulsanteTondo("⚙", { impostazioniAperte = true })
                 }
             }
@@ -414,6 +417,10 @@ private fun Schermata(vm: FotoViewModel) {
 
     if (instagramAperto) {
         SchermataInstagram(vm) { instagramAperto = false }
+    }
+
+    if (guideAperte) {
+        SchermataGuide { guideAperte = false }
     }
 
     if (impostazioniAperte) {
@@ -595,6 +602,7 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     var sbloccata by remember { mutableStateOf(false) }
     var grande by remember { mutableStateOf<File?>(null) }   // fotina ingrandita
     var avvisoPrenotato by remember { mutableStateOf<Pubblicato?>(null) }   // appena prenotato: cosa fare con le storie
+    var guida by remember { mutableStateOf(false) }
     // Articoli pubblicati senza fotina (es. prima della 4.8): la rifaccio dalle foto ancora in lista
     LaunchedEffect(Unit) { vm.recuperaMiniature() }
 
@@ -610,8 +618,11 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
                     fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = BluNotte,
                     modifier = Modifier.weight(1f).padding(start = if (giorno != null) 12.dp else 0.dp),
                 )
+                PulsanteTondo("❓", { guida = true })
+                Spacer(Modifier.width(8.dp))
                 PulsanteTondo("✕", chiudi)
             }
+            ProponiGuida(Guide.STORICO, vm.guidaVista(Guide.STORICO.id), { vm.segnaGuidaVista(Guide.STORICO.id) }) { guida = true }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val g = giorno
                 if (g == null) {
@@ -680,6 +691,7 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     }
 
     avvisoPrenotato?.let { p -> DialogoPrenotato(vm, p) { avvisoPrenotato = null } }
+    if (guida) SchermataGuide(Guide.STORICO) { guida = false }
 
     daTogliere?.let { p ->
         AlertDialog(
@@ -735,8 +747,8 @@ private fun DialogoPrenotato(vm: FotoViewModel, p: Pubblicato, chiudi: () -> Uni
                 Text("2. Se vuoi, pubblica la storia \"PRENOTATO\":", fontWeight = FontWeight.Bold)
                 if (preparo) Text("Preparo la foto…", color = TestoTenue)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PulsanteChiaro("WhatsApp", "", { pubblicaPrenotato(true) }, Modifier.weight(1f).testTag("prenotato_wa"), colore = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
-                    PulsanteChiaro("Instagram", "", { pubblicaPrenotato(false) }, Modifier.weight(1f).testTag("prenotato_ig"), colore = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
+                    PulsanteChiaro("WhatsApp", "", { pubblicaPrenotato(true) }, Modifier.weight(1f).testTag("prenotato_wa"), sfondo = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
+                    PulsanteChiaro("Instagram", "", { pubblicaPrenotato(false) }, Modifier.weight(1f).testTag("prenotato_ig"), sfondo = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
                 }
                 if (caroselli.isNotEmpty()) {
                     val c = caroselli.first()
@@ -841,6 +853,8 @@ private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> U
  */
 @Composable
 private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
+    var guide by remember { mutableStateOf(false) }
+    if (guide) SchermataGuide { guide = false }
     var aperta by remember { mutableStateOf<String?>(null) }
     fun apri(nome: String) { aperta = if (aperta == nome) null else nome }
     val nomiModo = listOf("Chiaro", "Scuro", "Come il telefono")
@@ -920,6 +934,16 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 RigaInterruttore("💶", "Spunta \"Venduto\" nello storico", vm.mostraVenduto, vm::cambiaMostraVenduto)
                 val context = LocalContext.current
                 val versione = remember { Aggiornamento.nomeVersione(context) }
+                Surface(onClick = { guide = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("❓", fontSize = 20.sp)
+                        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text("Guide", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = BluNotte)
+                            Text("Come si fa, passo per passo", fontSize = 13.sp, color = TestoTenue)
+                        }
+                        Text("›", fontSize = 22.sp, color = BluNotte)
+                    }
+                }
                 Sezione("📸", "Instagram", vm.hashtagIG.ifBlank { "Nessun hashtag" }, aperta == "instagram", { apri("instagram") }) {
                     Text("Prima riga del carosello", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     OutlinedTextField(vm.inizioIG, vm::cambiaInizioIG, Modifier.fillMaxWidth(), singleLine = true)
