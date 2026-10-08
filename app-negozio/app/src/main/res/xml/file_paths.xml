@@ -4,4 +4,6 @@
     <files-path name="raddrizzate" path="raddrizzate/" />
     <!-- L'aggiornamento scaricato, da passare all'installazione di Android -->
     <cache-path name="aggiornamento" path="aggiornamento/" />
+    <!-- Le immagini pronte per Instagram (storie e carosello) -->
+    <cache-path name="instagram" path="instagram/" />
 </paths>

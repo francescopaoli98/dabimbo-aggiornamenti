@@ -27,6 +27,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/** Per quanti giorni lo storico tiene la copia buona delle foto (per Instagram). */
+const val GIORNI_HD = 30
+
 /** Una foto nella lista, con il suo stato di elaborazione. */
 data class Foto(
     val numero: Int,
@@ -183,6 +186,49 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     var mostraVenduto by mutableStateOf(preferenze.getBoolean("mostra_venduto", false))
         private set
     fun cambiaMostraVenduto(v: Boolean) { mostraVenduto = v; preferenze.edit().putBoolean("mostra_venduto", v).apply() }
+
+    // ---- Instagram ----
+    /** Hashtag in fondo alla didascalia del carosello (modificabili nelle impostazioni). */
+    var hashtagIG by mutableStateOf(preferenze.getString("hashtag_ig", null) ?: TestoInstagram.HASHTAG)
+        private set
+    fun cambiaHashtagIG(v: String) { hashtagIG = v; preferenze.edit().putString("hashtag_ig", v).apply() }
+    /** Prima riga della didascalia ("Nuovi arrivi 🧸"). */
+    var inizioIG by mutableStateOf(preferenze.getString("inizio_ig", null) ?: TestoInstagram.INIZIO)
+        private set
+    fun cambiaInizioIG(v: String) { inizioIG = v; preferenze.edit().putString("inizio_ig", v).apply() }
+
+    /** Le foto della lista di adesso, pronte per Instagram. */
+    fun elementiListaIG(): List<ElementoIG> = foto.filter { !it.inCorso && it.errore == null && it.file?.exists() == true }.map { f ->
+        ElementoIG("L${f.numero}", f.file!!, f.articoli.map { TestoInstagram.daDati(it, dizionario) })
+    }
+
+    /** Le foto pubblicate in un giorno passato che hanno ancora la copia buona (una per foto, anche con più articoli). */
+    fun elementiGiornoIG(giorno: String): List<ElementoIG> = registro
+        .filter { it.giorno == giorno && it.foto.isNotEmpty() && File(cartellaStoricoHd, it.foto).exists() }
+        .groupBy { it.foto }
+        .map { (hd, articoli) ->
+            ElementoIG("S$hd", File(cartellaStoricoHd, hd), articoli.map(TestoInstagram::daStorico),
+                articoli.first().miniatura.takeIf { it.isNotEmpty() }?.let { File(cartellaStorico, it) })
+        }
+
+    /** I giorni dello storico con almeno una foto ancora buona per Instagram. */
+    fun giorniIG(): List<String> = registro
+        .filter { it.foto.isNotEmpty() && File(cartellaStoricoHd, it.foto).exists() }
+        .map { it.giorno }.distinct().sortedDescending()
+
+    /** Prepara le storie (una per foto, con la fascia), nell'ordine scelto. */
+    suspend fun preparaStorie(context: android.content.Context, scelte: List<ElementoIG>): List<File> = withContext(Dispatchers.Default) {
+        val immagini = scelte.mapNotNull { e -> ImmaginiInstagram.carica(e.file, 1080)?.let { ImmaginiInstagram.storia(it, e.righe) } }
+        ImmaginiInstagram.salva(context, immagini, "storia")
+    }
+
+    /** Prepara il carosello (4:5, col numero nell'angolo), nell'ordine scelto. */
+    suspend fun preparaCarosello(context: android.content.Context, scelte: List<ElementoIG>): List<File> = withContext(Dispatchers.Default) {
+        val immagini = scelte.mapIndexedNotNull { i, e -> ImmaginiInstagram.carica(e.file, 1080)?.let { ImmaginiInstagram.carosello(it, i + 1) } }
+        ImmaginiInstagram.salva(context, immagini, "carosello")
+    }
+
+    fun didascaliaIG(scelte: List<ElementoIG>) = TestoInstagram.didascalia(scelte.map { it.righe }, inizioIG, hashtagIG)
 
     // ---- Aggiornamenti ----
     /** Versione nuova trovata su GitHub (null = nessuna). */
@@ -420,8 +466,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
             val articoli = articoliPerRegistro(foto[i])
             // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
             val unAnnoFa = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(System.currentTimeMillis() - 365L * 24 * 3600 * 1000))
-            val mini = salvaMiniaturaStorico(foto[i])
-            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli, mini)
+            val (mini, hd) = salvaCopieStorico(foto[i])
+            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli, mini, hd)
             fileRegistro.writeText(Riepilogo.scrivi(registro))
             pulisciStorico()
         }
@@ -430,49 +476,73 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Cartella con le fotine dello storico (restano anche quando la lista si svuota). */
     val cartellaStorico: File get() = File(getApplication<Application>().filesDir, "storico").apply { mkdirs() }
 
+    /** Copie in alta qualità delle foto pubblicate, per Instagram (si tengono [GIORNI_HD] giorni). */
+    val cartellaStoricoHd: File get() = File(getApplication<Application>().filesDir, "storico_hd").apply { mkdirs() }
+
     /**
-     * Fotina piccola (lato 640) della foto pubblicata, per riconoscere l'articolo nello storico.
-     * Il nome lo decido subito; il file lo scrivo in sottofondo (la foto grande va letta).
+     * Due copie della foto pubblicata, per lo storico:
+     * - fotina leggera (lato 640) per riconoscere l'articolo;
+     * - copia buona (lato 2160, il doppio di quello che usa Instagram) per storie e carosello dei giorni passati.
+     * I nomi li decido subito; i file li scrivo in sottofondo (la foto grande va letta).
      */
-    private fun salvaMiniaturaStorico(f: Foto): String {
-        val sorgente = f.file ?: return ""
-        val nome = "m_${System.currentTimeMillis()}_${f.numero}.jpg"
-        val dest = File(cartellaStorico, nome)
+    private fun salvaCopieStorico(f: Foto): Pair<String, String> {
+        val sorgente = f.file ?: return "" to ""
+        val base = "${System.currentTimeMillis()}_${f.numero}.jpg"
+        val mini = "m_$base"; val hd = "h_$base"
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
-                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(sorgente.path, o)
-                var passo = 1
-                while (maxOf(o.outWidth, o.outHeight) / (passo * 2) >= 640) passo *= 2
-                val b = BitmapFactory.decodeFile(sorgente.path, BitmapFactory.Options().apply { inSampleSize = passo }) ?: return@runCatching
-                val scala = 640f / maxOf(b.width, b.height)
-                val piccola = if (scala < 1f) Bitmap.createScaledBitmap(b, (b.width * scala).toInt().coerceAtLeast(1), (b.height * scala).toInt().coerceAtLeast(1), true) else b
-                dest.outputStream().use { piccola.compress(Bitmap.CompressFormat.JPEG, 75, it) }
+                salvaRidotta(sorgente, File(cartellaStoricoHd, hd), 2160, 92)
+                salvaRidotta(sorgente, File(cartellaStorico, mini), 640, 75)
             }
         }
-        return nome
+        return mini to hd
     }
 
-    /** Gli articoli come vanno nel registro: col nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…). */
-    private fun articoliPerRegistro(f: Foto) =
-        f.articoli.map { a -> a.copy(descrizione = a.descrizione?.let { TestoFinale.espandi(it, a.taglia, dizionario) }) }
+    /** Salva [sorgente] rimpicciolita (lato lungo al massimo [lato]) in JPEG. */
+    private fun salvaRidotta(sorgente: File, dest: File, lato: Int, qualita: Int) {
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(sorgente.path, o)
+        var passo = 1
+        while (maxOf(o.outWidth, o.outHeight) / (passo * 2) >= lato) passo *= 2
+        val b = BitmapFactory.decodeFile(sorgente.path, BitmapFactory.Options().apply { inSampleSize = passo }) ?: return
+        val scala = lato.toFloat() / maxOf(b.width, b.height)
+        val r = if (scala < 1f) Bitmap.createScaledBitmap(b, (b.width * scala).toInt().coerceAtLeast(1), (b.height * scala).toInt().coerceAtLeast(1), true) else b
+        // Prima in un file a parte, poi rinomino: chi legge non trova mai un file a metà
+        val tmp = File(dest.parentFile, dest.name + ".tmp")
+        tmp.outputStream().use { r.compress(Bitmap.CompressFormat.JPEG, qualita, it) }
+        tmp.renameTo(dest)
+    }
 
     /**
-     * Articoli dello storico senza fotina (pubblicati prima della 4.8, o fotina persa):
-     * se la loro foto è ancora in lista, la fotina si rifà da lì.
+     * Gli articoli come vanno nel registro: nome già "tradotto" con il dizionario (Felpa zip con cappuccio rosa…)
+     * e taglia per esteso ("8 anni"), come nel testo di WhatsApp.
+     */
+    private fun articoliPerRegistro(f: Foto) = f.articoli.map { a ->
+        val taglia = a.taglia ?: a.descrizione?.let(TestoFinale::tagliaNellaDescrizione)
+        val descr = a.descrizione?.let { TestoFinale.espandi(it, taglia, dizionario) }
+        a.copy(descrizione = descr, taglia = TestoFinale.tagliaPerEsteso(taglia, descr))
+    }
+
+    private fun giornoDi(ms: Long) = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(ms))
+
+    /**
+     * Articoli dello storico senza fotina o senza copia buona (pubblicati prima, o file persi):
+     * se la loro foto è ancora in lista, le copie si rifanno da lì.
      */
     fun recuperaMiniature() {
-        val senza = registro.filter { it.miniatura.isEmpty() || !File(cartellaStorico, it.miniatura).exists() }
-        if (senza.isEmpty()) return
+        val limiteHd = giornoDi(System.currentTimeMillis() - GIORNI_HD * 24L * 3600 * 1000)
+        fun manca(p: Pubblicato) = p.miniatura.isEmpty() || !File(cartellaStorico, p.miniatura).exists() ||
+            (p.giorno >= limiteHd && (p.foto.isEmpty() || !File(cartellaStoricoHd, p.foto).exists()))
+        if (registro.none(::manca)) return
         var nuovo = registro
         for (f in foto) {
             if (f.inCorso || f.file?.exists() != true) continue
             val chiavi = articoliPerRegistro(f).mapNotNull { it.codice ?: it.descrizione }.toSet()
-            val qui = senza.filter { it.chiave in chiavi && nuovo.any { n -> n.giorno == it.giorno && n.chiave == it.chiave && n.miniatura == it.miniatura } }
+            val qui = nuovo.filter { it.chiave in chiavi && manca(it) }
             if (qui.isEmpty()) continue
-            val nome = salvaMiniaturaStorico(f)
-            if (nome.isEmpty()) continue
-            for (p in qui) nuovo = Riepilogo.cambia(nuovo, p) { it.copy(miniatura = nome) }
+            val (mini, hd) = salvaCopieStorico(f)
+            if (mini.isEmpty()) continue
+            for (p in qui) nuovo = Riepilogo.cambia(nuovo, p) { it.copy(miniatura = mini, foto = hd) }
         }
         if (nuovo != registro) {
             registro = nuovo
@@ -480,13 +550,17 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Via le fotine che nessun articolo dello storico usa più. */
+    /** Via le fotine che nessun articolo usa più, e le copie buone più vecchie di [GIORNI_HD] giorni. */
     private fun pulisciStorico() {
         val usate = registro.mapTo(HashSet()) { it.miniatura }
+        val usateHd = registro.mapTo(HashSet()) { it.foto }
         viewModelScope.launch(Dispatchers.IO) {
             // Solo quelle vecchie di almeno un minuto: una appena decisa potrebbe non essere ancora scritta
-            val limite = System.currentTimeMillis() - 60_000
+            val adesso = System.currentTimeMillis()
+            val limite = adesso - 60_000
             cartellaStorico.listFiles()?.filter { it.name !in usate && it.lastModified() < limite }?.forEach { it.delete() }
+            val vecchie = adesso - GIORNI_HD * 24L * 3600 * 1000
+            cartellaStoricoHd.listFiles()?.filter { (it.name !in usateHd && it.lastModified() < limite) || it.lastModified() < vecchie }?.forEach { it.delete() }
         }
     }
 
@@ -498,6 +572,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     private val giornateCalcolate by derivedStateOf { Riepilogo.giornate(registro) }
     private val codiciNoti by derivedStateOf { registro.mapTo(HashSet()) { it.chiave } }
     val giornate: List<Giornata> get() = giornateCalcolate
+    // Le copie buone più vecchie di 30 giorni si cancellano anche solo aprendo l'app
+    init { pulisciStorico() }
 
     /** Gli articoli contati in un giorno. */
     fun articoliDel(giorno: String): List<Pubblicato> = registro.filter { it.giorno == giorno }

@@ -24,6 +24,14 @@ class ScattiTest {
 
     @Test fun scatti() {
         val cartella = System.getProperty("scatti") ?: return
+        // Con una foto vera nella cartella: le immagini di Instagram fatte dall'app, per guardarle
+        java.io.File("$cartella/foto_vera.jpg").takeIf { it.exists() }?.let { vera ->
+            val f = ImmaginiInstagram.carica(vera, 1080)!!
+            val righe = listOf(RigaIG("Scarpe Diadora bianche fucsia", "numero 33", "1444583", "€ 9,00"))
+            ImmaginiInstagram.storia(f, righe).compress(Bitmap.CompressFormat.JPEG, 90, java.io.FileOutputStream("$cartella/esempio_storia.jpg"))
+            ImmaginiInstagram.storia(f, righe + RigaIG("Calzini rosa", "numero 33", "1444584", "€ 1,00")).compress(Bitmap.CompressFormat.JPEG, 90, java.io.FileOutputStream("$cartella/esempio_storia_due.jpg"))
+            ImmaginiInstagram.carosello(f, 1).compress(Bitmap.CompressFormat.JPEG, 90, java.io.FileOutputStream("$cartella/esempio_carosello.jpg"))
+        }
         val b = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
         for (y in 0 until 400) for (x in 0 until 300) b.setPixel(x, y, if ((x / 50 + y / 50) % 2 == 0) 0xFFE8B4C8.toInt() else 0xFFB4D8E8.toInt())
         val file = Raddrizzatore.salva(regola.activity, b, "scatto")
@@ -94,6 +102,25 @@ class ScattiTest {
         regola.onNodeWithText("4:5").performClick()
         regola.waitForIdle()
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/ritaglio.png")
+        regola.onNodeWithText("Esci").performClick()
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        // Instagram: due foto scelte, poi l'anteprima delle storie e del carosello
+        regola.onNodeWithText("Instagram: storie e carosello").performClick()
+        regola.onNodeWithTag("ig_L1").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/instagram.png")
+        regola.onNodeWithText("Storie").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithTag("anteprima_ig").assertExists() }.isSuccess }
+        Thread.sleep(500); regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/instagram_storie.png")
+        ImmaginiInstagram.cartella(regola.activity).listFiles()!!.first().copyTo(java.io.File("$cartella/storia_vera.jpg"), true)
+        regola.onNodeWithText("‹").performClick()
+        regola.onNodeWithText("Carosello").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithTag("didascalia_ig").assertExists() }.isSuccess }
+        Thread.sleep(500); regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/instagram_carosello.png")
+        ImmaginiInstagram.cartella(regola.activity).listFiles()!!.first().copyTo(java.io.File("$cartella/carosello_vero.jpg"), true)
     }
 
     /** Disegna la finestra in un'immagine (Robolectric disegna anche senza schermo vero). */

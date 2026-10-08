@@ -6,6 +6,7 @@ import org.json.JSONObject
 /**
  * Un articolo pubblicato: giorno (aaaa-mm-gg), codice (o descrizione se manca) e prezzo in centesimi.
  * [miniatura] = nome del file con la fotina (in filesDir/storico); [prenotato]/[venduto] li spunta Elisa.
+ * [foto] = copia in alta qualità (in filesDir/storico_hd, tenuta 30 giorni) per Instagram; [taglia] già per esteso ("8 anni").
  */
 data class Pubblicato(
     val giorno: String,
@@ -15,6 +16,8 @@ data class Pubblicato(
     val miniatura: String = "",
     val prenotato: Boolean = false,
     val venduto: Boolean = false,
+    val foto: String = "",
+    val taglia: String = "",
 )
 
 /** Totale di un giorno: quanti articoli e quanto valgono, e quanti di questi sono prenotati/venduti. */
@@ -44,14 +47,16 @@ object Riepilogo {
     }
 
     /** Aggiunge al registro gli articoli di una foto pubblicata oggi (senza doppioni nello stesso giorno). */
-    fun aggiungi(registro: List<Pubblicato>, giorno: String, articoli: List<DatiCartellino>, miniatura: String = ""): List<Pubblicato> {
+    fun aggiungi(registro: List<Pubblicato>, giorno: String, articoli: List<DatiCartellino>, miniatura: String = "", foto: String = ""): List<Pubblicato> {
         val nuovi = articoli.mapNotNull { a ->
             val chiave = a.codice ?: a.descrizione ?: return@mapNotNull null
-            Pubblicato(giorno, chiave, centesimi(a.prezzo) ?: 0, a.descrizione.orEmpty(), miniatura)
+            Pubblicato(giorno, chiave, centesimi(a.prezzo) ?: 0, a.descrizione.orEmpty(), miniatura, foto = foto, taglia = a.taglia.orEmpty())
         }
-        // Già contato oggi ma senza fotina (es. pubblicato con la versione vecchia): ora la prende
-        val conFotina = if (miniatura.isEmpty()) registro else registro.map { r ->
-            if (r.giorno == giorno && r.miniatura.isEmpty() && nuovi.any { it.chiave == r.chiave }) r.copy(miniatura = miniatura) else r
+        // Già contato oggi ma senza fotina/copia buona/taglia (es. pubblicato con la versione vecchia): ora le prende
+        val conFotina = registro.map { r ->
+            val n = if (r.giorno == giorno) nuovi.firstOrNull { it.chiave == r.chiave } else null
+            if (n == null) r
+            else r.copy(miniatura = r.miniatura.ifEmpty { miniatura }, foto = r.foto.ifEmpty { foto }, taglia = r.taglia.ifEmpty { n.taglia })
         }
         return conFotina + nuovi.filter { n -> registro.none { it.giorno == n.giorno && it.chiave == n.chiave } }.distinctBy { it.chiave }
     }
@@ -77,6 +82,8 @@ object Riepilogo {
                 if (it.miniatura.isNotEmpty()) put("m", it.miniatura)
                 if (it.prenotato) put("p", true)
                 if (it.venduto) put("v", true)
+                if (it.foto.isNotEmpty()) put("f", it.foto)
+                if (it.taglia.isNotEmpty()) put("t", it.taglia)
             })
         }
     }.toString()
@@ -85,7 +92,7 @@ object Riepilogo {
         val a = JSONArray(testo)
         List(a.length()) {
             val o = a.getJSONObject(it)
-            Pubblicato(o.getString("g"), o.getString("k"), o.optInt("c"), o.optString("n"), o.optString("m"), o.optBoolean("p"), o.optBoolean("v"))
+            Pubblicato(o.getString("g"), o.getString("k"), o.optInt("c"), o.optString("n"), o.optString("m"), o.optBoolean("p"), o.optBoolean("v"), o.optString("f"), o.optString("t"))
         }
     }.getOrDefault(emptyList())
 }

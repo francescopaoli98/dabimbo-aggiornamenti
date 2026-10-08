@@ -62,4 +62,16 @@ class RiepilogoTest {
         r = Riepilogo.aggiungi(r, "2026-10-06", listOf(felpa), "m_3.jpg")
         assertEquals("m_2.jpg", r[0].miniatura)
     }
+
+    @Test
+    fun copia_buona_e_taglia() {
+        val r = Riepilogo.aggiungi(emptyList(), "2026-10-06", listOf(felpa.copy(taglia = "8 anni")), "m_1.jpg", "h_1.jpg")
+        assertEquals("h_1.jpg", r[0].foto)
+        assertEquals("8 anni", r[0].taglia)
+        assertEquals(r, Riepilogo.leggi(Riepilogo.scrivi(r)))
+        // Ripubblicato con la versione vecchia (senza copia buona): la prende ora
+        var v = Riepilogo.aggiungi(emptyList(), "2026-10-06", listOf(felpa))
+        v = Riepilogo.aggiungi(v, "2026-10-06", listOf(felpa), "m_2.jpg", "h_2.jpg")
+        assertEquals("h_2.jpg", v[0].foto)
+    }
 }

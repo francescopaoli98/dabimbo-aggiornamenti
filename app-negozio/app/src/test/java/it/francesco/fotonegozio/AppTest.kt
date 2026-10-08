@@ -580,6 +580,61 @@ class AppTest {
     }
 
     @Test
+    fun instagramCaroselloNellOrdine() {
+        metti(
+            fotoDiProva(1, listOf(felpa)),
+            fotoDiProva(2, listOf(felpa.copy(codice = "7654321", descrizione = "scarpe", prezzo = "€ 9,00"))),
+            fotoDiProva(3, listOf(felpa.copy(codice = "1111111", descrizione = "libro", prezzo = "€ 1,50", taglia = null))),
+        )
+        regola.onNodeWithText("Instagram: storie e carosello").performClick()
+        // Tocco nell'ordine 2, 1, 3; poi tolgo la 1: la 3 diventa la numero 2
+        regola.onNodeWithTag("ig_L2").performClick()
+        regola.onNodeWithTag("ig_L1").performClick()
+        regola.onNodeWithTag("ig_L3").performClick()
+        regola.onNodeWithText("Scelte: 3. Ritocca una foto per toglierla.").assertExists()
+        regola.onNodeWithTag("ig_L1").performClick()
+        regola.onNodeWithText("Carosello").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithTag("didascalia_ig").assertExists() }.isSuccess }
+        val testo = "Nuovi arrivi 🧸\n\n1. Scarpe - 8 anni - cod. 7654321 - € 9,00\n2. Libro - cod. 1111111 - € 1,50\n\n" + TestoInstagram.FINE + "\n\n" + TestoInstagram.HASHTAG
+        regola.onNodeWithTag("didascalia_ig").assertTextEquals(testo)
+        regola.onNodeWithText("Apri Instagram").performClick()
+        // Instagram non c'è nel simulatore: si apre il menu Condividi, con 2 foto nell'ordine giusto
+        // (prima c'è la richiesta del permesso per gli avvisi: la salto)
+        val aperto = generateSequence { shadowOf(regola.activity).nextStartedActivity }.first { it.action == Intent.ACTION_CHOOSER }
+        val dentro = aperto.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+        assertEquals(Intent.ACTION_SEND_MULTIPLE, dentro.action)
+        val uri = dentro.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)!!
+        assertEquals(2, uri.size)
+        assertTrue(uri[0].toString().contains("carosello") && uri[0].toString().endsWith("_1.jpg"))
+        val appunti = regola.activity.getSystemService(android.content.ClipboardManager::class.java)
+        assertEquals(testo, appunti.primaryClip!!.getItemAt(0).text.toString())
+        // Le immagini vere: 4:5
+        val f = java.io.File(ImmaginiInstagram.cartella(regola.activity), uri[0].lastPathSegment!!)
+        val b = android.graphics.BitmapFactory.decodeFile(f.path)
+        assertEquals(1080, b.width); assertEquals(1350, b.height)
+    }
+
+    @Test
+    fun instagramStorieDaUnGiornoPassato() {
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.runOnUiThread { vm.segnaPubblicata(1) }
+        regola.waitUntil(5_000) { vm.registro.all { java.io.File(vm.cartellaStoricoHd, it.foto).exists() } }
+        // La lista si svuota: la foto resta nello storico, in buona qualità
+        regola.runOnUiThread { vm.svuota() }
+        regola.waitForIdle()
+        regola.onNodeWithText("Instagram: storie e carosello").performClick()
+        val oggi = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date())
+        regola.onNodeWithTag("giorno_$oggi").assertIsSelected()
+        val id = "S" + vm.registro.first().foto
+        regola.onNodeWithTag("ig_$id").performClick()
+        regola.onNodeWithText("Storie").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Anteprima storie (1)").assertExists() }.isSuccess }
+        val storia = ImmaginiInstagram.cartella(regola.activity).listFiles()!!.single()
+        val b = android.graphics.BitmapFactory.decodeFile(storia.path)
+        assertEquals(1080, b.width); assertEquals(1920, b.height)
+    }
+
+    @Test
     fun ritaglio() {
         metti(fotoDiProva(1, listOf(felpa)))
         apriVisore()

@@ -181,7 +181,7 @@ private fun ConScritte(scala: Float, contenuto: @Composable () -> Unit) {
 
 /** Finestra a tutto schermo che rispetta anche lei la grandezza del testo. */
 @Composable
-private fun Finestra(onDismissRequest: () -> Unit, properties: DialogProperties, contenuto: @Composable () -> Unit) {
+internal fun Finestra(onDismissRequest: () -> Unit, properties: DialogProperties, contenuto: @Composable () -> Unit) {
     val scala = LocalScalaTesto.current
     Dialog(onDismissRequest, properties) { ConScritte(scala, contenuto) }
 }
@@ -211,6 +211,7 @@ private fun Schermata(vm: FotoViewModel) {
     var daTogliere by remember { mutableStateOf<Int?>(null) }        // foto da togliere dalla lista (chiedo conferma)
     var impostazioniAperte by remember { mutableStateOf(false) }
     var riepilogoAperto by remember { mutableStateOf(false) }
+    var instagramAperto by remember { mutableStateOf(false) }
     var chiediMenu by remember { mutableStateOf(false) }               // ✕: tornare al menu principale (chiedo se mancano foto)
     val riaperte = remember { mutableStateListOf<Int>() }              // foto pubblicate riaperte (se le schede si comprimono)
     val lista = rememberLazyListState()
@@ -317,6 +318,16 @@ private fun Schermata(vm: FotoViewModel) {
                     }
                 }
             }
+            // Instagram: storie e carosello (dalla lista di adesso o dai giorni passati)
+            if (vm.foto.any { !it.inCorso && it.file != null } || vm.registro.any { it.foto.isNotEmpty() }) item {
+                Surface(onClick = { instagramAperto = true }, color = Superficie, shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, BordoScheda)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("📸", fontSize = 16.sp)
+                        Text("Instagram: storie e carosello", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+                        Text("›", color = BluNotte, fontSize = 20.sp)
+                    }
+                }
+            }
             if (vm.foto.isNotEmpty()) item {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val quante = vm.foto.count { it.daGuardare }
@@ -398,6 +409,10 @@ private fun Schermata(vm: FotoViewModel) {
 
     if (riepilogoAperto) {
         SchermataRiepilogo(vm) { riepilogoAperto = false }
+    }
+
+    if (instagramAperto) {
+        SchermataInstagram(vm) { instagramAperto = false }
     }
 
     if (impostazioniAperte) {
@@ -838,6 +853,14 @@ private fun SchermataImpostazioni(vm: FotoViewModel, chiudi: () -> Unit) {
                 RigaInterruttore("💶", "Spunta \"Venduto\" nello storico", vm.mostraVenduto, vm::cambiaMostraVenduto)
                 val context = LocalContext.current
                 val versione = remember { Aggiornamento.nomeVersione(context) }
+                Sezione("📸", "Instagram", vm.hashtagIG.ifBlank { "Nessun hashtag" }, aperta == "instagram", { apri("instagram") }) {
+                    Text("Prima riga del carosello", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    OutlinedTextField(vm.inizioIG, vm::cambiaInizioIG, Modifier.fillMaxWidth(), singleLine = true)
+                    Text("Hashtag (in fondo al testo)", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.padding(top = 8.dp))
+                    OutlinedTextField(vm.hashtagIG, vm::cambiaHashtagIG, Modifier.fillMaxWidth().testTag("hashtag_ig"))
+                    TextButton(onClick = { vm.cambiaHashtagIG(TestoInstagram.HASHTAG); vm.cambiaInizioIG(TestoInstagram.INIZIO) }) { Text("Rimetti quelli di partenza") }
+                    Text("Le foto pubblicate restano in buona qualità per $GIORNI_HD giorni, per poterle mettere su Instagram anche dopo.", fontSize = 12.sp, color = TestoTenue)
+                }
                 Sezione("🔄", "Aggiornamenti", vm.esitoControllo ?: "Versione $versione", aperta == "aggiornamenti", { apri("aggiornamenti") }) {
                     PulsanteChiaro("Controlla aggiornamenti", "🔄", { vm.controllaAggiornamenti(aMano = true) }, Modifier.fillMaxWidth(), altezza = 48.dp)
                     vm.novita?.let { n -> Box(Modifier.padding(top = 8.dp)) { AvvisoAggiornamento(n, vm.scaricamento, vm::aggiorna) } }
@@ -1848,7 +1871,7 @@ private fun caricaRuotata(file: File, gradi: Int): ImageBitmap? {
     return Raddrizzatore.ruotaImmagine(b, gradi).asImageBitmap()
 }
 
-private fun caricaRidotta(file: File, lato: Int): ImageBitmap? {
+internal fun caricaRidotta(file: File, lato: Int): ImageBitmap? {
     val (w, h) = misureFoto(file)
     var campione = 1
     while (maxOf(w, h) / (campione * 2) >= lato) campione *= 2
