@@ -1,6 +1,6 @@
 {
-  "versionCode": 82,
-  "versionName": "5.7",
+  "versionCode": 83,
+  "versionName": "5.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Storico più preciso: orari di ogni articolo (entrata nell'app, WhatsApp, storie, post), giorno da mezzanotte a mezzanotte, e quelli che non contano in grigio. Niente più articoli finti dalla lettura (numeri da soli o lo stesso cartellino letto due volte)."
+  "note": "Pulsanti più chiari: ognuno dice cosa fa (Segna prenotato, Storia PRENOTATO, Annulla prenotazione, Caricato su…). La foto «PRENOTATO» si può modificare: trasparenza, colore, grandezza, posizione e scritta."
 }
