@@ -85,6 +85,11 @@ class ScattiTest {
         regola.waitUntil(5_000) { regola.onAllNodesWithContentDescription("Foto", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         regola.waitForIdle()
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/riepilogo.png")
+        regola.onNodeWithTag("avvisa_1444496").performClick()
+        regola.waitForIdle()
+        salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/prenotato_riquadro.png")
+        regola.onNodeWithText("Fatto").performClick()
+        regola.waitForIdle()
         regola.onAllNodesWithText("✕").onLast().performClick()
         regola.waitForIdle()
         regola.runOnUiThread { vm.segnaPubblicata(1, false) }

@@ -24,6 +24,9 @@ import java.io.File
 /** Un articolo come si scrive su Instagram: nome, taglia ("8 anni"), codice e prezzo ("€ 4,00"). */
 data class RigaIG(val nome: String, val taglia: String? = null, val codice: String? = null, val prezzo: String? = null)
 
+/** Un carosello mandato a Instagram: il giorno e gli articoli di ogni foto, nell'ordine (per rifare il testo coi prenotati). */
+data class CaroselloIG(val giorno: String, val foto: List<List<RigaIG>>)
+
 /** Una foto da mandare a Instagram: il file (buona qualità) e gli articoli che ci sono dentro. */
 data class ElementoIG(val id: String, val file: File, val righe: List<RigaIG>, val fotina: File? = null)
 
@@ -59,14 +62,49 @@ object TestoInstagram {
      * La didascalia del carosello: un numero per foto, nello stesso ordine delle foto
      * (più articoli nella stessa foto: sulla stessa riga, separati da " + ").
      */
-    fun didascalia(foto: List<List<RigaIG>>, inizio: String = INIZIO, hashtag: String = HASHTAG): String = buildString {
+    fun didascalia(
+        foto: List<List<RigaIG>>, inizio: String = INIZIO, hashtag: String = HASHTAG,
+        prenotati: Set<String> = emptySet(),   // codici prenotati: nella riga compare "PRENOTATO –"
+    ): String = buildString {
         if (inizio.isNotBlank()) append(inizio.trim()).append("\n\n")
         foto.forEachIndexed { i, righe ->
-            append(i + 1).append(". ").append(righe.joinToString(" + ") { riga(it) }.ifEmpty { "—" }).append('\n')
+            val testo = righe.joinToString(" + ") { r -> (if (r.codice != null && r.codice in prenotati) "PRENOTATO – " else "") + riga(r) }
+            append(i + 1).append(". ").append(testo.ifEmpty { "—" }).append('\n')
         }
         append('\n').append(FINE)
         if (hashtag.isNotBlank()) append("\n\n").append(hashtag.trim())
     }
+}
+
+/** I caroselli salvati (per poter rifare il testo quando un articolo viene prenotato). */
+object CaroselliSalvati {
+    fun scrivi(lista: List<CaroselloIG>): String = org.json.JSONArray().apply {
+        lista.forEach { c ->
+            put(org.json.JSONObject().put("g", c.giorno).put("f", org.json.JSONArray().apply {
+                c.foto.forEach { righe ->
+                    put(org.json.JSONArray().apply {
+                        righe.forEach { r -> put(org.json.JSONObject().put("n", r.nome).put("t", r.taglia).put("c", r.codice).put("p", r.prezzo)) }
+                    })
+                }
+            }))
+        }
+    }.toString()
+
+    fun leggi(testo: String): List<CaroselloIG> = runCatching {
+        val a = org.json.JSONArray(testo)
+        List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            val f = o.getJSONArray("f")
+            CaroselloIG(o.getString("g"), List(f.length()) { j ->
+                val r = f.getJSONArray(j)
+                List(r.length()) { k ->
+                    val x = r.getJSONObject(k)
+                    fun t(c: String) = if (x.has(c) && !x.isNull(c)) x.getString(c) else null
+                    RigaIG(x.getString("n"), t("t"), t("c"), t("p"))
+                }
+            })
+        }
+    }.getOrDefault(emptyList())
 }
 
 /** Le immagini per Instagram: storia 9:16 con la fascia sotto la foto, carosello 4:5 col numero nell'angolo. */
@@ -188,17 +226,52 @@ object ImmaginiInstagram {
         return out
     }
 
+    /** La stessa immagine con una fascia rosa "PRENOTATO" di traverso, sopra la foto. */
+    fun prenotato(immagine: Bitmap): Bitmap {
+        val out = immagine.copy(Bitmap.Config.ARGB_8888, true)
+        val c = Canvas(out)
+        val w = out.width.toFloat(); val h = out.height.toFloat()
+        val alta = w * 0.17f
+        c.save()
+        c.translate(w / 2, h * 0.30f)
+        c.rotate(-28f)
+        c.drawRect(-w, -alta / 2, w, alta / 2, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(238, 232, 120, 160) })
+        val p = testo(w * 0.11f, Color.WHITE, true).apply { letterSpacing = 0.05f }
+        val t = "PRENOTATO"
+        c.drawText(t, -p.measureText(t) / 2, -(p.descent() + p.ascent()) / 2, p)
+        c.restore()
+        return out
+    }
+
     fun cartella(context: Context) = File(context.cacheDir, "instagram").apply { mkdirs() }
 
     /** Salva le immagini pronte (svuotando quelle della volta prima). */
     fun salva(context: Context, immagini: List<Bitmap>, nome: String): List<File> {
         val dir = cartella(context)
-        dir.listFiles()?.forEach { it.delete() }
+        dir.listFiles()?.filter { it.name.startsWith(nome) }?.forEach { it.delete() }
         val ora = System.currentTimeMillis() % 100_000_000
         return immagini.mapIndexed { i, b ->
-            File(dir, "${nome}_${ora}_${i + 1}.jpg").also { f -> f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+            File(dir, "${nome}_${ora}_${i + 1}.jpg").also { f ->
+                // Prima in un file a parte, poi rinomino: nessuno legge mai un'immagine a metà
+                val tmp = File(dir, "tmp_${f.name}")
+                tmp.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                tmp.renameTo(f)
+            }
         }
     }
+}
+
+/** Apre WhatsApp (Business se c'è) o Instagram, per esempio per togliere a mano una storia. */
+object ApriApp {
+    private fun apri(context: Context, pacchetti: List<String>): Boolean {
+        for (p in pacchetti) {
+            val i = context.packageManager.getLaunchIntentForPackage(p) ?: continue
+            return runCatching { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true }.getOrDefault(false)
+        }
+        return false
+    }
+    fun whatsapp(context: Context) = apri(context, listOf("com.whatsapp.w4b", "com.whatsapp"))
+    fun instagram(context: Context) = apri(context, listOf(CondividiInstagram.PACCHETTO))
 }
 
 /**

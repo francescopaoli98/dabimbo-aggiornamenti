@@ -48,4 +48,11 @@ class TestoInstagramTest {
         assertEquals("1444496", r.codice)
         assertTrue(!r.nome.contains("8A"))
     }
+
+    @Test
+    fun carosello_coi_prenotati() {
+        val t = TestoInstagram.didascalia(listOf(listOf(scarpe), listOf(felpa, libro)), "", "", prenotati = setOf("1444496"))
+        assertTrue(t.startsWith("1. Scarpe Diadora - numero 33"))
+        assertTrue(t.contains("2. PRENOTATO – Felpa rosa - 8 anni - cod. 1444496 - € 4,00 + Librottino - € 1,50"))
+    }
 }

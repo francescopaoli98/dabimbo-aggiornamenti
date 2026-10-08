@@ -228,7 +228,36 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         ImmaginiInstagram.salva(context, immagini, "carosello")
     }
 
-    fun didascaliaIG(scelte: List<ElementoIG>) = TestoInstagram.didascalia(scelte.map { it.righe }, inizioIG, hashtagIG)
+    fun didascaliaIG(scelte: List<ElementoIG>) = TestoInstagram.didascalia(scelte.map { it.righe }, inizioIG, hashtagIG, codiciPrenotati)
+
+    // Caroselli mandati a Instagram: li ricordo (60 giorni), così se un articolo viene prenotato si rifà il testo
+    private val fileCaroselli = File(app.filesDir, "caroselli.json")
+    var caroselli by mutableStateOf(CaroselliSalvati.leggi(fileCaroselli.takeIf { it.exists() }?.readText().orEmpty()))
+        private set
+
+    fun ricordaCarosello(scelte: List<ElementoIG>) {
+        val limite = giornoDi(System.currentTimeMillis() - 60L * 24 * 3600 * 1000)
+        caroselli = caroselli.filter { it.giorno >= limite } + CaroselloIG(oggi(), scelte.map { it.righe })
+        fileCaroselli.writeText(CaroselliSalvati.scrivi(caroselli))
+    }
+
+    /** I caroselli (dal più recente) che contengono questo codice. */
+    fun caroselliCon(codice: String): List<CaroselloIG> =
+        caroselli.filter { c -> c.foto.any { righe -> righe.any { it.codice == codice } } }.reversed()
+
+    /** Il testo del carosello rifatto coi prenotati di adesso ("2. PRENOTATO – Scarpe…"). */
+    fun didascaliaAggiornata(c: CaroselloIG) = TestoInstagram.didascalia(c.foto, inizioIG, hashtagIG, codiciPrenotati)
+
+    /** La storia "PRENOTATO" di un articolo dello storico (dalla copia buona, o dalla fotina se non c'è più). */
+    suspend fun preparaPrenotato(context: android.content.Context, p: Pubblicato): File? = withContext(Dispatchers.Default) {
+        val sorgente = listOfNotNull(
+            p.foto.takeIf { it.isNotEmpty() }?.let { File(cartellaStoricoHd, it) },
+            p.miniatura.takeIf { it.isNotEmpty() }?.let { File(cartellaStorico, it) },
+        ).firstOrNull { it.exists() } ?: return@withContext null
+        val foto = ImmaginiInstagram.carica(sorgente, 1080) ?: return@withContext null
+        val storia = ImmaginiInstagram.prenotato(ImmaginiInstagram.storia(foto, listOf(TestoInstagram.daStorico(p))))
+        ImmaginiInstagram.salva(context, listOf(storia), "prenotato").firstOrNull()
+    }
 
     // ---- Aggiornamenti ----
     /** Versione nuova trovata su GitHub (null = nessuna). */
@@ -571,6 +600,8 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         private set
     private val giornateCalcolate by derivedStateOf { Riepilogo.giornate(registro) }
     private val codiciNoti by derivedStateOf { registro.mapTo(HashSet()) { it.chiave } }
+    /** Codici degli articoli prenotati (in qualunque giorno). */
+    val codiciPrenotati: Set<String> by derivedStateOf { registro.filter { it.prenotato }.mapTo(HashSet()) { it.chiave } }
     val giornate: List<Giornata> get() = giornateCalcolate
     // Le copie buone più vecchie di 30 giorni si cancellano anche solo aprendo l'app
     init { pulisciStorico() }
@@ -600,7 +631,13 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
     /** Codici di questa foto già pubblicati in passato (per non pubblicarli due volte). Vuoto se la foto è già pubblicata ora. */
     fun giaPubblicati(f: Foto): List<String> {
         if (f.pubblicata) return emptyList()
-        return f.articoli.mapNotNull { it.codice }.filter { it in codiciNoti }.distinct()
+        return f.articoli.mapNotNull { it.codice }.filter { it in codiciNoti && it !in codiciPrenotati }.distinct()
+    }
+
+    /** Codici di questa foto già PRENOTATI (rifotografati per sbaglio: non vanno ripubblicati). */
+    fun giaPrenotati(f: Foto): List<String> {
+        if (f.pubblicata) return emptyList()
+        return f.articoli.mapNotNull { it.codice }.filter { it in codiciPrenotati }.distinct()
     }
     val oggiPubblicati: Giornata? get() = giornate.firstOrNull { it.giorno == oggi() }
     private fun oggi() = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date())

@@ -635,6 +635,50 @@ class AppTest {
     }
 
     @Test
+    fun prenotatoStorieTestoEAvviso() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321", descrizione = "scarpe", prezzo = "€ 9,00"))))
+        regola.runOnUiThread { vm.segnaPubblicata(1); vm.segnaPubblicata(2) }
+        regola.waitUntil(5_000) { vm.registro.size == 2 && vm.registro.all { java.io.File(vm.cartellaStoricoHd, it.foto).exists() } }
+        // Carosello con le due foto (la felpa è la n. 2)
+        regola.onNodeWithText("Instagram: storie e carosello").performClick()
+        regola.onNodeWithTag("ig_L2").performClick()
+        regola.onNodeWithTag("ig_L1").performClick()
+        regola.onNodeWithText("Carosello").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Apri Instagram").assertExists() }.isSuccess }
+        regola.onNodeWithText("Apri Instagram").performClick()
+        assertEquals(1, vm.caroselli.size)
+        regola.onNodeWithText("‹").performClick()
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        // Nello storico la prenoto: compare il riquadro con le tre cose da fare
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("2 · € 13,00").performClick()
+        regola.onNodeWithTag("prenota_1234567").performClick()
+        regola.onNodeWithText("📌 Prenotato:", substring = true).assertExists()
+        // C: testo del carosello rifatto
+        regola.onNodeWithTag("copia_carosello").performClick()
+        val appunti = regola.activity.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString()
+        assertTrue(appunti, appunti.contains("2. PRENOTATO – Felpa"))
+        assertTrue(appunti, appunti.contains("1. Scarpe"))
+        assertTrue(!appunti.contains("PRENOTATO – Scarpe"))
+        // A: storia PRENOTATO per WhatsApp (nel simulatore WhatsApp non c'è: menu Condividi)
+        regola.onNodeWithTag("prenotato_wa").performClick()
+        regola.waitUntil(10_000) { ImmaginiInstagram.cartella(regola.activity).listFiles()?.any { it.name.startsWith("prenotato") } == true }
+        val f = ImmaginiInstagram.cartella(regola.activity).listFiles()!!.first { it.name.startsWith("prenotato") }
+        val b = android.graphics.BitmapFactory.decodeFile(f.path)
+        assertEquals(1080, b.width); assertEquals(1920, b.height)
+        regola.onNodeWithText("Fatto").performClick()
+        // Il pulsante resta nella riga, per dopo
+        regola.onNodeWithTag("avvisa_1234567").assertExists()
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        // D: rifotografata per sbaglio → avviso "Già prenotato"
+        metti(fotoDiProva(1, listOf(felpa)))
+        regola.onNodeWithText("⛔ Già prenotato: cod. 1234567").assertExists()
+        regola.onNodeWithText("Già pubblicato", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun ritaglio() {
         metti(fotoDiProva(1, listOf(felpa)))
         apriVisore()

@@ -146,7 +146,11 @@ fun SchermataInstagram(vm: FotoViewModel, chiudi: () -> Unit) {
     }
 
     anteprima?.let { (tipo, file) ->
-        AnteprimaIG(tipo, file, if (tipo == TipoIG.CAROSELLO) vm.didascaliaIG(scelte) else null) { anteprima = null }
+        AnteprimaIG(
+            tipo, file, if (tipo == TipoIG.CAROSELLO) vm.didascaliaIG(scelte) else null,
+            // Il carosello mandato si ricorda: se poi un articolo viene prenotato, il testo si rifà
+            mandato = { if (tipo == TipoIG.CAROSELLO) vm.ricordaCarosello(scelte.toList()) },
+        ) { anteprima = null }
     }
 }
 
@@ -184,7 +188,7 @@ private fun CellaIG(e: ElementoIG, vm: FotoViewModel, numero: Int?, tocca: () ->
  * Storie: se Instagram ne prende una sola, "Una alla volta" le passa una per volta.
  */
 @Composable
-private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, chiudi: () -> Unit) {
+private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, mandato: () -> Unit, chiudi: () -> Unit) {
     val context = LocalContext.current
     var prossima by remember { mutableIntStateOf(-1) }   // -1 = tutte insieme; altrimenti la prossima da mandare una alla volta
     fun manda(quali: List<File>) {
@@ -244,7 +248,7 @@ private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, chi
                         }
                     }
                     if (prossima < 0) PulsanteGrande(
-                        "Apri Instagram", "📸", { manda(file) }, Modifier.fillMaxWidth(), altezza = 56.dp, grandezzaTesto = 16,
+                        "Apri Instagram", "📸", { manda(file); mandato() }, Modifier.fillMaxWidth(), altezza = 56.dp, grandezzaTesto = 16,
                     )
                 }
             }

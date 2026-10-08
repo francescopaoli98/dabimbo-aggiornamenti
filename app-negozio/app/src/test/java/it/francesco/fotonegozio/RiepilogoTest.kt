@@ -74,4 +74,11 @@ class RiepilogoTest {
         v = Riepilogo.aggiungi(v, "2026-10-06", listOf(felpa), "m_2.jpg", "h_2.jpg")
         assertEquals("h_2.jpg", v[0].foto)
     }
+
+    @Test
+    fun caroselli_salvati() {
+        val c = listOf(CaroselloIG("2026-10-08", listOf(listOf(RigaIG("Felpa", "8 anni", "1444496", "€ 4,00")), listOf(RigaIG("Libro")))))
+        assertEquals(c, CaroselliSalvati.leggi(CaroselliSalvati.scrivi(c)))
+        assertEquals(emptyList<CaroselloIG>(), CaroselliSalvati.leggi("rotto"))
+    }
 }

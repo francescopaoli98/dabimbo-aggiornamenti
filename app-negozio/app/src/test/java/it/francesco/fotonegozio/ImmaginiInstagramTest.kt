@@ -43,4 +43,14 @@ class ImmaginiInstagramTest {
         val o = ImmaginiInstagram.carosello(foto(2000, 1000), 1)
         assertEquals(1350, o.height)
     }
+
+    @Test
+    fun fascia_prenotato() {
+        val s = ImmaginiInstagram.storia(foto(1500, 2000), listOf(RigaIG("Felpa", null, "1444496", "€ 4,00")))
+        val p = ImmaginiInstagram.prenotato(s)
+        assertEquals(1080, p.width); assertEquals(1920, p.height)
+        // Al centro della fascia: rosa (prima era la foto rossa)
+        val c = p.getPixel(540 + 200, (1920 * 0.30f).toInt() - 106)
+        assertTrue(Color.blue(c) > 120)
+    }
 }

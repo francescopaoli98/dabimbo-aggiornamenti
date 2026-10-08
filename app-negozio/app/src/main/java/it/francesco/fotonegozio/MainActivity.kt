@@ -240,7 +240,7 @@ private fun Schermata(vm: FotoViewModel) {
         }
     }
     fun chiediEPubblica(f: Foto) {
-        if (f.avvisi.isEmpty() && vm.giaPubblicati(f).isEmpty()) pubblica(f) else daConfermare = f.numero
+        if (f.avvisi.isEmpty() && vm.giaPubblicati(f).isEmpty() && vm.giaPrenotati(f).isEmpty()) pubblica(f) else daConfermare = f.numero
     }
     fun scegliFoto() = scegli.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
 
@@ -388,6 +388,7 @@ private fun Schermata(vm: FotoViewModel) {
                     pubblica = { chiediEPubblica(f) },
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                     giaPubblicati = vm.giaPubblicati(f),
+                    giaPrenotati = vm.giaPrenotati(f),
                     zoomAnteprima = vm.zoomAnteprima,
                     togli = { daTogliere = f.numero },
                     comprimi = if (comprimibile) ({ riaperte -= f.numero }) else null,
@@ -447,7 +448,7 @@ private fun Schermata(vm: FotoViewModel) {
                 onDismissRequest = { daConfermare = null },
                 title = { Text("Foto ${f.numero}: da controllare") },
                 text = {
-                    val gia = vm.giaPubblicati(f).map { "già pubblicato: cod. $it" }
+                    val gia = vm.giaPrenotati(f).map { "già PRENOTATO: cod. $it" } + vm.giaPubblicati(f).map { "già pubblicato: cod. $it" }
                     Text((gia + f.avvisi).joinToString("\n") { "• $it" } + "\n\nVuoi sistemarla prima, o pubblicarla così?")
                 },
                 confirmButton = { TextButton(onClick = { daConfermare = null; pubblica(f) }) { Text("Pubblica lo stesso") } },
@@ -593,6 +594,7 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     var daTogliere by remember { mutableStateOf<Pubblicato?>(null) }
     var sbloccata by remember { mutableStateOf(false) }
     var grande by remember { mutableStateOf<File?>(null) }   // fotina ingrandita
+    var avvisoPrenotato by remember { mutableStateOf<Pubblicato?>(null) }   // appena prenotato: cosa fare con le storie
     // Articoli pubblicati senza fotina (es. prima della 4.8): la rifaccio dalle foto ancora in lista
     LaunchedEffect(Unit) { vm.recuperaMiniature() }
 
@@ -656,7 +658,8 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
                             p, File(vm.cartellaStorico, p.miniatura).takeIf { p.miniatura.isNotEmpty() },
                             mostraVenduto = vm.mostraVenduto, cancellabile = sbloccata,
                             ingrandisci = { grande = it },
-                            prenota = { vm.segnaPrenotato(p, it) },
+                            prenota = { vm.segnaPrenotato(p, it); if (it) avvisoPrenotato = p },
+                            avvisa = { avvisoPrenotato = p },
                             vendi = { vm.segnaVenduto(p, it) },
                             togli = { daTogliere = p },
                         )
@@ -676,6 +679,8 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
         }
     }
 
+    avvisoPrenotato?.let { p -> DialogoPrenotato(vm, p) { avvisoPrenotato = null } }
+
     daTogliere?.let { p ->
         AlertDialog(
             onDismissRequest = { daTogliere = null },
@@ -692,11 +697,72 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
     }
 }
 
+/**
+ * Appena prenotato: l'app non può togliere da sola le storie già pubblicate (WhatsApp e Instagram non lo permettono),
+ * quindi aiuta Elisa: apre WhatsApp/Instagram per toglierle, prepara la storia "PRENOTATO",
+ * e rifà il testo dei caroselli dove c'era l'articolo.
+ */
+@Composable
+private fun DialogoPrenotato(vm: FotoViewModel, p: Pubblicato, chiudi: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val caroselli = remember(p) { p.chiave.takeIf { c -> c.all(Char::isDigit) }?.let(vm::caroselliCon).orEmpty() }
+    var preparo by remember { mutableStateOf(false) }
+    fun nonApre() = Toast.makeText(context, "App non trovata sul telefono", Toast.LENGTH_SHORT).show()
+    fun pubblicaPrenotato(suWhatsApp: Boolean) {
+        if (preparo) return
+        preparo = true
+        scope.launch {
+            val file = vm.preparaPrenotato(context, p)
+            preparo = false
+            when {
+                file == null -> Toast.makeText(context, "La foto di questo articolo non c'è più", Toast.LENGTH_LONG).show()
+                suWhatsApp -> if (!Condivisione.pubblica(context, file, "PRENOTATO - " + TestoInstagram.riga(TestoInstagram.daStorico(p)))) nonApre()
+                else -> if (!CondividiInstagram.condividi(context, listOf(file), null)) nonApre()
+            }
+        }
+    }
+    AlertDialog(
+        onDismissRequest = chiudi,
+        title = { Text("📌 Prenotato: ${p.nome.ifBlank { "cod. ${p.chiave}" }}") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("1. Togli la sua storia (l'app non può farlo da sola):", fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PulsanteChiaro("WhatsApp", "", { if (!ApriApp.whatsapp(context)) nonApre() }, Modifier.weight(1f), altezza = 44.dp, grandezzaTesto = 13)
+                    PulsanteChiaro("Instagram", "", { if (!ApriApp.instagram(context)) nonApre() }, Modifier.weight(1f), altezza = 44.dp, grandezzaTesto = 13)
+                }
+                Text("2. Se vuoi, pubblica la storia \"PRENOTATO\":", fontWeight = FontWeight.Bold)
+                if (preparo) Text("Preparo la foto…", color = TestoTenue)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PulsanteChiaro("WhatsApp", "", { pubblicaPrenotato(true) }, Modifier.weight(1f).testTag("prenotato_wa"), colore = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
+                    PulsanteChiaro("Instagram", "", { pubblicaPrenotato(false) }, Modifier.weight(1f).testTag("prenotato_ig"), colore = Rosa, altezza = 44.dp, grandezzaTesto = 13, attivo = !preparo)
+                }
+                if (caroselli.isNotEmpty()) {
+                    val c = caroselli.first()
+                    Text("3. Era nel carosello di Instagram del ${c.giorno.split('-').reversed().take(2).joinToString("/")}:", fontWeight = FontWeight.Bold)
+                    PulsanteChiaro(
+                        "Copia il testo aggiornato", "📋",
+                        {
+                            context.getSystemService(android.content.ClipboardManager::class.java)
+                                ?.setPrimaryClip(android.content.ClipData.newPlainText("Testo per Instagram", vm.didascaliaAggiornata(c)))
+                            Toast.makeText(context, "Copiato! Apri il post, tocca ⋯ → Modifica e incolla", Toast.LENGTH_LONG).show()
+                        },
+                        Modifier.fillMaxWidth().testTag("copia_carosello"), altezza = 44.dp, grandezzaTesto = 13,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = chiudi) { Text("Fatto", fontWeight = FontWeight.Bold) } },
+    )
+}
+
 /** Un articolo dello storico: fotina, nome, codice e prezzo, spunte Prenotato (e Venduto). */
 @Composable
 private fun RigaStorico(
     p: Pubblicato, fotina: File?, mostraVenduto: Boolean, cancellabile: Boolean,
     ingrandisci: (File) -> Unit, prenota: (Boolean) -> Unit, vendi: (Boolean) -> Unit, togli: () -> Unit,
+    avvisa: () -> Unit = {},
 ) {
     // La fotina si legge in sottofondo (appena pubblicata potrebbe essere ancora in scrittura: riprovo un attimo)
     val img by produceState<ImageBitmap?>(null, fotina) {
@@ -731,6 +797,7 @@ private fun RigaStorico(
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Verde.copy(alpha = 0.22f)),
                         )
                         TextButton(onClick = { prenota(false) }) { Text("Annulla prenotazione", color = Arancione, fontSize = 13.sp) }
+                        TextButton(onClick = avvisa, modifier = Modifier.testTag("avvisa_${p.chiave}")) { Text("📣 Storie e testo", color = Azzurro, fontSize = 13.sp) }
                     } else {
                         FilterChip(selected = false, onClick = { prenota(true) }, label = { Text("📌 Prenotato") }, modifier = Modifier.testTag("prenota_${p.chiave}"))
                     }
@@ -973,6 +1040,7 @@ private fun Scheda(
     pubblica: () -> Unit,
     salvaDiagnosi: () -> Unit,
     giaPubblicati: List<String> = emptyList(),
+    giaPrenotati: List<String> = emptyList(),
     zoomAnteprima: ZoomAnteprima = ZoomAnteprima.RESTA,
     togli: () -> Unit,
     comprimi: (() -> Unit)? = null,
@@ -1058,6 +1126,7 @@ private fun Scheda(
                         else -> null
                     }
                     // Prima di tutto: è già stato pubblicato in passato?
+                    if (giaPrenotati.isNotEmpty()) Avviso("⛔ Già prenotato: cod. " + giaPrenotati.joinToString(", "))
                     if (giaPubblicati.isNotEmpty()) Avviso("⚠ Già pubblicato: cod. " + giaPubblicati.joinToString(", "))
                     avviso?.let { Avviso(it) }
 

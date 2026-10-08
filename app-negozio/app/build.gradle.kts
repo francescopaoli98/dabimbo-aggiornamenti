@@ -12,8 +12,8 @@ android {
         applicationId = "it.francesco.fotonegozio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 75
-        versionName = "5.0"
+        versionCode = 76
+        versionName = "5.1"
 
         // Solo processori a 64 bit (tutti i OnePlus recenti): APK molto più leggero
         ndk {
@@ -58,6 +58,8 @@ android {
         unitTests.isIncludeAndroidResources = true
         // Immagini dell'aspetto (ScattiTest): ./gradlew testDebugUnitTest -Pscatti=/percorso
         unitTests.all { t -> project.findProperty("scatti")?.let { t.systemProperty("scatti", it) } }
+        // Schermate delle guide (GuideTest): ./gradlew testDebugUnitTest --tests '*GuideTest' -Pguida=/percorso
+        unitTests.all { t -> project.findProperty("guida")?.let { t.systemProperty("guida", it) } }
     }
     kotlinOptions {
         jvmTarget = "17"
