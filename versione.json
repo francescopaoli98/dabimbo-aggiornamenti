@@ -1,6 +1,6 @@
 {
-  "versionCode": 80,
-  "versionName": "5.5",
+  "versionCode": 81,
+  "versionName": "5.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Grafica nuova: storico più semplice e leggibile anche con le scritte grandi, Oggi e Instagram affiancati, segni «caricato su» più compatti. Guide aggiornate."
+  "note": "Storico più snello: elenco senza foto (con 🖼 la vedi, «🖼 Foto» le mostra tutte), ricerca del codice in cima, e il giorno di oggi si chiama «Oggi»."
 }
