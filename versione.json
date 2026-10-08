@@ -1,6 +1,6 @@
 {
-  "versionCode": 75,
-  "versionName": "5.0",
+  "versionCode": 76,
+  "versionName": "5.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Instagram: storie con prezzo e codice sotto la foto, carosello numerato nell'ordine che scegli (anche dai giorni passati), testo e hashtag già copiati."
+  "note": "Prenotati: promemoria per togliere la storia, storia \"PRENOTATO\" per WhatsApp e Instagram, testo del carosello aggiornato, avviso se rifotografi un articolo prenotato."
 }
