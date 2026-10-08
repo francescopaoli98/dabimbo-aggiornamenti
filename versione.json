@@ -1,6 +1,6 @@
 {
-  "versionCode": 83,
-  "versionName": "5.8",
+  "versionCode": 84,
+  "versionName": "5.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Pulsanti più chiari: ognuno dice cosa fa (Segna prenotato, Storia PRENOTATO, Annulla prenotazione, Caricato su…). La foto «PRENOTATO» si può modificare: trasparenza, colore, grandezza, posizione e scritta."
+  "note": "Più semplice: «Oggi» apre subito gli articoli di oggi, cerchi un codice in tutti i giorni, «Scegli tutte» per Instagram e in cima c'è sempre cosa fare adesso. Prima di cambiare o cancellare qualcosa l'app chiede «Sei sicura?»."
 }
