@@ -62,7 +62,12 @@ data class Foto(
     val rotazioneFile: Int = 0,                 // rotazione a mano già "dentro" il file finale (se diversa: si sta ricomponendo)
     val statoFile: String = "",                 // cosa c'è nel file finale (per non ricomporlo due volte uguale)
     val ritaglio: Riquadro? = null,             // ritaglio sulla foto di base, in proporzione 0..1 (null = tutta)
+    val storiaIG: Boolean = false,              // caricata nelle storie di Instagram
+    val postIG: Boolean = false,                // caricata in un post (carosello) di Instagram
 )
+
+/** È stata caricata su questo canale? (WhatsApp = "pubblicata", come sempre) */
+fun Foto.su(c: Canale) = when (c) { Canale.WHATSAPP -> pubblicata; Canale.STORIA_IG -> storiaIG; Canale.POST_IG -> postIG }
 
 /** Cosa deve contenere il file finale: se cambia, la foto va ricomposta. */
 val Foto.statoVoluto: String get() =
@@ -501,16 +506,70 @@ class FotoViewModel(app: Application) : AndroidViewModel(app) {
         val i = foto.indexOfFirst { it.numero == numero }
         if (i < 0) return
         foto[i] = foto[i].copy(pubblicata = pubblicata)
-        if (pubblicata) {
-            val articoli = articoliPerRegistro(foto[i])
-            // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
-            val unAnnoFa = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ITALY).format(java.util.Date(System.currentTimeMillis() - 365L * 24 * 3600 * 1000))
-            val (mini, hd) = salvaCopieStorico(foto[i])
-            registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli, mini, hd)
-            fileRegistro.writeText(Riepilogo.scrivi(registro))
-            pulisciStorico()
+        if (pubblicata) registra(foto[i], Canale.WHATSAPP)
+    }
+
+    /** Mette nel registro di oggi gli articoli della foto, col segno del canale dove è stata caricata. */
+    private fun registra(f: Foto, canale: Canale) {
+        val articoli = articoliPerRegistro(f)
+        // Tengo un anno di storia (basta per i doppioni, e il file resta piccolo)
+        val unAnnoFa = giornoDi(System.currentTimeMillis() - 365L * 24 * 3600 * 1000)
+        // Le copie per lo storico servono solo la prima volta (poi gli articoli le hanno già)
+        val chiavi = articoli.mapNotNull { it.codice ?: it.descrizione }
+        val giaTutti = chiavi.isNotEmpty() && chiavi.all { k -> registro.any { it.giorno == oggi() && it.chiave == k && it.miniatura.isNotEmpty() } }
+        val (mini, hd) = if (giaTutti) "" to "" else salvaCopieStorico(f)
+        registro = Riepilogo.aggiungi(registro.filter { it.giorno >= unAnnoFa }, oggi(), articoli, mini, hd, canale)
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+        pulisciStorico()
+    }
+
+    /** Segno "caricata su …" di una foto della lista, messo o tolto a mano (tiene in pari anche lo storico di oggi). */
+    fun segnaCanaleFoto(numero: Int, canale: Canale, si: Boolean) {
+        val i = foto.indexOfFirst { it.numero == numero }
+        if (i < 0) return
+        val f = foto[i]
+        foto[i] = when (canale) {
+            Canale.WHATSAPP -> f.copy(pubblicata = si)
+            Canale.STORIA_IG -> f.copy(storiaIG = si)
+            Canale.POST_IG -> f.copy(postIG = si)
+        }
+        if (si) { registra(foto[i], canale); return }
+        val chiavi = articoliPerRegistro(f).mapNotNull { it.codice ?: it.descrizione }.toSet()
+        var nuovo = registro
+        for (p in registro.filter { it.giorno == oggi() && it.chiave in chiavi }) nuovo = Riepilogo.segnaCanale(nuovo, p, canale, false)
+        registro = nuovo
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+    }
+
+    /** Segno "caricato su …" di un articolo dello storico, messo o tolto a mano. */
+    fun segnaCanaleStorico(p: Pubblicato, canale: Canale, si: Boolean) {
+        registro = Riepilogo.segnaCanale(registro, p, canale, si)
+        fileRegistro.writeText(Riepilogo.scrivi(registro))
+        // Se è una foto ancora in lista, anche lei prende il segno
+        foto.indices.filter { i -> foto[i].articoli.any { (it.codice ?: it.descrizione) == p.chiave } && p.giorno == oggi() }.forEach { i ->
+            foto[i] = when (canale) {
+                Canale.WHATSAPP -> foto[i].copy(pubblicata = si)
+                Canale.STORIA_IG -> foto[i].copy(storiaIG = si)
+                Canale.POST_IG -> foto[i].copy(postIG = si)
+            }
         }
     }
+
+    /** Mandata a Instagram dalla schermata Instagram: il segno si mette da solo. */
+    fun segnaInstagram(e: ElementoIG, canale: Canale) {
+        if (e.id.startsWith("L")) {
+            e.id.drop(1).toIntOrNull()?.let { segnaCanaleFoto(it, canale, true) }
+        } else {
+            val hd = e.id.drop(1)
+            registro = registro.map { if (it.foto == hd) it.con(canale, true) else it }
+            fileRegistro.writeText(Riepilogo.scrivi(registro))
+        }
+    }
+
+    /** Dove è già stata caricata una foto della schermata Instagram. */
+    fun canaliDi(e: ElementoIG): Set<Canale> =
+        if (e.id.startsWith("L")) foto.firstOrNull { "L${it.numero}" == e.id }?.let { f -> Canale.entries.filter { f.su(it) }.toSet() }.orEmpty()
+        else registro.filter { it.foto == e.id.drop(1) }.flatMap { p -> Canale.entries.filter { p.su(it) } }.toSet()
 
     /** Cartella con le fotine dello storico (restano anche quando la lista si svuota). */
     val cartellaStorico: File get() = File(getApplication<Application>().filesDir, "storico").apply { mkdirs() }

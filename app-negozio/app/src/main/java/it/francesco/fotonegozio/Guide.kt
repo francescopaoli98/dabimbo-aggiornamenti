@@ -44,6 +44,7 @@ object Guide {
             PaginaGuida(R.drawable.guida_wa_4, "Quando è tutto a posto, tocca «Pubblica la prossima»: si apre WhatsApp con la foto e il testo già pronti."),
             PaginaGuida(null, "In WhatsApp scegli «Il mio stato» e premi Invia. Se il testo non c'è, tieni premuto e scegli «Incolla»: l'app l'ha già copiato.", "📱"),
             PaginaGuida(R.drawable.guida_wa_5, "Torna nell'app: la foto pubblicata si chiude e qui vedi quante ne hai fatte. Tocca di nuovo «Pubblica la prossima» per la foto dopo."),
+            PaginaGuida(R.drawable.guida_wa_segni, "Questi segni dicono dove hai caricato la foto: 🟢 WhatsApp, 📱 Storia Instagram, ▦ Post Instagram. Si accendono da soli; se poi non l'hai caricata davvero, toccali per spegnerli (o per accenderli a mano)."),
         )
     )
     val FOTO = Guida(
@@ -60,6 +61,7 @@ object Guide {
         "storico", "📌", "Storico e prenotati", listOf(
             PaginaGuida(R.drawable.guida_storico_1, "Tocca «📊 Oggi» per vedere cosa hai pubblicato."),
             PaginaGuida(R.drawable.guida_storico_2, "Qui ci sono i giorni: tocca un giorno per vedere i suoi articoli."),
+            PaginaGuida(R.drawable.guida_storico_segni, "Ogni articolo ha i suoi segni: 🟢 WhatsApp, 📱 Storia IG, ▦ Post IG. Toccali per metterli o toglierli. In alto vedi quanti ne hai caricati per ognuno."),
             PaginaGuida(R.drawable.guida_storico_3, "Quando qualcuno prenota un articolo, tocca «📌 Prenotato» accanto a quell'articolo."),
             PaginaGuida(R.drawable.guida_storico_4, "L'app non può togliere da sola la storia già pubblicata: tocca «WhatsApp» o «Instagram» e cancellala tu."),
             PaginaGuida(R.drawable.guida_storico_5, "Se vuoi, pubblica la storia «PRENOTATO»: la stessa foto con una fascia rosa. Chi la vede sa che l'articolo è andato."),

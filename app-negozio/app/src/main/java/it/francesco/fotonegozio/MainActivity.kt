@@ -392,6 +392,7 @@ private fun Schermata(vm: FotoViewModel) {
                     salvaDiagnosi = { vm.salvaDiagnosi(f.numero) },
                     giaPubblicati = vm.giaPubblicati(f),
                     giaPrenotati = vm.giaPrenotati(f),
+                    cambiaCanale = { c, si -> vm.segnaCanaleFoto(f.numero, c, si) },
                     zoomAnteprima = vm.zoomAnteprima,
                     togli = { daTogliere = f.numero },
                     comprimi = if (comprimibile) ({ riaperte -= f.numero }) else null,
@@ -650,6 +651,10 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
                                     Text("${it.articoli} ${if (it.articoli == 1) "pubblicato" else "pubblicati"} · ${Riepilogo.euro(it.centesimi)}", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 15.sp)
                                     Text("📌 Prenotati: ${it.prenotati} · ${Riepilogo.euro(it.centesimiPrenotati)}", color = Verde, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     if (vm.mostraVenduto) Text("💶 Venduti: ${it.venduti} · ${Riepilogo.euro(it.centesimiVenduti)}", color = Azzurro, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text(
+                                        "Caricati: 🟢 WhatsApp ${it.suWhatsapp} · 📱 Storie IG ${it.suStorieIG} · ▦ Post IG ${it.suPostIG}",
+                                        color = TestoTenue, fontSize = 13.sp, modifier = Modifier.testTag("canali_giorno"),
+                                    )
                                 }
                                 Row(
                                     Modifier.fillMaxWidth().padding(top = 4.dp).clip(RoundedCornerShape(10.dp)).clickable { sbloccata = !sbloccata },
@@ -670,6 +675,7 @@ private fun SchermataRiepilogo(vm: FotoViewModel, chiudi: () -> Unit) {
                             mostraVenduto = vm.mostraVenduto, cancellabile = sbloccata,
                             ingrandisci = { grande = it },
                             prenota = { vm.segnaPrenotato(p, it); if (it) avvisoPrenotato = p },
+                            cambiaCanale = { c, si -> vm.segnaCanaleStorico(p, c, si) },
                             avvisa = { avvisoPrenotato = p },
                             vendi = { vm.segnaVenduto(p, it) },
                             togli = { daTogliere = p },
@@ -769,12 +775,39 @@ private fun DialogoPrenotato(vm: FotoViewModel, p: Pubblicato, chiudi: () -> Uni
     )
 }
 
+/**
+ * I tre segni "caricato su": 🟢 WhatsApp, 📱 Storia IG, ▦ Post IG.
+ * Acceso = caricato (si accende da solo quando lo mandi); toccandolo lo togli o lo rimetti a mano.
+ */
+@Composable
+private fun RigaCanali(accesi: Set<Canale>, chiave: String, cambia: (Canale, Boolean) -> Unit) {
+    Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Canale.entries.forEach { c ->
+            val su = c in accesi
+            Surface(
+                onClick = { cambia(c, !su) },
+                shape = RoundedCornerShape(50),
+                color = if (su) Verde.copy(alpha = 0.18f) else Color.Transparent,
+                border = BorderStroke(1.dp, if (su) Verde else BordoScheda),
+                modifier = Modifier.testTag("canale_${c.name}_$chiave"),
+            ) {
+                Text(
+                    (if (su) "✓ " else "") + "${c.simbolo} ${c.nome}",
+                    fontSize = 12.sp, fontWeight = if (su) FontWeight.Bold else FontWeight.Normal,
+                    color = if (su) BluNotte else TestoTenue, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+    }
+}
+
 /** Un articolo dello storico: fotina, nome, codice e prezzo, spunte Prenotato (e Venduto). */
 @Composable
 private fun RigaStorico(
     p: Pubblicato, fotina: File?, mostraVenduto: Boolean, cancellabile: Boolean,
     ingrandisci: (File) -> Unit, prenota: (Boolean) -> Unit, vendi: (Boolean) -> Unit, togli: () -> Unit,
     avvisa: () -> Unit = {},
+    cambiaCanale: (Canale, Boolean) -> Unit = { _, _ -> },
 ) {
     // La fotina si legge in sottofondo (appena pubblicata potrebbe essere ancora in scrittura: riprovo un attimo)
     val img by produceState<ImageBitmap?>(null, fotina) {
@@ -802,6 +835,7 @@ private fun RigaStorico(
             Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text(p.nome.ifBlank { "Articolo" }, fontSize = 16.sp, maxLines = 2)
                 Text("cod. ${p.chiave} · ${Riepilogo.euro(p.centesimi)}", fontSize = 13.sp, color = TestoTenue)
+                RigaCanali(Canale.entries.filter { p.su(it) }.toSet(), p.chiave, cambiaCanale)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (p.prenotato) {
                         FilterChip(
@@ -840,6 +874,7 @@ private fun SchedaCompatta(f: Foto, modifier: Modifier = Modifier, apri: () -> U
                 f.miniatura?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
             }
             Text("Foto ${f.numero}", fontWeight = FontWeight.Bold, color = BluNotte, fontSize = 17.sp, modifier = Modifier.padding(start = 12.dp).weight(1f))
+            Text(Canale.entries.filter { f.su(it) }.joinToString(" ") { it.simbolo }, fontSize = 14.sp, modifier = Modifier.padding(end = 6.dp))
             Etichetta("✓ Pubblicata", Color.White, Verde)
             Text("▼", color = BluNotte, modifier = Modifier.padding(horizontal = 10.dp))
         }
@@ -1067,6 +1102,7 @@ private fun Scheda(
     salvaDiagnosi: () -> Unit,
     giaPubblicati: List<String> = emptyList(),
     giaPrenotati: List<String> = emptyList(),
+    cambiaCanale: (Canale, Boolean) -> Unit = { _, _ -> },
     zoomAnteprima: ZoomAnteprima = ZoomAnteprima.RESTA,
     togli: () -> Unit,
     comprimi: (() -> Unit)? = null,
@@ -1180,6 +1216,9 @@ private fun Scheda(
                             " · ${f.metodo} · ${"%.1f".format(f.secondi)} s",
                         fontSize = 12.sp, color = TestoTenue, modifier = Modifier.padding(top = 6.dp),
                     )
+
+                    // Dove è stata caricata: si segna da sola, toccando si toglie o si rimette
+                    if (!f.inCorso && f.file != null) RigaCanali(Canale.entries.filter { f.su(it) }.toSet(), "foto${f.numero}", cambiaCanale)
 
                     // Due pulsanti, niente di più
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

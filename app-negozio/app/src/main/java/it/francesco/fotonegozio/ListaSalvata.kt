@@ -47,6 +47,8 @@ object ListaSalvata {
         put("rotazioneFile", f.rotazioneFile)
         put("statoFile", f.statoFile)
         f.ritaglio?.let { put("ritaglio", Ritaglio.scrivi(it)) }
+        put("storiaIG", f.storiaIG)
+        put("postIG", f.postIG)
     }
 
     private fun json(d: DatiCartellino) = JSONObject().apply {
@@ -81,6 +83,8 @@ object ListaSalvata {
         rotazioneFile = o.optInt("rotazioneFile", o.optInt("rotazioneManuale")),
         statoFile = o.optString("statoFile"),
         ritaglio = Ritaglio.leggi(o.testo("ritaglio")),
+        storiaIG = o.optBoolean("storiaIG"),
+        postIG = o.optBoolean("postIG"),
     )
 
     private fun dati(o: JSONObject) = DatiCartellino(o.testo("codice"), o.testo("descrizione"), o.testo("prezzo"), o.testo("taglia"))

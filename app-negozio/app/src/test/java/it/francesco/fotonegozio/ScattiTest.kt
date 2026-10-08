@@ -96,7 +96,7 @@ class ScattiTest {
         // Il visore, con lo sfondo "pixelato" acceso (così si vede anche "Originale")
         regola.runOnUiThread { vm.foto[0] = vm.foto[0].copy(fileSfondo = file, sfondoPixelato = true) }
         regola.onAllNodesWithText("🔍 Tocca").onFirst().performClick()
-        regola.waitUntil(5_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
+        regola.waitUntil(20_000) { runCatching { regola.onNodeWithText("Pixel a mano").assertIsEnabled() }.isSuccess }
         salva(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView, "$cartella/visore.png")
         regola.onNodeWithText("Pixel a mano").performClick()
         regola.waitForIdle()

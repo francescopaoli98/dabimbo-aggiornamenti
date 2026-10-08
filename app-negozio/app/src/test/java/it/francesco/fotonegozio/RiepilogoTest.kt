@@ -25,8 +25,8 @@ class RiepilogoTest {
         r = Riepilogo.aggiungi(r, "2026-10-06", listOf(felpa))          // ripubblicata: non conta
         r = Riepilogo.aggiungi(r, "2026-10-07", listOf(felpa))          // giorno dopo: conta
         val g = Riepilogo.giornate(r)
-        assertEquals(Giornata("2026-10-07", 1, 400), g[0])
-        assertEquals(Giornata("2026-10-06", 2, 550), g[1])
+        assertEquals(Giornata("2026-10-07", 1, 400, suWhatsapp = 1), g[0])
+        assertEquals(Giornata("2026-10-06", 2, 550, suWhatsapp = 2), g[1])
         // Si salva e si rilegge uguale
         assertEquals(r, Riepilogo.leggi(Riepilogo.scrivi(r)))
     }
@@ -37,7 +37,7 @@ class RiepilogoTest {
         assertEquals("m_1.jpg", r[0].miniatura)
         r = Riepilogo.cambia(r, r[0]) { it.copy(prenotato = true) }
         r = Riepilogo.cambia(r, r[1]) { it.copy(venduto = true) }
-        assertEquals(Giornata("2026-10-06", 2, 550, 1, 400, 1, 150), Riepilogo.giornate(r)[0])
+        assertEquals(Giornata("2026-10-06", 2, 550, 1, 400, 1, 150, suWhatsapp = 2), Riepilogo.giornate(r)[0])
         // Annulla prenotazione
         r = Riepilogo.cambia(r, r[0]) { it.copy(prenotato = false) }
         assertEquals(0, Riepilogo.giornate(r)[0].prenotati)
@@ -80,5 +80,24 @@ class RiepilogoTest {
         val c = listOf(CaroselloIG("2026-10-08", listOf(listOf(RigaIG("Felpa", "8 anni", "1444496", "€ 4,00")), listOf(RigaIG("Libro")))))
         assertEquals(c, CaroselliSalvati.leggi(CaroselliSalvati.scrivi(c)))
         assertEquals(emptyList<CaroselloIG>(), CaroselliSalvati.leggi("rotto"))
+    }
+
+    @Test
+    fun dove_e_stato_caricato() {
+        // WhatsApp, poi lo stesso giorno anche nelle storie IG: un solo articolo con due segni
+        var r = Riepilogo.aggiungi(emptyList(), "2026-10-08", listOf(felpa))
+        r = Riepilogo.aggiungi(r, "2026-10-08", listOf(felpa, libro), canale = Canale.STORIA_IG)
+        assertEquals(2, r.size)
+        assertEquals(true, r[0].whatsapp && r[0].storiaIG && !r[0].postIG)
+        // Il libro è andato solo su Instagram
+        assertEquals(false, r[1].whatsapp); assertEquals(true, r[1].storiaIG)
+        val g = Riepilogo.giornate(r)[0]
+        assertEquals(1, g.suWhatsapp); assertEquals(2, g.suStorieIG); assertEquals(0, g.suPostIG)
+        // Tolto a mano: il segno va via ma l'articolo resta (per toglierlo c'è la ✕)
+        r = Riepilogo.segnaCanale(r, r[1], Canale.STORIA_IG, false)
+        assertEquals(2, r.size); assertEquals(false, r[1].storiaIG)
+        assertEquals(r, Riepilogo.leggi(Riepilogo.scrivi(r)))
+        // Registro vecchio: era tutto WhatsApp
+        assertEquals(true, Riepilogo.leggi("""[{"g":"2026-10-06","k":"1","c":0,"n":""}]""")[0].whatsapp)
     }
 }

@@ -62,6 +62,7 @@ class AppTest {
         TemaApp.tavolozza = 0
         TemaApp.coloreMio = 0xFF2E86AB
         java.io.File(app.filesDir, "pubblicazioni.json").delete()
+        java.io.File(app.filesDir, "caroselli.json").delete()
         // Il FileProvider si ricorda le cartelle del primo test (cache statica): la svuoto
         runCatching {
             val cache = androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
@@ -687,6 +688,41 @@ class AppTest {
         assertTrue(vm.didascaliaIG(emptyList()).endsWith("Scrivi nei commenti il numero 👇\n\n" + TestoInstagram.HASHTAG))
         regola.onNodeWithText("Rimetti quelli di partenza").performClick()
         assertEquals(TestoInstagram.FINE, vm.fineIG)
+    }
+
+    @Test
+    fun segniCaricatoSu() {
+        metti(fotoDiProva(1, listOf(felpa)), fotoDiProva(2, listOf(felpa.copy(codice = "7654321", prezzo = "€ 1,50"))))
+        // A mano, dalla scheda: la foto 2 messa nelle storie IG (senza WhatsApp)
+        regola.onNodeWithTag("canale_STORIA_IG_foto2").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.foto[1].storiaIG)
+        val p = vm.registro.single { it.chiave == "7654321" }
+        assertTrue(p.storiaIG && !p.whatsapp)
+        // Toccato di nuovo: tolto
+        regola.onNodeWithTag("canale_STORIA_IG_foto2").performClick()
+        regola.waitForIdle()
+        assertTrue(!vm.foto[1].storiaIG && !vm.registro.single { it.chiave == "7654321" }.storiaIG)
+        // Da solo: carosello mandato a Instagram → "Post IG"
+        regola.onNodeWithText("Instagram: storie e carosello").performClick()
+        regola.onNodeWithTag("ig_L1").performClick()
+        regola.onNodeWithText("Carosello").performClick()
+        regola.waitUntil(10_000) { runCatching { regola.onNodeWithText("Apri Instagram").assertExists() }.isSuccess }
+        regola.onNodeWithText("Apri Instagram").performClick()
+        regola.waitForIdle()
+        assertTrue(vm.foto[0].postIG)
+        assertTrue(vm.registro.single { it.chiave == "1234567" }.postIG)
+        regola.onNodeWithText("‹").performClick()
+        regola.onNodeWithTag("canali_L1", useUnmergedTree = true).assertTextEquals("▦")
+        regola.onAllNodesWithText("✕").onLast().performClick()
+        regola.waitForIdle()
+        // Nello storico: i totali e il segno messo a mano
+        regola.onNodeWithText("Oggi:", substring = true).performClick()
+        regola.onNodeWithText("2 · € 5,50").performClick()
+        regola.onNodeWithTag("canali_giorno").assertTextEquals("Caricati: 🟢 WhatsApp 0 · 📱 Storie IG 0 · ▦ Post IG 1")
+        regola.onNodeWithTag("canale_WHATSAPP_1234567").performClick()
+        regola.onNodeWithTag("canali_giorno").assertTextEquals("Caricati: 🟢 WhatsApp 1 · 📱 Storie IG 0 · ▦ Post IG 1")
+        assertTrue(vm.foto[0].pubblicata)   // anche la foto in lista
     }
 
     @Test

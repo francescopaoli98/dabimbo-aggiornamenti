@@ -155,7 +155,12 @@ fun SchermataInstagram(vm: FotoViewModel, chiudi: () -> Unit) {
         AnteprimaIG(
             tipo, file, if (tipo == TipoIG.CAROSELLO) vm.didascaliaIG(scelte) else null,
             // Il carosello mandato si ricorda: se poi un articolo viene prenotato, il testo si rifà
-            mandato = { if (tipo == TipoIG.CAROSELLO) vm.ricordaCarosello(scelte.toList()) },
+            mandato = { indici ->
+                // Il segno "caricata su Instagram" si mette da solo (si toglie a mano se poi non l'hai caricata)
+                val canale = if (tipo == TipoIG.STORIE) Canale.STORIA_IG else Canale.POST_IG
+                indici.mapNotNull { scelte.getOrNull(it) }.forEach { vm.segnaInstagram(it, canale) }
+                if (tipo == TipoIG.CAROSELLO) vm.ricordaCarosello(scelte.toList())
+            },
         ) { anteprima = null }
     }
 }
@@ -180,6 +185,13 @@ private fun CellaIG(e: ElementoIG, vm: FotoViewModel, numero: Int?, tocca: () ->
             contentAlignment = Alignment.Center,
         ) { Text("$numero", color = BluNotte, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp) }
         // Prezzo in basso, per riconoscerla
+        // Dove è già stata caricata (così non la rimandi due volte)
+        val canali = vm.canaliDi(e)
+        if (canali.isNotEmpty()) Text(
+            Canale.entries.filter { it in canali }.joinToString(" ") { it.simbolo },
+            fontSize = 12.sp, modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+                .background(Color(0xDDFFFFFF), RoundedCornerShape(8.dp)).padding(horizontal = 5.dp, vertical = 1.dp).testTag("canali_${e.id}"),
+        )
         e.righe.firstOrNull()?.prezzo?.let { p ->
             Text(
                 p, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold,
@@ -194,7 +206,7 @@ private fun CellaIG(e: ElementoIG, vm: FotoViewModel, numero: Int?, tocca: () ->
  * Storie: se Instagram ne prende una sola, "Una alla volta" le passa una per volta.
  */
 @Composable
-private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, mandato: () -> Unit, chiudi: () -> Unit) {
+private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, mandato: (List<Int>) -> Unit, chiudi: () -> Unit) {
     val context = LocalContext.current
     var prossima by remember { mutableIntStateOf(-1) }   // -1 = tutte insieme; altrimenti la prossima da mandare una alla volta
     fun manda(quali: List<File>) {
@@ -247,14 +259,14 @@ private fun AnteprimaIG(tipo: TipoIG, file: List<File>, didascalia: String?, man
                         } else if (prossima < file.size) {
                             PulsanteGrande(
                                 "Storia ${prossima + 1} di ${file.size}", "📱",
-                                { manda(listOf(file[prossima])); prossima++ }, Modifier.fillMaxWidth(), colore = Verde, altezza = 52.dp, grandezzaTesto = 15,
+                                { manda(listOf(file[prossima])); mandato(listOf(prossima)); prossima++ }, Modifier.fillMaxWidth(), colore = Verde, altezza = 52.dp, grandezzaTesto = 15,
                             )
                         } else {
                             Text("✓ Mandate tutte", color = Verde, fontWeight = FontWeight.Bold, modifier = Modifier.padding(4.dp))
                         }
                     }
                     if (prossima < 0) PulsanteGrande(
-                        "Apri Instagram", "📸", { manda(file); mandato() }, Modifier.fillMaxWidth(), altezza = 56.dp, grandezzaTesto = 16,
+                        "Apri Instagram", "📸", { manda(file); mandato(file.indices.toList()) }, Modifier.fillMaxWidth(), altezza = 56.dp, grandezzaTesto = 16,
                     )
                 }
             }

@@ -68,7 +68,12 @@ class GuideTest {
         regola.runOnUiThread { vm.foto[0] = vm.foto[0].copy(daControllare = false); vm.segnaPubblicata(1) }
         aspetta()
         scatto("wa_5", regola.onNodeWithText("Pubblicate 1 di 6"))
+        regola.onNodeWithTag("canale_WHATSAPP_foto2").performScrollTo()
+        aspetta()
+        scatto("wa_segni", *Canale.entries.map { regola.onNodeWithTag("canale_${it.name}_foto2") }.toTypedArray())
 
+        regola.onNodeWithText("Scegli foto").performScrollTo()
+        aspetta()
         // ---------- 2. Sistemare una foto ----------
         scatto("foto_1", regola.onAllNodesWithText("🔍 Tocca").onFirst())
         regola.onAllNodesWithText("🔍 Tocca").onFirst().performClick()
@@ -100,6 +105,7 @@ class GuideTest {
         regola.onNodeWithText("${totale.articoli} · ${Riepilogo.euro(totale.centesimi)}").performClick()
         regola.waitUntil(5_000) { regola.onAllNodesWithContentDescription("Foto", useUnmergedTree = true).fetchSemanticsNodes().size >= 3 }
         aspetta()
+        scatto("storico_segni", *Canale.entries.map { regola.onNodeWithTag("canale_${it.name}_1444583") }.toTypedArray(), dialogo = true)
         scatto("storico_3", regola.onNodeWithTag("prenota_1443990"), dialogo = true)
         regola.onNodeWithTag("prenota_1443990").performClick()
         aspetta()
@@ -144,7 +150,8 @@ class GuideTest {
         aspetta()
         // Un articolo del carosello viene prenotato: testo aggiornato
         regola.onNodeWithText("Oggi:", substring = true).performClick()
-        regola.onNodeWithText("${totale.articoli} · ${Riepilogo.euro(totale.centesimi)}").performClick()
+        val dopo = vm.oggiPubblicati!!   // col carosello sono entrati anche gli articoli mandati solo su Instagram
+        regola.onNodeWithText("${dopo.articoli} · ${Riepilogo.euro(dopo.centesimi)}").performClick()
         aspetta()
         regola.onNodeWithTag("avvisa_1443990").performClick()   // il piumino (prenotato prima) era nel carosello
         aspetta()
