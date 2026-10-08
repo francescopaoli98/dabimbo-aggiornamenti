@@ -1,6 +1,6 @@
 {
-  "versionCode": 81,
-  "versionName": "5.6",
+  "versionCode": 82,
+  "versionName": "5.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Storico più snello: elenco senza foto (con 🖼 la vedi, «🖼 Foto» le mostra tutte), ricerca del codice in cima, e il giorno di oggi si chiama «Oggi»."
+  "note": "Storico più preciso: orari di ogni articolo (entrata nell'app, WhatsApp, storie, post), giorno da mezzanotte a mezzanotte, e quelli che non contano in grigio. Niente più articoli finti dalla lettura (numeri da soli o lo stesso cartellino letto due volte)."
 }
