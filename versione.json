@@ -1,6 +1,6 @@
 {
-  "versionCode": 85,
-  "versionName": "6.0",
+  "versionCode": 86,
+  "versionName": "7.0",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Ancora più semplice: prenoti un codice dalla schermata principale, le foto partono «di seguito» (con «Ferma»), «È dritta / Gira» direttamente sulla foto, storico più corto, il Dizionario sta in ⚙."
+  "note": "Grafica nuova, più veloce: le foto una alla volta a tutto schermo con «Pubblica su WhatsApp», in basso Oggi, Storico e Instagram. Le funzioni e le foto per i clienti restano come prima."
 }
