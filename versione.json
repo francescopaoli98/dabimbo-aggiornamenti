@@ -1,6 +1,6 @@
 {
-  "versionCode": 92,
-  "versionName": "7.6",
+  "versionCode": 93,
+  "versionName": "7.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Richieste delle clienti più semplici: niente più prezzo massimo, basta cosa cerca, taglia, nome e telefono."
+  "note": "Richieste più veloci da scrivere: il tasto «Avanti» della tastiera passa al campo dopo, sull'ultimo salva. Nome e telefono anche dalla rubrica."
 }
