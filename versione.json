@@ -1,6 +1,6 @@
 {
-  "versionCode": 89,
-  "versionName": "7.3",
+  "versionCode": 90,
+  "versionName": "7.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Copertine degli album: prima delle foto scegli «Che album è?». Testo del post Instagram modificabile. Taglia presa sempre dalla zona sotto il codice. Correzioni che vanno anche nello storico, e «Correggi» dallo storico."
+  "note": "Le foto scelte non si perdono più se il telefono chiude l'app mentre sei su WhatsApp. Se una foto non si apre, «Sistema: Foto N» e «Scegli di nuovo questa foto»."
 }
