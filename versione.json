@@ -1,6 +1,6 @@
 {
-  "versionCode": 91,
-  "versionName": "7.5",
+  "versionCode": 92,
+  "versionName": "7.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo: «Richieste delle clienti». Scrivi cosa cerca una cliente: quando arriva un articolo che somiglia, l'app te lo dice sulla foto e puoi prenotarlo per lei o scriverle su WhatsApp."
+  "note": "Richieste delle clienti più semplici: niente più prezzo massimo, basta cosa cerca, taglia, nome e telefono."
 }
