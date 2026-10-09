@@ -1,6 +1,6 @@
 {
-  "versionCode": 86,
-  "versionName": "7.0",
+  "versionCode": 87,
+  "versionName": "7.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Grafica nuova, più veloce: le foto una alla volta a tutto schermo con «Pubblica su WhatsApp», in basso Oggi, Storico e Instagram. Le funzioni e le foto per i clienti restano come prima."
+  "note": "La taglia del cartellino (in basso a destra, accanto al prezzo) ora si legge molto più spesso: niente più da scrivere a mano."
 }
