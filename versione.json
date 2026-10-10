@@ -1,6 +1,6 @@
 {
-  "versionCode": 97,
-  "versionName": "8.1",
+  "versionCode": 98,
+  "versionName": "8.2",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Lettura dei cartellini più precisa: colori attaccati («BN», «RSB»), lettere lette come numeri, punti in mezzo e sigle spezzate vengono rimessi a posto."
+  "note": "Se manca il prezzo o il cartellino non si è letto, lo scrivi direttamente sulla foto: tastiera già aperta, «Avanti» passa al campo dopo."
 }
