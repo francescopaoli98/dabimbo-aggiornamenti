@@ -1,6 +1,6 @@
 {
-  "versionCode": 93,
-  "versionName": "7.7",
+  "versionCode": 94,
+  "versionName": "7.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Richieste più veloci da scrivere: il tasto «Avanti» della tastiera passa al campo dopo, sull'ultimo salva. Nome e telefono anche dalla rubrica."
+  "note": "Il testo che correggi prima di pubblicare va anche nello storico e nella foto PRENOTATO. Nel pannello «Prenotato!» c'è «Correggi nome e prezzo»."
 }
