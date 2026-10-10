@@ -1,6 +1,6 @@
 {
-  "versionCode": 94,
-  "versionName": "7.8",
+  "versionCode": 95,
+  "versionName": "7.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Il testo che correggi prima di pubblicare va anche nello storico e nella foto PRENOTATO. Nel pannello «Prenotato!» c'è «Correggi nome e prezzo»."
+  "note": "Nello storico i conti della settimana e del mese. Nelle impostazioni la copia di sicurezza: salvala su Drive e non perdi niente se cambi telefono."
 }
