@@ -1,6 +1,6 @@
 {
-  "versionCode": 101,
-  "versionName": "8.5",
+  "versionCode": 102,
+  "versionName": "8.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Instagram per lista: ogni gruppo di foto caricato è una lista, col nome della copertina o degli articoli (si può cambiare). «Metti le 30 nelle storie» per una lista, «Scegli tra le foto di oggi» con le foto già tutte scelte. Promemoria per mettere le storie anche su Facebook."
+  "note": "In «Scegli tra le foto di oggi» c'è l'interruttore «Tutte insieme»: spento le foto sono divise per lista, acceso tutte in una griglia. Le foto scelte restano come sono quando lo cambi."
 }
