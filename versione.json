@@ -1,6 +1,6 @@
 {
-  "versionCode": 102,
-  "versionName": "8.6",
+  "versionCode": 103,
+  "versionName": "8.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Scegli tra le foto di oggi» c'è l'interruttore «Tutte insieme»: spento le foto sono divise per lista, acceso tutte in una griglia. Le foto scelte restano come sono quando lo cambi."
+  "note": "Le parole della descrizione restano nell'ordine del cartellino: «giubbotto» non finisce più in fondo quando il cartellino è un po' storto."
 }
