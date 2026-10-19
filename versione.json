@@ -1,6 +1,6 @@
 {
-  "versionCode": 105,
-  "versionName": "9.0",
+  "versionCode": 106,
+  "versionName": "9.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Grafica nuova: «Da pubblicare» in grande, quattro riquadri colorati, la lente per prenotare, lo storico col grafico della settimana, Instagram solo storie con le liste da mettere ben segnate. E tante piccole correzioni (una foto non parte mai senza i pixel che hai messo)."
+  "note": "Storie a gruppi di 10: se ne scegli di più, l'app prepara le prime 10; quando torni da Instagram, quelle mandate si tolgono da sole e sono già pronte le prossime 10."
 }
