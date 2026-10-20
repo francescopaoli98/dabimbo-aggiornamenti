@@ -1,6 +1,6 @@
 {
-  "versionCode": 106,
-  "versionName": "9.1",
+  "versionCode": 107,
+  "versionName": "9.2",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Storie a gruppi di 10: se ne scegli di più, l'app prepara le prime 10; quando torni da Instagram, quelle mandate si tolgono da sole e sono già pronte le prossime 10."
+  "note": "Saldi: in Impostazioni → «Saldi» scegli lo sconto e per quanto; su WhatsApp e nelle storie il prezzo vecchio esce barrato e accanto quello nuovo. E il lunedì mattina il riassunto della settimana passata."
 }
