@@ -1,6 +1,6 @@
 {
-  "versionCode": 108,
-  "versionName": "9.3",
+  "versionCode": 109,
+  "versionName": "9.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuova pagina «La tua settimana»: cosa è andato meglio della settimana prima, il grafico dei giorni e del mese, e «Salva come immagine». Si apre dal riquadro del lunedì in Oggi o dallo storico (📊 Settimana)."
+  "note": "Prenotati da mandare: quando prenoti scrivi per chi; in Oggi «Sullo stato» manda tutte insieme le foto PRENOTATO e «In Cose fermate» le stesse col nome della cliente. In Oggi anche il riquadro «La tua settimana»."
 }
