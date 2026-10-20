@@ -1,6 +1,6 @@
 {
-  "versionCode": 107,
-  "versionName": "9.2",
+  "versionCode": 108,
+  "versionName": "9.3",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Saldi: in Impostazioni → «Saldi» scegli lo sconto e per quanto; su WhatsApp e nelle storie il prezzo vecchio esce barrato e accanto quello nuovo. E il lunedì mattina il riassunto della settimana passata."
+  "note": "Nuova pagina «La tua settimana»: cosa è andato meglio della settimana prima, il grafico dei giorni e del mese, e «Salva come immagine». Si apre dal riquadro del lunedì in Oggi o dallo storico (📊 Settimana)."
 }
