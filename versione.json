@@ -1,6 +1,6 @@
 {
-  "versionCode": 110,
-  "versionName": "9.5",
+  "versionCode": 111,
+  "versionName": "9.6",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Saldi sulla foto: il cartellino rosso col bollino giallo (o la fascia in fondo) su WhatsApp e nelle storie, da sistemare in Impostazioni → Saldi. Sconto solo per un album in «Che album è?». «Cambia» sulla striscia dei saldi porta dritto ai saldi."
+  "note": "Prima di pubblicare vedi già la foto col cartellino dei saldi; con «Modifica» sotto la foto lo sposti, rimpicciolisci, cambi colore o lo spegni solo per quella foto."
 }
