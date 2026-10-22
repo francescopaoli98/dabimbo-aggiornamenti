@@ -1,6 +1,6 @@
 {
-  "versionCode": 111,
-  "versionName": "9.6",
+  "versionCode": 112,
+  "versionName": "9.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Prima di pubblicare vedi già la foto col cartellino dei saldi; con «Modifica» sotto la foto lo sposti, rimpicciolisci, cambi colore o lo spegni solo per quella foto."
+  "note": "Prenotati: in «Cose fermate» il codice grande sulla foto e un messaggio con nomi e codici (si ritrovano con la ricerca di WhatsApp); codice più grande nella lista e nello storico; nello storico si cerca anche il nome della cliente."
 }
