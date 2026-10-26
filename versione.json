@@ -1,6 +1,6 @@
 {
-  "versionCode": 115,
-  "versionName": "10.0",
+  "versionCode": 116,
+  "versionName": "10.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Prenotati in negozio: «Rimetti in vendita» su ogni articolo (con «Annulla»). Dopo una consegna, un avviso o un «Rimetti in vendita», la barra con «Annulla» resta 5 secondi e poi sparisce da sola."
+  "note": "Grafica nuova: carattere Lexend e pulsanti nuovi (pastello e pieni, si abbassano quando li premi), meno colori. «Prenotati in negozio» più carina e con la ricerca. «In Cose fermate» di nuovo tutte insieme, col nome e il codice sulla foto."
 }
