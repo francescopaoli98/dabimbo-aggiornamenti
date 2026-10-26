@@ -1,6 +1,6 @@
 {
-  "versionCode": 114,
-  "versionName": "9.9",
+  "versionCode": 115,
+  "versionName": "10.0",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Prenotati in negozio: in Oggi il pulsante verde con tutto quello che è messo da parte. «Consegna» quando la cliente passa a prenderlo; dopo 5 giorni «Avvisa» col messaggio già scritto e il giorno giusto secondo gli orari del negozio; poi «Rimetti in vendita». Il nome della cliente ci vuole, il telefono se vuoi (anche dalla rubrica)."
+  "note": "Prenotati in negozio: «Rimetti in vendita» su ogni articolo (con «Annulla»). Dopo una consegna, un avviso o un «Rimetti in vendita», la barra con «Annulla» resta 5 secondi e poi sparisce da sola."
 }
