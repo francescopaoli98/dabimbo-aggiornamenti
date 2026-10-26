@@ -1,6 +1,6 @@
 {
-  "versionCode": 112,
-  "versionName": "9.7",
+  "versionCode": 113,
+  "versionName": "9.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Prenotati: in «Cose fermate» il codice grande sulla foto e un messaggio con nomi e codici (si ritrovano con la ricerca di WhatsApp); codice più grande nella lista e nello storico; nello storico si cerca anche il nome della cliente."
+  "note": "«In Cose fermate» manda una foto alla volta, ognuna col suo testo sotto (nome, articolo, codice): ci metti il 👍 e la ritrovi con la ricerca di WhatsApp; poi «Prossima ›». In Oggi il nuovo pulsante «Pannello Gestore Appuntamenti» apre le prenotazioni del sito."
 }
