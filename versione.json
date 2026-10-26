@@ -1,6 +1,6 @@
 {
-  "versionCode": 118,
-  "versionName": "10.3",
+  "versionCode": 119,
+  "versionName": "10.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Corretto: l'app non si chiude più cambiando il nome in «Prenotati in negozio». La mascotte ora ti guida nelle guide, dice com'è andata la settimana e compare quando l'app chiede «Sei sicura?». Ombra sul logo."
+  "note": "La mascotte anche nello storico: ti racconta il giorno (e ti dice quando è il migliore della settimana), com'è andata la settimana scorsa, e ti aiuta se la ricerca non trova niente."
 }
