@@ -1,6 +1,6 @@
 {
-  "versionCode": 113,
-  "versionName": "9.8",
+  "versionCode": 114,
+  "versionName": "9.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«In Cose fermate» manda una foto alla volta, ognuna col suo testo sotto (nome, articolo, codice): ci metti il 👍 e la ritrovi con la ricerca di WhatsApp; poi «Prossima ›». In Oggi il nuovo pulsante «Pannello Gestore Appuntamenti» apre le prenotazioni del sito."
+  "note": "Prenotati in negozio: in Oggi il pulsante verde con tutto quello che è messo da parte. «Consegna» quando la cliente passa a prenderlo; dopo 5 giorni «Avvisa» col messaggio già scritto e il giorno giusto secondo gli orari del negozio; poi «Rimetti in vendita». Il nome della cliente ci vuole, il telefono se vuoi (anche dalla rubrica)."
 }
