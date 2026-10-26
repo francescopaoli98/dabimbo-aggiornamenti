@@ -1,6 +1,6 @@
 {
-  "versionCode": 117,
-  "versionName": "10.2",
+  "versionCode": 118,
+  "versionName": "10.3",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "È arrivata la mascotte! Il bimbo coi capelli rossi fluttua in cima a «Oggi» e ti dice cosa fare (clienti da avvisare, foto da pubblicare…). Toccalo: dice una frase. E lo stile nuovo dei pulsanti ora è su tutti i riquadri."
+  "note": "Corretto: l'app non si chiude più cambiando il nome in «Prenotati in negozio». La mascotte ora ti guida nelle guide, dice com'è andata la settimana e compare quando l'app chiede «Sei sicura?». Ombra sul logo."
 }
