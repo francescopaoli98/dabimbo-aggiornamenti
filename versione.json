@@ -1,6 +1,6 @@
 {
-  "versionCode": 123,
-  "versionName": "10.8",
+  "versionCode": 124,
+  "versionName": "10.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Pagina del negozio più sicura: solo il telefono di Elisa cambia la lista. Dopo l'aggiornamento tocca l'avviso giallo in «Oggi» e scegli di chi è il telefono."
+  "note": "Sulla pagina del negozio Raffaele e Cinzia possono aprire le foto grandi: l'app le manda da sola."
 }
