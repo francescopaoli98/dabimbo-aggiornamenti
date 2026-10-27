@@ -1,6 +1,6 @@
 {
-  "versionCode": 119,
-  "versionName": "10.4",
+  "versionCode": 120,
+  "versionName": "10.5",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "La mascotte anche nello storico: ti racconta il giorno (e ti dice quando è il migliore della settimana), com'è andata la settimana scorsa, e ti aiuta se la ricerca non trova niente."
+  "note": "Prenotati in negozio: le cose della stessa cliente, anche fermate in giorni diversi, stanno in una scheda sola con «Consegna tutto». Se ne consegni solo una, la mascotte ti ricorda le altre."
 }
