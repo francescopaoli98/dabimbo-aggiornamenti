@@ -1,6 +1,6 @@
 {
-  "versionCode": 121,
-  "versionName": "10.6",
+  "versionCode": 122,
+  "versionName": "10.7",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo: Impostazioni → Collaboratori, per dare a Raffaele e Cinzia la pagina dei prenotati sul loro telefono. Vedi cosa hanno fatto in «Cosa è successo», e le loro domande arrivano in una notifica sola."
+  "note": "Il messaggio per la cliente dice «Stiamo tenendo da parte». Con «Avvisa» scegli: gentile (nei prossimi giorni) o con la data."
 }
