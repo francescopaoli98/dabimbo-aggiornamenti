@@ -1,6 +1,6 @@
 {
-  "versionCode": 126,
-  "versionName": "11.1",
+  "versionCode": 127,
+  "versionName": "11.2",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«Quanto vale?» ora funziona gratis: una stima dell'intelligenza artificiale, con dove controllare i prezzi veri. Google Lens si apre direttamente."
+  "note": "«Quanto vale?»: scatti la foto e si apre subito Google Lens, che trova il modello e i prezzi."
 }
