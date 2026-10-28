@@ -1,6 +1,6 @@
 {
-  "versionCode": 127,
-  "versionName": "11.2",
+  "versionCode": 128,
+  "versionName": "11.3",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«Quanto vale?»: scatti la foto e si apre subito Google Lens, che trova il modello e i prezzi."
+  "note": "Tolta la funzione «Quanto vale?»."
 }
