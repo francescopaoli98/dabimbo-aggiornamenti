@@ -1,6 +1,6 @@
 {
-  "versionCode": 128,
-  "versionName": "11.3",
+  "versionCode": 129,
+  "versionName": "11.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Tolta la funzione «Quanto vale?»."
+  "note": "In Collaboratori: «Fa' la prova al prossimo avvio», per far provare la pagina a Raffaele e Cinzia con una cliente finta."
 }
