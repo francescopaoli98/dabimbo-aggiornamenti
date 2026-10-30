@@ -1,6 +1,6 @@
 {
-  "versionCode": 136,
-  "versionName": "11.11",
+  "versionCode": 137,
+  "versionName": "11.12",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo in «Cose fermate»: «Aggiungi oggetto a mano» per le cose fermate prima dell'app (cos'è, prezzo, per chi, quando, foto se vuoi). Contano nei conti come le altre."
+  "note": "«Aggiungi oggetto a mano»: ora si fotografa il cartellino e l'app legge da sola cos'è, taglia, prezzo e codice (la foto resta allegata). Se non lo legge, si scrive a mano."
 }
