@@ -1,6 +1,6 @@
 {
-  "versionCode": 138,
-  "versionName": "11.13",
+  "versionCode": 139,
+  "versionName": "11.14",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«Aggiungi oggetto a mano»: se l'oggetto è già prenotato per un'altra persona, senza persona o venduto, l'app chiede cosa fare e poi lo mette per la persona giusta. Microfono anche nella ricerca dello storico."
+  "note": "«Aggiungi oggetto a mano» più ordinato: prima la foto, «oppure scrivi a mano» piccolo; la taglia ha tutta la riga e si corregge bene."
 }
