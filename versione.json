@@ -1,6 +1,6 @@
 {
-  "versionCode": 135,
-  "versionName": "11.10",
+  "versionCode": 136,
+  "versionName": "11.11",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Cose fermate» tocca la foto per vederla grande. Il microfono ora mostra «Sto ascoltando» come sulla pagina di Raffaele e Cinzia: la prima volta tocca «Consenti» per il microfono."
+  "note": "Nuovo in «Cose fermate»: «Aggiungi oggetto a mano» per le cose fermate prima dell'app (cos'è, prezzo, per chi, quando, foto se vuoi). Contano nei conti come le altre."
 }
