@@ -1,6 +1,6 @@
 {
-  "versionCode": 134,
-  "versionName": "11.9",
+  "versionCode": 135,
+  "versionName": "11.10",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Cose fermate»: la ricerca è in cima col microfono rosa (dì il nome o il codice). Su ogni cosa «In Cose fermate» la manda nel gruppo WhatsApp, e «Cambia cliente» se era fermata per la persona sbagliata."
+  "note": "In «Cose fermate» tocca la foto per vederla grande. Il microfono ora mostra «Sto ascoltando» come sulla pagina di Raffaele e Cinzia: la prima volta tocca «Consenti» per il microfono."
 }
