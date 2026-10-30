@@ -1,6 +1,6 @@
 {
-  "versionCode": 132,
-  "versionName": "11.7",
+  "versionCode": 133,
+  "versionName": "11.8",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo «Nello scaffale»: sotto ogni cosa fermata la fascia arancione «Da mettere» diventa blu «Nello scaffale» con un tocco. Lo vedono anche Raffaele e Cinzia."
+  "note": "Microfono nella ricerca di «Cose fermate». Nuovo «Mandare di nuovo su WhatsApp una cosa fermata»: cerchi una cosa già fermata (anche vecchia) e la rimetti da mandare. «Nello scaffale» non esce più dalla fascia."
 }
