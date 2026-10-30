@@ -1,6 +1,6 @@
 {
-  "versionCode": 133,
-  "versionName": "11.8",
+  "versionCode": 134,
+  "versionName": "11.9",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Microfono nella ricerca di «Cose fermate». Nuovo «Mandare di nuovo su WhatsApp una cosa fermata»: cerchi una cosa già fermata (anche vecchia) e la rimetti da mandare. «Nello scaffale» non esce più dalla fascia."
+  "note": "In «Cose fermate»: la ricerca è in cima col microfono rosa (dì il nome o il codice). Su ogni cosa «In Cose fermate» la manda nel gruppo WhatsApp, e «Cambia cliente» se era fermata per la persona sbagliata."
 }
