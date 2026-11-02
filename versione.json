@@ -1,6 +1,6 @@
 {
-  "versionCode": 140,
-  "versionName": "11.15",
+  "versionCode": 141,
+  "versionName": "11.16",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Il buono spesa che mandi alla cliente non ha più il nome sopra: per chi è lo sa solo l'app."
+  "note": "Dopo «Usato» un buono puoi mandare alla cliente il messaggio già scritto (se vuoi). In «Cose fermate» il filtro «Tutte · Da mettere · Scaffale»."
 }
