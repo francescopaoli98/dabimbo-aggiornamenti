@@ -1,6 +1,6 @@
 {
-  "versionCode": 144,
-  "versionName": "11.19",
+  "versionCode": 145,
+  "versionName": "11.20",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Articoli del negozio» puoi scegliere l'ordine: ultimi caricati, codice, nome dalla A alla Z o al contrario."
+  "note": "In «Oggi» la tessera «Articoli del negozio» è sempre sotto «Cose fermate». Tolto il riquadro dei prenotati da avvisare: si vedono in «Cose fermate»."
 }
