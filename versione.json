@@ -1,6 +1,6 @@
 {
-  "versionCode": 147,
-  "versionName": "11.22",
+  "versionCode": 148,
+  "versionName": "11.23",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Negli «Articoli del negozio» la data in cui l'articolo è entrato in negozio e il prezzo fatto alla cassa (quando il programma li manda)."
+  "note": "«Articoli del negozio» si riempie su ogni telefono collegato, anche su quello solo per guardare. Se non riesce a leggerli lo dice, con «Riprova»."
 }
