@@ -1,6 +1,6 @@
 {
-  "versionCode": 148,
-  "versionName": "11.23",
+  "versionCode": 149,
+  "versionName": "11.24",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«Articoli del negozio» si riempie su ogni telefono collegato, anche su quello solo per guardare. Se non riesce a leggerli lo dice, con «Riprova»."
+  "note": "«Articoli del negozio» con le schede nuove a cartellino: disegno del reparto quando manca la foto, timbro, prezzo grande, da quanti giorni è in negozio."
 }
