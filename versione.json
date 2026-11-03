@@ -1,6 +1,6 @@
 {
-  "versionCode": 143,
-  "versionName": "11.18",
+  "versionCode": 144,
+  "versionName": "11.19",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo «Articoli del negozio» in «Oggi»: gli articoli del programma, con ricerca anche per cliente e a voce, filtro per stato e «Fermalo per una cliente»."
+  "note": "In «Articoli del negozio» puoi scegliere l'ordine: ultimi caricati, codice, nome dalla A alla Z o al contrario."
 }
