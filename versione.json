@@ -1,6 +1,6 @@
 {
-  "versionCode": 142,
-  "versionName": "11.17",
+  "versionCode": 143,
+  "versionName": "11.18",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Collegamento col programma del negozio: i venduti in cassa arrivano da soli nell'app, col codice del cartellino descrizione, taglia e prezzo vengono dal programma, e le foto pubblicate vanno al programma."
+  "note": "Nuovo «Articoli del negozio» in «Oggi»: gli articoli del programma, con ricerca anche per cliente e a voce, filtro per stato e «Fermalo per una cliente»."
 }
