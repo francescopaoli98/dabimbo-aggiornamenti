@@ -1,6 +1,6 @@
 {
-  "versionCode": 146,
-  "versionName": "11.21",
+  "versionCode": 147,
+  "versionName": "11.22",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Articoli del negozio» si può scegliere taglia, reparto e prezzo. Colori sistemati quando il telefono è in tema scuro."
+  "note": "Negli «Articoli del negozio» la data in cui l'articolo è entrato in negozio e il prezzo fatto alla cassa (quando il programma li manda)."
 }
