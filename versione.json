@@ -1,6 +1,6 @@
 {
-  "versionCode": 145,
-  "versionName": "11.20",
+  "versionCode": 146,
+  "versionName": "11.21",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "In «Oggi» la tessera «Articoli del negozio» è sempre sotto «Cose fermate». Tolto il riquadro dei prenotati da avvisare: si vedono in «Cose fermate»."
+  "note": "In «Articoli del negozio» si può scegliere taglia, reparto e prezzo. Colori sistemati quando il telefono è in tema scuro."
 }
