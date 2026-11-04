@@ -1,6 +1,6 @@
 {
-  "versionCode": 152,
-  "versionName": "11.27",
+  "versionCode": 153,
+  "versionName": "11.28",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuova pagina «Vendite» (in «Oggi», sotto gli articoli del negozio): incasso e pezzi del giorno, confronto con la settimana prima, ora per ora e cosa è stato venduto. Frecce e calendario per gli altri giorni."
+  "note": "Nuova pagina «Oggi»: le tessere divise in Pubblica, Negozio, Clienti e Diario, e in basso il tasto tondo «Foto». Rifatte le pagine Vendite e Richieste. In Articoli la taglia si può anche scrivere."
 }
