@@ -1,6 +1,6 @@
 {
-  "versionCode": 153,
-  "versionName": "11.28",
+  "versionCode": 154,
+  "versionName": "11.29",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuova pagina «Oggi»: le tessere divise in Pubblica, Negozio, Clienti e Diario, e in basso il tasto tondo «Foto». Rifatte le pagine Vendite e Richieste. In Articoli la taglia si può anche scrivere."
+  "note": "App più leggera e fluida: scorrimento più morbido, pagine che si aprono prima e ricerca negli articoli molto più veloce."
 }
