@@ -1,6 +1,6 @@
 {
-  "versionCode": 151,
-  "versionName": "11.26",
+  "versionCode": 152,
+  "versionName": "11.27",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Buoni: «Stampa in negozio» sulla Zebra. Le richieste delle clienti si vedono anche nel programma del negozio, e quelle del programma qui."
+  "note": "Nuova pagina «Vendite» (in «Oggi», sotto gli articoli del negozio): incasso e pezzi del giorno, confronto con la settimana prima, ora per ora e cosa è stato venduto. Frecce e calendario per gli altri giorni."
 }
