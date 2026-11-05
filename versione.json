@@ -1,6 +1,6 @@
 {
-  "versionCode": 155,
-  "versionName": "11.30",
+  "versionCode": 156,
+  "versionName": "11.31",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Buoni, Storico e Cose fermate col loro riquadro colorato in cima; la pagina Instagram ora si chiama «Storie»; guide con le immagini nuove."
+  "note": "Le storie ora vanno anche nello stato di WhatsApp: nella pagina «Storie» tocca «Nello stato» su una lista (l'invio lo premi tu su WhatsApp)."
 }
