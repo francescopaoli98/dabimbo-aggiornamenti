@@ -1,6 +1,6 @@
 {
-  "versionCode": 157,
-  "versionName": "11.32",
+  "versionCode": 158,
+  "versionName": "11.33",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuova «Diretta di Elisa»: sul telefono «Solo per guardare» si vedono le foto pubblicate negli ultimi 7 giorni."
+  "note": "Nuovo «Carica su Facebook» nella Diretta: un post con tutte le foto della lista, descrizione e numero dentro ogni foto. «Pubblica» lo premi tu."
 }
