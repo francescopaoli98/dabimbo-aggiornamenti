@@ -1,6 +1,6 @@
 {
-  "versionCode": 161,
-  "versionName": "11.36",
+  "versionCode": 162,
+  "versionName": "11.37",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Correzioni a Diretta e Facebook: foto del post che riempie il riquadro, tasto «Non l'ho pubblicato», orari presi dal telefono di Elisa."
+  "note": "Aggiornamenti più sicuri: senza internet te lo dice, e controlla che il file scaricato sia davvero l'app."
 }
