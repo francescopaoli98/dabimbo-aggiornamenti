@@ -1,6 +1,6 @@
 {
-  "versionCode": 174,
-  "versionName": "11.50",
+  "versionCode": 175,
+  "versionName": "11.51",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Cose fermate» il pulsante verde «Consegna tutto» è in alto, sotto il nome della cliente, ed è più grande."
+  "note": "Novità: in «Vendi», toccando «Cambia prezzo» c'è il pulsante verde «Modifica e vendi»: scrivi il prezzo nuovo e vendi con un tocco solo. Più due piccole correzioni."
 }
