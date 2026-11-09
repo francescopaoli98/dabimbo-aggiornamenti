@@ -1,6 +1,6 @@
 {
-  "versionCode": 173,
-  "versionName": "11.49",
+  "versionCode": 174,
+  "versionName": "11.50",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: «Vendi» dal telefono (punta il cartellino e vendi: la vendita va dritta nel programma del negozio) e in «Cose fermate» il pulsante «Stampa etichetta busta» per stampare il nome della cliente sulla Zebra."
+  "note": "Novità: in «Cose fermate» il pulsante verde «Consegna tutto» è in alto, sotto il nome della cliente, ed è più grande."
 }
