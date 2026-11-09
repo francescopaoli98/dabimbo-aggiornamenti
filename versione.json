@@ -1,6 +1,6 @@
 {
-  "versionCode": 171,
-  "versionName": "11.47",
+  "versionCode": 172,
+  "versionName": "11.48",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: «Cose fermate» come la pagina di Cinzia e Raffaele (una scheda per cliente con le foto grandi); ogni cosa fermata ha il nome della cliente; il codice detto col microfono si scrive in cifre."
+  "note": "Novità: in «Cose fermate» la parte in cima è più piccola e scorre con le foto; accanto al microfono c'è il tasto per leggere il codice a barre con la fotocamera."
 }
