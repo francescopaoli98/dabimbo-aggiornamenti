@@ -1,6 +1,6 @@
 {
-  "versionCode": 175,
-  "versionName": "11.51",
+  "versionCode": 176,
+  "versionName": "11.52",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Vendi», toccando «Cambia prezzo» c'è il pulsante verde «Modifica e vendi»: scrivi il prezzo nuovo e vendi con un tocco solo. Più due piccole correzioni."
+  "note": "Novità: in «Vendi» vedi la lista del parziale mentre passi i cartellini e puoi dargli un nome; nella Cassa «Nuovo parziale» per mettere insieme articoli già venduti, prezzi da cambiare senza ripassare il cartellino; i cartellini vecchi col codice lungo si leggono giusti."
 }
