@@ -1,6 +1,6 @@
 {
-  "versionCode": 181,
-  "versionName": "11.57",
+  "versionCode": 182,
+  "versionName": "11.58",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: Storie più semplici. In cima tre numeri (da mettere, sullo stato, su Instagram); ogni lista ha le foto grandi e due pulsanti: Stato e Instagram. La scelta delle foto ha «Tutte» e «Nessuna». E l'avviso delle versioni nuove ora è in cima."
+  "note": "Novità: nelle storie le cose vendute alla cassa o fermate non si scelgono più da sole (striscia rossa o rosa; se una è tornata puoi metterla lo stesso). Il tasto blu in basso ora è «Scansiona». E in Cose fermate resta la barra in basso."
 }
