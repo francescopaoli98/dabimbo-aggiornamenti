@@ -1,6 +1,6 @@
 {
-  "versionCode": 178,
-  "versionName": "11.54",
+  "versionCode": 179,
+  "versionName": "11.55",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: l'app avvisa quando un articolo è stato venduto alla cassa: striscia rossa sulle foto da pubblicare, «Venduti da togliere dallo stato» in Oggi, avviso prima di fermarlo, e nelle Cose fermate «era lei?»."
+  "note": "Novità: pagina principale più semplice. In cima la lente: cerca un articolo, una cliente o cosa fare. Sotto tre pulsanti grandi: Negozio (vendi, cassa, articoli, vendite, richieste), Storie e Fermate. Poi «Da fare adesso» con le cose urgenti."
 }
