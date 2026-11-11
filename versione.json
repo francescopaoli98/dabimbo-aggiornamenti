@@ -1,6 +1,6 @@
 {
-  "versionCode": 182,
-  "versionName": "11.58",
+  "versionCode": 183,
+  "versionName": "11.59",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: nelle storie le cose vendute alla cassa o fermate non si scelgono più da sole (striscia rossa o rosa; se una è tornata puoi metterla lo stesso). Il tasto blu in basso ora è «Scansiona». E in Cose fermate resta la barra in basso."
+  "note": "Novità: «Scansiona» apre la scheda dell'articolo con tutte le informazioni, la sua storia e cosa si può fare (Consegna, Vendi, Prenota, Reso dalla cliente). In Cose fermate c'è la cronologia 🕘: chi ha fatto cosa, giorno per giorno."
 }
