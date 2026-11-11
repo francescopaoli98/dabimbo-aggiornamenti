@@ -1,6 +1,6 @@
 {
-  "versionCode": 176,
-  "versionName": "11.52",
+  "versionCode": 177,
+  "versionName": "11.53",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Vendi» vedi la lista del parziale mentre passi i cartellini e puoi dargli un nome; nella Cassa «Nuovo parziale» per mettere insieme articoli già venduti, prezzi da cambiare senza ripassare il cartellino; i cartellini vecchi col codice lungo si leggono giusti."
+  "note": "Novità: in «Vendi» il parziale si vede sempre, anche sui telefoni più piccoli: «Prezzo» e «Vendi» uno accanto all'altro."
 }
