@@ -1,6 +1,6 @@
 {
-  "versionCode": 180,
-  "versionName": "11.56",
+  "versionCode": 181,
+  "versionName": "11.57",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: Cose fermate più semplice. In cima la ricerca e i filtri Tutte · Avvisare · Scaffale. Ogni cliente ha le foto grandi, «Consegna» e «⋯» con tutto il resto (avvisa, scaffale, gruppo, etichetta, nome, rimetti in vendita). I giorni sono nel ❓."
+  "note": "Novità: Storie più semplici. In cima tre numeri (da mettere, sullo stato, su Instagram); ogni lista ha le foto grandi e due pulsanti: Stato e Instagram. La scelta delle foto ha «Tutte» e «Nessuna». E l'avviso delle versioni nuove ora è in cima."
 }
