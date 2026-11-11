@@ -1,6 +1,6 @@
 {
-  "versionCode": 183,
-  "versionName": "11.59",
+  "versionCode": 184,
+  "versionName": "11.60",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: «Scansiona» apre la scheda dell'articolo con tutte le informazioni, la sua storia e cosa si può fare (Consegna, Vendi, Prenota, Reso dalla cliente). In Cose fermate c'è la cronologia 🕘: chi ha fatto cosa, giorno per giorno."
+  "note": "Novità: il reso dalla cliente («Rimetti in vendita») si fa solo dal telefono di Elisa. La cronologia di Cose fermate è più ordinata e leggibile."
 }
