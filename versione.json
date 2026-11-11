@@ -1,6 +1,6 @@
 {
-  "versionCode": 185,
-  "versionName": "11.61",
+  "versionCode": 186,
+  "versionName": "11.62",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: «Da pubblicare» nella pagina principale è più piccolo: la prossima foto con il suo articolo e «Continua» accanto."
+  "note": "Novità: l'app è più veloce tra una pagina e l'altra e non si chiude più quando ci sono tante foto aperte."
 }
