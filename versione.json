@@ -1,6 +1,6 @@
 {
-  "versionCode": 177,
-  "versionName": "11.53",
+  "versionCode": 178,
+  "versionName": "11.54",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Vendi» il parziale si vede sempre, anche sui telefoni più piccoli: «Prezzo» e «Vendi» uno accanto all'altro."
+  "note": "Novità: l'app avvisa quando un articolo è stato venduto alla cassa: striscia rossa sulle foto da pubblicare, «Venduti da togliere dallo stato» in Oggi, avviso prima di fermarlo, e nelle Cose fermate «era lei?»."
 }
