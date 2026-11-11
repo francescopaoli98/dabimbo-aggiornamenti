@@ -1,6 +1,6 @@
 {
-  "versionCode": 187,
-  "versionName": "11.63",
+  "versionCode": 188,
+  "versionName": "11.64",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Cassa di oggi» c'è tutta la cassa del PC: il cassetto, il conto, i contati a fine giornata e le entrate a mano."
+  "note": "Novità: nelle impostazioni la copia di sicurezza anche su Cloudflare, ogni sera da sola (si accende quando Francesco la attiva)."
 }
