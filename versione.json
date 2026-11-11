@@ -1,6 +1,6 @@
 {
-  "versionCode": 179,
-  "versionName": "11.55",
+  "versionCode": 180,
+  "versionName": "11.56",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: pagina principale più semplice. In cima la lente: cerca un articolo, una cliente o cosa fare. Sotto tre pulsanti grandi: Negozio (vendi, cassa, articoli, vendite, richieste), Storie e Fermate. Poi «Da fare adesso» con le cose urgenti."
+  "note": "Novità: Cose fermate più semplice. In cima la ricerca e i filtri Tutte · Avvisare · Scaffale. Ogni cliente ha le foto grandi, «Consegna» e «⋯» con tutto il resto (avvisa, scaffale, gruppo, etichetta, nome, rimetti in vendita). I giorni sono nel ❓."
 }
