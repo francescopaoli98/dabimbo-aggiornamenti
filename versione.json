@@ -1,6 +1,6 @@
 {
-  "versionCode": 189,
-  "versionName": "11.65",
+  "versionCode": 190,
+  "versionName": "11.66",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Correzione: la ricerca (la lente in alto) non blocca più l'app."
+  "note": "Novità: in «Cose fermate» il 🛒 Carrello: prendi le cose (anche scansionando), poi «Smista nei sacchetti»."
 }
