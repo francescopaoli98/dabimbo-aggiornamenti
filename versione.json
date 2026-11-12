@@ -1,6 +1,6 @@
 {
-  "versionCode": 188,
-  "versionName": "11.64",
+  "versionCode": 189,
+  "versionName": "11.65",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: nelle impostazioni la copia di sicurezza anche su Cloudflare, ogni sera da sola (si accende quando Francesco la attiva)."
+  "note": "Correzione: la ricerca (la lente in alto) non blocca più l'app."
 }
