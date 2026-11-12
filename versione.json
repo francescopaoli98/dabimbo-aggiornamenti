@@ -1,6 +1,6 @@
 {
-  "versionCode": 196,
-  "versionName": "11.72",
+  "versionCode": 197,
+  "versionName": "11.73",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Correzione: il «1° mese» dura fino allo stesso giorno del mese dopo compreso, come nel programma del PC."
+  "note": "Nuovo: «Cosa è successo oggi» in home, con tutto quello che hanno fatto tutti. Cose fermate: il giro in una riga, come sulla pagina."
 }
