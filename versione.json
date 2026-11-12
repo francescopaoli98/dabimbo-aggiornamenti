@@ -1,6 +1,6 @@
 {
-  "versionCode": 190,
-  "versionName": "11.66",
+  "versionCode": 191,
+  "versionName": "11.67",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: in «Cose fermate» il 🛒 Carrello: prendi le cose (anche scansionando), poi «Smista nei sacchetti»."
+  "note": "Correzione: l'app legge meglio le etichette nuove del negozio (quelle con la nuvoletta del prezzo)."
 }
