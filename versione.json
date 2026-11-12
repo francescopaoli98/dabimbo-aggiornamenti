@@ -1,6 +1,6 @@
 {
-  "versionCode": 191,
-  "versionName": "11.67",
+  "versionCode": 192,
+  "versionName": "11.68",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Correzione: l'app legge meglio le etichette nuove del negozio (quelle con la nuvoletta del prezzo)."
+  "note": "Nuovo: «Stampa l'etichetta» nella scheda dell'articolo e accanto a «Vendi» nella ricerca (la stampa il PC con la Zebra)."
 }
