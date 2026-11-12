@@ -1,6 +1,6 @@
 {
-  "versionCode": 195,
-  "versionName": "11.71",
+  "versionCode": 196,
+  "versionName": "11.72",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Vendi: data di carico, «1° mese» e quanto va alla persona e al negozio quando cambi il prezzo. Le richieste dei collaboratori in cima. Il telefono di Francesco vede le cose fermate."
+  "note": "Correzione: il «1° mese» dura fino allo stesso giorno del mese dopo compreso, come nel programma del PC."
 }
