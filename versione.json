@@ -1,6 +1,6 @@
 {
-  "versionCode": 192,
-  "versionName": "11.68",
+  "versionCode": 193,
+  "versionName": "11.69",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Nuovo: «Stampa l'etichetta» nella scheda dell'articolo e accanto a «Vendi» nella ricerca (la stampa il PC con la Zebra)."
+  "note": "Cose fermate: nuovo filtro «Da mettere via». «Cosa è successo» più chiara e nella pagina Negozio. «Stampa l'etichetta» anche in Articoli del negozio."
 }
