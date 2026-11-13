@@ -1,6 +1,6 @@
 {
-  "versionCode": 201,
-  "versionName": "11.77",
+  "versionCode": 202,
+  "versionName": "11.78",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "«Sposti questo articolo?»: con tanti parziali il pulsante «Sì, sposta» ora si vede sempre."
+  "note": "Parziali: si chiudono toccandoli, «Chiudi tutti», più articoli spostati insieme, «Riapri e continua» un parziale azzerato."
 }
