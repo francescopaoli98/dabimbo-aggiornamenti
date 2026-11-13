@@ -1,6 +1,6 @@
 {
-  "versionCode": 206,
-  "versionName": "11.82",
+  "versionCode": 207,
+  "versionName": "11.83",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Correzioni e piccole migliorie."
+  "note": "Foto: se la memoria del telefono non basta, l'app riprova da sola."
 }
