@@ -1,6 +1,6 @@
 {
-  "versionCode": 202,
-  "versionName": "11.78",
+  "versionCode": 203,
+  "versionName": "11.79",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Parziali: si chiudono toccandoli, «Chiudi tutti», più articoli spostati insieme, «Riapri e continua» un parziale azzerato."
+  "note": "Vendi: dopo 10 minuti fermo chiede «È un cliente nuovo?»; «Era lei?» porta alla cliente (e dice a chi è stata venduta); buoni condivisi col programma del PC."
 }
