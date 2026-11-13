@@ -1,6 +1,6 @@
 {
-  "versionCode": 203,
-  "versionName": "11.79",
+  "versionCode": 204,
+  "versionName": "11.80",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Vendi: dopo 10 minuti fermo chiede «È un cliente nuovo?»; «Era lei?» porta alla cliente (e dice a chi è stata venduta); buoni condivisi col programma del PC."
+  "note": "Correzioni e piccole migliorie."
 }
