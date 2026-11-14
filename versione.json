@@ -1,6 +1,6 @@
 {
-  "versionCode": 207,
-  "versionName": "11.83",
+  "versionCode": 208,
+  "versionName": "11.84",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Foto: se la memoria del telefono non basta, l'app riprova da sola."
+  "note": "Ricerca: «Scheda» per vedere l'articolo prima di venderlo. Vendi: tocchi il prezzo per cambiarlo, e il prezzo stampato sull'etichetta si legge da solo. «Riapri e continua» apre subito la fotocamera."
 }
