@@ -1,6 +1,6 @@
 {
-  "versionCode": 209,
-  "versionName": "11.85",
+  "versionCode": 210,
+  "versionName": "11.86",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Foto per il PC: in «Negozio» si mandano al programma le foto da abbinare agli articoli, e le foto pubblicate partono da sole col Wi-Fi."
+  "note": "«Allena il programma» in «Negozio»: foto a raffica degli articoli per insegnare al programma del PC a riconoscerli."
 }
