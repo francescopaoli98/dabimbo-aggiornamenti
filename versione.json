@@ -1,6 +1,6 @@
 {
-  "versionCode": 213,
-  "versionName": "11.90",
+  "versionCode": 214,
+  "versionName": "11.91",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Cambio prezzo: si vede quando è entrato e, nel primo mese, quanto resta al venditore e al negozio. Si può cambiare il prezzo anche di una cosa già venduta. La Cassa di oggi si apre su «Per parziale»."
+  "note": "Diretta: più articoli venduti dello stesso post Facebook in un riquadro solo; nel testo GIÀ PRENOTATI e GIÀ VENDUTI subito sotto il titolo. Cambio prezzo nel primo mese: interruttore «Lo sconto lo paga il negozio»."
 }
