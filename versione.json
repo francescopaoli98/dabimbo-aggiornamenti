@@ -1,6 +1,6 @@
 {
-  "versionCode": 212,
-  "versionName": "11.88",
+  "versionCode": 213,
+  "versionName": "11.90",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Facebook: le foto già vendute hanno il timbro rosso VENDUTO e si tolgono dal post con un tocco; nel testo «GIÀ VENDUTI» e avviso se un articolo del tuo post viene venduto."
+  "note": "Cambio prezzo: si vede quando è entrato e, nel primo mese, quanto resta al venditore e al negozio. Si può cambiare il prezzo anche di una cosa già venduta. La Cassa di oggi si apre su «Per parziale»."
 }
