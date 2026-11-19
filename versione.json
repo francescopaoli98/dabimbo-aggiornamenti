@@ -1,6 +1,6 @@
 {
-  "versionCode": 217,
-  "versionName": "11.94",
+  "versionCode": 218,
+  "versionName": "11.95",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Video delle novità: il tocco sul video toglie e rimette subito il muto (e non ferma più la musica del telefono); dopo «Rifallo» il video nuovo compare da solo."
+  "note": "Il video di oggi rifatto più bello: dopo averlo condiviso si rimpicciolisce, si può chiudere per oggi o tenerlo sempre chiuso, e la notifica col tasto «Metti nello stato»."
 }
