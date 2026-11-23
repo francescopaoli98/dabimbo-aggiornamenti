@@ -1,6 +1,6 @@
 {
-  "versionCode": 226,
-  "versionName": "12.3",
+  "versionCode": 227,
+  "versionName": "12.4",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "La pagina principale nuova, calda e rilassante: il saluto, «Da fare oggi», Negozio e Fermate grandi, gli altri tasti in una griglia, icone nuove tutte uguali."
+  "note": "Nuova pagina «La giornata del negozio» (in Negozio): l'incasso di oggi, contanti e carta, il pezzo più caro, cosa è stato caricato e l'elenco delle vendite. L'incasso si vede anche sul riquadro Negozio."
 }
