@@ -1,6 +1,6 @@
 {
-  "versionCode": 233,
-  "versionName": "13.0",
+  "versionCode": 234,
+  "versionName": "13.1",
   "apk": "https://raw.githubusercontent.com/francescopaoli98/dabimbo-aggiornamenti/main/dabimbo.apk",
-  "note": "Novità: la foto «Di nuovo disponibile» per le cose fermate e poi lasciate (in Storie e in «Da fare oggi»). Negozio e Fermate ora sono in cima, il video sotto «Da fare oggi»."
+  "note": "Novità: l'assistente apre le pagine col tasto «Apri» (risposta subito) e non perde più la seconda domanda. In «Foto per il PC» le cartelle controllate: le foto nuove vanno al PC da sole."
 }
